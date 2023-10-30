@@ -14,7 +14,7 @@ This overview is focused on the technicalities of bulk photometry recordings. So
 
 ### Bleaching, decay and temporal drifts
 
-Bulk fluorescence signals are unstable by nature. Even if the bleaching of GcAMP is limited compared with 2-photon imaging that uses much strong light beams, it still contributes to signal decay. Other sources of signal decay are less well understood, but they may involve all or part of the following mechanisms:
+Bulk fluorescence signals are unstable by nature. Even if the bleaching of GcAMP is limited compared with 2-photon imaging that uses much strong light beams, it still contributes to signal decay (possibly starting around [40uW at patchcord tip](https://blog.mohebial.com/led-power-tuning-for-fiber-photometry/)). Other sources of signal decay are less well understood, but they may involve all or part of the following mechanisms:
 
 -   **Reduction in apparatus autofluorescence**. Typically, the patchcords used for photometric recordings are autofluorescent (even the "low autofluorescence" versions tailored to photometry). This type of autofluorescence is mostly driven by the connection between different elements of the recording apparatuses, and it tends to decrease over time. Recordings without any connection to a living animal can highlight this phenomenon.
 
@@ -44,7 +44,11 @@ One key problem with bulk photometry recordings is that they can be significantl
 
     -   A 410nm light beam does not penetrate brain tissue exactly like 470nm light beam does, and it does not induce the exact same autofluorescence levels. In practice, and given that its apparent signal to noise ratio is lower, isosbestic signals may therefore be suspected of under-correcting movement artifacts.
 
-    -   In high-quality recordings, isosbestic signals are often *anticorrelated* with GCaMP signals of interest. While in theory (note that our understanding of GCAMP fluorescence chemistry is still limited), the isosbestic signal should reflect the *total* amount of GCaMP (both calcium-bounded and free), in practice it is not so simple [@barnett2017] and anticorrelation are observed. The literature on this issue is messy and the isosbestic signal has been used in many different ways over the years.
+    -   In high-quality recordings, isosbestic signals are often *anticorrelated* with GCaMP signals of interest. While in theory (note that our understanding of GCAMP fluorescence chemistry is still limited), the isosbestic signal should reflect the *total* amount of GCaMP (both calcium-bounded and free), in practice it is not so simple [@barnett2017] and anticorrelation are observed [@formozov2023]. The literature on this issue is messy and the isosbestic signal has been used in many different ways over the years. Another likely source of contamination of the isosbestic signal is hemodynamic mechanisms (see below).
+
+### Hemodynamic confounds
+
+Unfortunately, hemoglobin is fluorescent and oxygenated hemoglobin absorbs green light (510-560nm). That's useful to measure heart-beat in humans, but it is very inconvenient to measure GCaMP responses [@valley2020; @zhang2022], especially when it comes to highly vascularized structures such as the brainstem. This effect likely contributes to the slow time-course of some fluorescence traces observed experimentally. It is a
 
 ### Normalization across animals and sessions
 
