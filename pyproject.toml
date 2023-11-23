@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "iblphotometry"
+description = "IBL photometry module"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+authors = [
+    {name = "IBL staff", email = "info@internationalbrainlab.org"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+version = "1.0.0"
+dynamic = ["dependencies"]
+
+
+[project.urls]
+"Homepage" = "https://github.com/int-brain-lab/iblphotometry"
+
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools]
+include-package-data = true
+
+
+[options.packages.find]
+where = "src"
