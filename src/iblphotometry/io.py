@@ -1,8 +1,11 @@
 import pandas as pd
 import numpy as np
 
+from iblutil.util import setup_logger
 import neurodsp.utils
-from brainbox.io.one import SessionLoader
+
+
+logger = setup_logger(__name__)
 
 
 def read_digital_input_bonsai(csv_file):
@@ -67,9 +70,14 @@ def sync_photometry(file_photometry, file_digital_input, trials=None, region=Non
     df_photometry = pd.DataFrame({
         'times': fcn_nph_to_bpod_times(df_photometry_raw.loc[i_calcium, 'Timestamp']),
         'times_isosbestic': fcn_nph_to_bpod_times(df_photometry_raw.loc[i_isosbestic, 'Timestamp']),
-        'isosbestic': df_photometry_raw.loc[i_isosbestic, region].values,
-        'calcium': df_photometry_raw.loc[i_calcium, region].values,
+        'raw_isosbestic': df_photometry_raw.loc[i_isosbestic, region].values,
+        'raw_calcium': df_photometry_raw.loc[i_calcium, region].values,
     })
+    # automatically swap isosbestic signal if there is a labeling issue
+    if np.mean(df_photometry['raw_calcium']) < np.mean(df_photometry['raw_isosbestic']) :
+        df_photometry = df_photometry.rename(
+            columns={'times_isosbestic': 'times', 'times': 'times_isosbestic', 'raw_isosbestic': 'raw_calcium', 'raw_calcium': 'raw_isosbestic'})
+        logger.warning("isosbestic and calcium signals were swapped")
     # restricts the photometry dataset to the session timings
     tmin, tmax = (trials['intervals_0'][0] - 1, trials['intervals_1'].values[-1] + 1)
     i = np.logical_and(df_photometry.times > tmin, df_photometry.times < tmax)

@@ -17,8 +17,8 @@ def baseline_correction(isosbestic, calcium):
     calcium_lp = scipy.signal.sosfiltfilt(sos, calcium)
     isosbestic_lp = scipy.signal.sosfiltfilt(sos, isosbestic)
     m = np.polyfit(isosbestic_lp, calcium_lp, 1)
-    sosbp = scipy.signal.butter(**{'N': 3, 'Wn': [.001, 0.2], 'btype': 'bandpass'}, output='sos')
+    sosbp = scipy.signal.butter(**{'N': 3, 'Wn': [.001, 0.5], 'btype': 'bandpass'}, output='sos')
     ph = (calcium - (ref := isosbestic_lp * m[0] + m[1])) / ref
     ph = scipy.signal.sosfiltfilt(sosbp, ph)
-    iso = scipy.signal.sosfiltfilt(sosbp,(isosbestic - ref) / ref)
-    return ph, iso
+    iso = scipy.signal.sosfiltfilt(sosbp, (isosbestic - ref) / ref)
+    return iso, ph

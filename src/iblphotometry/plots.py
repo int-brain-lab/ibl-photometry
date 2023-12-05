@@ -18,8 +18,8 @@ def plot_raw_data_df(df_photometry, **kwargs):
     """
     sns.set_style("whitegrid")
     times = df_photometry['times'].values
-    calcium = df_photometry['calcium'].values
-    isosbestic = df_photometry['isosbestic'].values
+    calcium = df_photometry['raw_calcium'].values
+    isosbestic = df_photometry['raw_isosbestic'].values
     return plot_photometry_traces(times, isosbestic, calcium, **kwargs)
 
 
