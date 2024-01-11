@@ -37,13 +37,13 @@ def plot_photometry_traces(times, isosbestic, calcium, event_times=None, suptitl
     if event_times is not None:
         ibllib.plots.vertical_lines(
             event_times, ymin=np.min(isosbestic), ymax=np.max(calcium), ax=axd['top'], alpha=.1, color='red')
-    axd['top'].set(xlabel='time (s)', ylabel='photometry raw trace', title='raw photometry signal')
+    axd['top'].set(xlabel='time (s)', ylabel='photometry trace', title='photometry signal')
     axd['top'].legend()
     # lower left plot is the PSD of the two signals
     axd['left'].psd(calcium, Fs=1 / np.median(np.diff(times)), color="#279F95", linewidth=2, label='calcium dependent')
     axd['left'].psd(isosbestic, Fs=1 / np.median(np.diff(times)), color='#803896', linewidth=2, label='isosbestic')
     # lower right plot is the cross plot of the two signals to see if a regression makes sense
-    scatter = axd['right'].scatter(isosbestic_lp, calcium_lp, s=None, c=times, cmap='magma', alpha=.8)
+    scatter = axd['right'].scatter(isosbestic_lp, calcium_lp, s=1, c=times, cmap='magma', alpha=.8)
     axd['right'].set(xlabel='isosbestic F', ylabel='calcium dependent F', title='Cross-plot')
     fig.colorbar(scatter, ax=axd['right'], label='time (s)')
     if suptitle is not None:
