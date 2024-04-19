@@ -65,7 +65,73 @@ def get_ttl(df_DI0, df_trials):
 
 
 
-
+def start_2_end_1(df_photometry): 
+    """
+    input = raw photometry data
+    output = photometry dataframe without the initial flag=0, starting at flag=2, finishing at flag=1, reset_index applied 
+    """
+    df_photometry = df_photometry.reset_index(drop=True)
+    array1 = df_photometry
+    if array1["LedState"][0] == 0: 
+        array1 = array1[1:len(array1)]
+        array1 = array1.reset_index(drop=True)
+    if (array1["LedState"][0] != 2) or (array1["LedState"][0] != 1): 
+        array1 = array1[1:len(array1)]
+        array1 = array1.reset_index(drop=True)
+    if array1["LedState"][0] == 1: 
+        array1 = array1[1:len(array1)]
+        array1 = array1.reset_index(drop=True)
+    if array1["LedState"][len(array1)-1] == 2: 
+        array1 = array1[0:len(array1)-1] 
+        array1 = array1.reset_index(drop=True)
+    array2 = pd.DataFrame(array1)
+    return(array2) 
+def start_17_end_18(df_photometry): 
+    """
+    input = raw photometry data
+    output = photometry dataframe without the initial flag=16, starting at flag=17, finishing at flag=18, reset_index applied 
+    """
+    df_photometry = df_photometry.reset_index(drop=True)
+    array1 = df_photometry
+    if array1["Flags"][0] == 16: 
+        array1 = array1[1:len(array1)]
+        array1 = array1.reset_index(drop=True)
+    if array1["Flags"][0] == 18: 
+        array1 = array1[1:len(array1)]
+        array1 = array1.reset_index(drop=True)
+    if array1["Flags"][len(array1)-1] == 17: 
+        array1 = array1[0:len(array1)-1] 
+        array1 = array1.reset_index(drop=True)
+    array2 = pd.DataFrame(array1)
+    return(array2) 
+""" 4.1.1 Change the Flags that are combined to Flags that will represent only the LED that was on """ 
+"""1 and 17 are isosbestic; 2 and 18 are GCaMP"""
+def change_flags(df_with_flags): 
+    df_with_flags = df_with_flags.reset_index(drop=True)
+    if 'LedState' in df_with_flags.columns: 
+        array1 = np.array(df_with_flags["LedState"])
+        for i in range(0,len(df_with_flags)): 
+            if array1[i] == 529 or array1[i] == 273 or array1[i] == 785 or array1[i] == 17: 
+                array1[i] = 1
+            elif array1[i] == 530 or array1[i] == 274 or array1[i] == 786 or array1[i] == 18: 
+                array1[i] = 2
+            else: 
+                array1[i] = array1[i] 
+        array2 = pd.DataFrame(array1)
+        df_with_flags["LedState"] = array2
+        return(df_with_flags) 
+    else: 
+        array1 = np.array(df_with_flags["Flags"])
+        for i in range(0,len(df_with_flags)): 
+            if array1[i] == 529 or array1[i] == 273 or array1[i] == 785 or array1[i] == 17: 
+                array1[i] = 1
+            elif array1[i] == 530 or array1[i] == 274 or array1[i] == 786 or array1[i] == 18: 
+                array1[i] = 2
+            else: 
+                array1[i] = array1[i] 
+        array2 = pd.DataFrame(array1)
+        df_with_flags["Flags"] = array2
+        return(df_with_flags) 
 
 
 
