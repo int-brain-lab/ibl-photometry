@@ -34,9 +34,19 @@ def plot_photometry_traces(times, isosbestic, calcium, event_times=None, suptitl
     fig, axd = plt.subplot_mosaic([['top', 'top'], ['left', 'right']], constrained_layout=True, figsize=(14, 8))
     axd['top'].plot(times, isosbestic, color='#803896', linewidth=.5, label='isosbestic')
     axd['top'].plot(times, calcium, color="#279F95", linewidth=.5, label='calcium dependent')
+    if np.min(isosbestic) < np.min(calcium): 
+        minimum_event = np.min(isosbestic)
+    else: 
+        minimum_event = np.min(calcium) 
+    if np.max(isosbestic) < np.min(calcium): 
+        maximum_event = np.max(calcium)
+    else: 
+        maximum_event = np.max(isosbestic)
+    #TO DO REFRACTOR WITH NP.MINIMUM
     if event_times is not None:
         ibllib.plots.vertical_lines(
-            event_times, ymin=np.min(isosbestic), ymax=np.max(calcium), ax=axd['top'], alpha=.1, color='red')
+            # event_times, ymin=np.min(isosbestic), ymax=np.max(calcium), ax=axd['top'], alpha=.1, color='red')
+            event_times, ymin=minimum_event, ymax=maximum_event, ax=axd['top'], alpha=.1, color='red')
     axd['top'].set(xlabel='time (s)', ylabel='photometry trace', title='photometry signal')
     axd['top'].legend()
     # lower left plot is the PSD of the two signals
@@ -50,4 +60,5 @@ def plot_photometry_traces(times, isosbestic, calcium, event_times=None, suptitl
         fig.suptitle(suptitle, fontsize=16)
     if output_file is not None:
         fig.savefig(output_file)
+    plt.show()
     return fig, axd
