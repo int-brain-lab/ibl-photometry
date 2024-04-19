@@ -281,7 +281,18 @@ def verify_repetitions(x):
 
 
 
-
+def find_FR(x): 
+    """
+    find the frame rate of acquisition
+    x = df_470["Timestamp"]
+    """
+    acq_FR = round(1/np.mean(x.diff()))
+    # check to make sure that it is 15/30/60! (- with a loop)
+    if acq_FR == 30 or acq_FR == 60 or acq_FR == 120: 
+        print("All good, the FR is: ", acq_FR)
+    else: 
+        print("CHECK FR!!!!!!!!!!!!!!!!!!!!") 
+    return acq_FR 
 
 
 
