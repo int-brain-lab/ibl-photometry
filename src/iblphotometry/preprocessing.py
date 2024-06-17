@@ -16,11 +16,9 @@ import pandas as pd
 @dataclass
 @abc.ABC
 class BaseProcessor():
-    """
-    S
-    """
     parameters: dict = None
     df_photometry: pd.DataFrame = None
+    fs: float = 30
 
     @abc.abstractmethod
     def process(self):
@@ -29,12 +27,14 @@ class BaseProcessor():
 
 class IsosesbesticRegression(BaseProcessor):
 
+    def params(self):
+        pass
 
     def process(self):
         self.isosbestic_control, self.calcium = baseline_correction(self.raw_isosbestic, self.raw_calcium)
 
 
-def baseline_correction(isosbestic, calcium):
+def isosbestic_regression(isosbestic, calcium, fil):
     """
     Prototype of baseline correction for photometry data.
     Fits a low pass version of the isosbestic signal to the calcium signal. The baseline signal is
