@@ -1,4 +1,5 @@
 ibllib
 numpy
 matplotlib
+pytest
 scipy
