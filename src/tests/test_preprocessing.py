@@ -15,3 +15,9 @@ def test_preproc_photobleaching_lowpass():
     df_photometry, _ = synthetic101()
     df_photometry['calcium'] = iblphotometry.preprocessing.photobleaching_lowpass(df_photometry['raw_calcium'])
     # plt.plot(df_photometry['calcium'])
+
+
+def test_psth():
+    df_photometry, t_events = synthetic101()
+    df_photometry['calcium'] = iblphotometry.preprocessing.photobleaching_lowpass(df_photometry['raw_calcium'])
+    iblphotometry.preprocessing.psth(df_photometry['calcium'].values, df_photometry['times'].values, fs=30, t_events=t_events)

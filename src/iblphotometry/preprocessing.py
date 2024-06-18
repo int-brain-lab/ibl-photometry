@@ -76,3 +76,26 @@ def isosbestic_correction_dataframe(df_photometry):
     df_photometry['isosbestic_control'] = iso
     df_photometry['calcium'] = ph
     return df_photometry
+
+
+def psth(calcium, times, t_events, fs, peri_event_window=None):
+    """
+    Compute the peri-event time histogram of a calcium signal
+    :param calcium:
+    :param times:
+    :param t_events:
+    :param fs:
+    :param peri_event_window:
+    :return:
+    """
+    peri_event_window = [-1, 2] if peri_event_window is None else peri_event_window
+    # compute a vector of indices corresponding to the perievent window at the given sampling rate
+    sample_window = np.arange(peri_event_window[0] * fs, peri_event_window[1] * fs + 1)
+    # we inflate this vector to a 2d array where each column corresponds to an event
+    idx_psth = np.tile(sample_window[:, np.newaxis], (1, t_events.size))
+    # we add the index of each event too their respective column
+    idx_event = np.searchsorted(times, t_events)
+    idx_psth += idx_event
+    psth = calcium[idx_psth]  # psth is a 2d array (ntimes, nevents)
+    psth[idx_psth > (calcium.size - 1)] = np.nan  # remove events that are out of bounds
+    return psth

@@ -15,3 +15,21 @@ ca_lpref = iblphotometry.preprocessing.photobleaching_lowpass(df_photometry['raw
 
 plt.plot(ca_reg)
 plt.plot(ca_lpref)
+
+
+## %% try and compute PSTH
+
+
+import numpy as np
+calcium = ca_reg
+times = df_photometry['times'].values
+ne = t_events.size
+
+
+
+
+
+
+    import matplotlib.pyplot as plt
+    plt.matshow(psth)
+
