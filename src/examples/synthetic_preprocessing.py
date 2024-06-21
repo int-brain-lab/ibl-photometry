@@ -18,18 +18,9 @@ plt.plot(ca_lpref)
 
 
 ## %% try and compute PSTH
-
-
+psth = iblphotometry.preprocessing.psth(calcium=ca_lpref.values, times=df_photometry['times'].values, fs=30, t_events=t_events)
+plt.matshow(psth)
 import numpy as np
 calcium = ca_reg
 times = df_photometry['times'].values
 ne = t_events.size
-
-
-
-
-
-
-    import matplotlib.pyplot as plt
-    plt.matshow(psth)
-
