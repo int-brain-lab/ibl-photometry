@@ -3,9 +3,11 @@ This modules offers pre-processing for raw photometry data.
 It implements different kinds of pre-processings depending on the preference of the user.
 Where applicable, I have indicated a publication with the methods.
 """
-
 import scipy.signal
 import numpy as np
+
+import ibldsp.utils
+from iblutil.numerical import rcoeff
 
 
 def photobleaching_lowpass(raw_calcium, **params):
@@ -102,21 +104,20 @@ def psth(calcium, times, t_events, fs, peri_event_window=None):
     psth[idx_psth > (calcium.size - 1)] = np.nan  # remove events that are out of bounds
     return psth
 
-
-# def sliding_rcoeff(signal_a, signal_b, wsize, overlap=0):
-#     from ibldsp.utils import WindowGenerator
-#     overlap = 0
-#     wsize = 240
-#     wg = WindowGenerator(ns=signal_a.size, nswin=wsize, overlap=overlap)
-#     signal_a = df_photometry['calcium'].values
-#     signal_b = df_photometry['isosbestic_control'].values
-#
-#     import numpy.lib
-#
-#     from iblutil.numerical import rcoeff
-#     r = rcoeff(
-#         numpy.lib.stride_tricks.sliding_window_view(signal_a, wsize),
-#         numpy.lib.stride_tricks.sliding_window_view(signal_b, wsize))
-#
-#
-#     pass
+def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):
+    """
+    Computes the local correlation coefficient between two signals in sliding windows
+    :param signal_a:
+    :param signal_b:
+    :param nswin: window size in samples
+    :param overlap: overlap of successiv windows in samples
+    :return: ix: indices of the center of the windows, r: correlation coefficients
+    """
+    wg = ibldsp.utils.WindowGenerator(ns=signal_a.size, nswin=nswin, overlap=overlap)
+    first_samples = np.array([fl[0] for fl in wg.firstlast])
+    iwin = np.zeros([wg.nwin, wg.nswin], dtype=np.int32) + np.arange(wg.nswin)
+    iwin += first_samples[:, np.newaxis]
+    iwin[iwin >= signal_a.size] = signal_a.size - 1
+    r = rcoeff(signal_a[iwin], signal_b[iwin])
+    ix = first_samples + nswin // 2
+    return ix, r

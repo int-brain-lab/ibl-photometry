@@ -31,7 +31,17 @@ for mapping in mappings:
 
     # apply the baseline correction
     df_photometry = iblphotometry.preprocessing.isosbestic_correction_dataframe(df_photometry)
+
+    ix, r = iblphotometry.preprocessing.sliding_rcoeff(
+        df_photometry['calcium'].values,
+        df_photometry['isosbestic_control'].values,
+        nswin=1024,
+        overlap=512
+    )
+    import matplotlib.pyplot as plt
+    plt.plot(ix / 240, r)
     break
+
     # plots the raw data and save to file
     fig, ax = iblphotometry.plots.plot_raw_data_df(
         df_photometry,
