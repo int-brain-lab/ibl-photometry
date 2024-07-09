@@ -1,11 +1,29 @@
+#%%
+"""
+KceniaB 
 
+Updates: 
+
+    2024-June-20 
+        added SessionLoader 
+        one = ONE(directory) to save them there 
+    2024-June-21
+        changed neurodsp to ibldsp 
+""" 
 import numpy as np
 import pandas as pd 
-from one.api import ONE
-one = ONE()
+import glob
 from ibllib.io.extractors.biased_trials import extract_all 
 from brainbox.io.one import SessionLoader
-import neurodsp.utils
+import ibldsp.utils
+from one.api import ONE
+one = ONE(base_url="/mnt/h0/kb/data/one")
+
+# #extracting a session OW 
+# sl = SessionLoader(one=one, eid=eid)
+# sl.load_trials() 
+# sl.trials.keys() 
+# sl.session_path
 
 # def get_regions(rec): 
 #     """ 
@@ -24,8 +42,9 @@ def get_regions(rec):
     return regions
 
 
-def get_nph(rec): 
-    source_folder = (f"/home/kceniabougrova/Documents/nph/{rec.date}/")
+def get_nph(source_path, rec): 
+    # source_folder = (f"/home/kceniabougrova/Documents/nph/{rec.date}/")
+    source_folder = source_path
     df_nph = pd.read_csv(source_folder+f"raw_photometry{rec.nph_file}.csv") 
     df_nphttl = pd.read_csv(source_folder+f"bonsai_DI{rec.nph_bnc}{rec.nph_file}.csv") 
     return df_nph, df_nphttl 
@@ -36,17 +55,24 @@ def get_eid(rec):
     ref = one.eid2ref(eid)
     print(eid)
     print(ref) 
-    try:
-        # Try to load the trials directly
-        a = one.load_object(eid, 'trials')
-        trials = a.to_df()
-    except Exception as e:
-        # If loading fails, use the alternative method
-        print("Failed to load trials directly. Using alternative method...")
-        session_path_behav = f'/home/kceniabougrova/Documents/nph/Behav_2024Mar20/{rec.mouse}/{rec.date}/001/'
-        df_alldata = extract_all(session_path_behav)
-        table_data = df_alldata[0]['table']
-        trials = pd.DataFrame(table_data) 
+    # session_path_behav = f'/home/kceniabougrova/Documents/nph/Behav_2024Mar20/{rec.mouse}/{rec.date}/001/' 
+    base_path = f'/mnt/h0/kb/data/one/mainenlab/Subjects/{rec.mouse}/{rec.date}/' 
+    session_path_pattern = f'{base_path}00*/'
+    session_paths = glob.glob(session_path_pattern)
+    if session_paths:
+        session_path_behav = session_paths[0]  # or handle multiple matches as needed
+    else:
+        session_path_behav = None  # or handle the case where no matching path is found
+    file_path = '/mnt/h0/kb/data/one/mainenlab/Subjects/ZFM-04022/2022-12-30/001/alf/_ibl_trials.table.pqt'
+    df = pd.read_parquet(file_path)
+
+
+
+
+    
+    df_alldata = extract_all(session_path_behav)
+    table_data = df_alldata[0]['table']
+    trials = pd.DataFrame(table_data) 
     return eid, trials 
     
 def get_ttl(df_DI0, df_trials): 

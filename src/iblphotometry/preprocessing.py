@@ -138,7 +138,7 @@ def psth(calcium, times, t_events, fs=None, peri_event_window=None):
     fs = 1 / np.median(np.diff(times)) if fs is None else fs
     peri_event_window = [-1, 2] if peri_event_window is None else peri_event_window
     # compute a vector of indices corresponding to the perievent window at the given sampling rate
-    sample_window = np.arange(peri_event_window[0] * fs, peri_event_window[1] * fs + 1).astype(int)
+    sample_window = np.round(np.arange(peri_event_window[0] * fs, peri_event_window[1] * fs + 1)).astype(int)
     # we inflate this vector to a 2d array where each column corresponds to an event
     idx_psth = np.tile(sample_window[:, np.newaxis], (1, t_events.size))
     # we add the index of each event too their respective column
@@ -148,7 +148,7 @@ def psth(calcium, times, t_events, fs=None, peri_event_window=None):
     idx_psth[i_out_of_bounds] = -1
     psth = calcium[idx_psth]  # psth is a 2d array (ntimes, nevents)
     psth[i_out_of_bounds] = np.nan  # remove events that are out of bounds
-    return psth
+    return psth, idx_psth
 
 
 def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):
