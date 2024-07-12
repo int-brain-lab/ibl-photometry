@@ -23,9 +23,9 @@ def preprocess_sliding_mad(raw_calcium, times, fs=None, wlen=120, overlap=90, re
     """
     calcium = photobleaching_lowpass(raw_calcium, fs, **params)
     wg = ibldsp.utils.WindowGenerator(ns=calcium.size, nswin=int(wlen * fs), overlap=overlap)
-    trms = np.array([first for first, last in wg.firstlast]) / fs
-    rmswin = psth(calcium, times, t_events=trms, fs=fs, peri_event_window=[0, wlen])
-    gain = np.median(np.abs(calcium)) / np.median(np.abs(rmswin), axis=0)
+    trms = np.array([first for first, last in wg.firstlast]) / fs + times[0]
+    rmswin, _ = psth(calcium, times, t_events=trms, fs=fs, peri_event_window=[0, wlen])
+    gain = np.nanmedian(np.abs(calcium)) / np.nanmedian(np.abs(rmswin), axis=0)
     gain = np.interp(times, trms, gain)
     if returns_gain:
         return calcium * gain, gain

@@ -67,7 +67,6 @@ for parquet_file in path_integration_data.glob('*.pqt'):
         output_file=path_figures.joinpath(f"{parquet_file.stem}_03_sliding_mad.png")
     )
 
-
     print(parquet_file)
     # if suptitle == 'ZFM-04022_2023-01-12_003_alf_Region3G':
     #     break

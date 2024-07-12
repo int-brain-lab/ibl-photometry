@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 from iblutil.util import setup_logger
-import neurodsp.utils
+import ibldsp.utils
 
 
 logger = setup_logger(__name__)
@@ -10,38 +10,42 @@ logger = setup_logger(__name__)
 
 def read_digital_input_bonsai(csv_file):
     """
-    input = raw DI data (TTL)
-    output = "Timestamp"; DI TTL times, only True values, this means only ups
-
-     > columns:
-         * old ones = "Seconds"
-         * new ones = "Timestamp"
+    :param csv_file: digital input file from bonsai
+    :return:
+        numpy array of timestamps
+        qc_timestamp: boolean: False means the timestamps were corrected
     """
-    df_DI0 = pd.read_csv(csv_file)
-    if 'Value.Value' in df_DI0.columns: #for the new ones
-        df_DI0 = df_DI0.rename(columns={"Value.Seconds": "Seconds", "Value.Value": "Value"})
+    qc_timestamp = True
+    df_di = pd.read_csv(csv_file)
+    if 'Value.Value' in df_di.columns: #for the new ones
+        df_di = df_di.rename(columns={"Value.Seconds": "Seconds", "Value.Value": "Value"})
     else:
-        df_DI0["Timestamp"] = df_DI0["Seconds"]  # for the old ones
+        df_di["Timestamp"] = df_di["Seconds"]  # for the old ones
     # use Timestamp from this part on, for any of the files
-    raw_phdata_DI0_true = df_DI0[df_DI0.Value == True]
-    df_raw_phdata_DI0_T_timestamp = pd.DataFrame(raw_phdata_DI0_true, columns=["Timestamp"])
-    df_raw_phdata_DI0_T_timestamp = df_raw_phdata_DI0_T_timestamp.reset_index(drop=True)
-    return df_raw_phdata_DI0_T_timestamp.squeeze()
+    df_di = df_di.loc[df_di['Value'] == True, :].reset_index()
+    # the issue is that when the timestamp columns starts repeating itself, we use the Seconds columns to recover the missing timestamps
+    ibad = np.diff(df_di['Timestamp'].values) == 0
+    if np.any(ibad):
+        ibad = np.r_[ibad, ibad[-1]]
+        slope, intercept = np.polyfit(df_di.loc[~ibad, 'Seconds'].values, df_di.loc[~ibad, 'Timestamp'].values, deg=1)
+        df_di.loc[ibad, 'Timestamp'] = np.polyval([slope, intercept], df_di['Seconds'].values[ibad])
+        qc_timestamp = False
+    if df_di.shape[0] == 0:
+        qc_timestamp = False
+    return df_di['Timestamp'].values, qc_timestamp
 
 
-def sync_photometry(file_photometry, file_digital_input, trials=None, region=None, **kwargs):
+def sync_photometry(df_photometry, digital_input, trials=None, region=None, **kwargs):
     """
     Synchronizes photometry data to bpod events and get the relevant column.
     Splits the calcium dependent and isosbestic signal
-    :param file_photometry:
+    :param df_photometry:
     :param file_digital_input:
     :param trials: pd.Dataframe
     :param region:
     :return: dataframe with fields: times, times_isosbestic, isosbestic, calcium
     """
     # first load photometry
-    df_photometry_raw = pd.read_csv(file_photometry)
-    tph = read_digital_input_bonsai(file_digital_input).values
     assert region in df_photometry_raw.columns, f"region {region} not found in {df_photometry_raw.columns}"
     # we get the events that correspond to the photometry TTLs
     ntrials = trials.shape[0]
@@ -51,7 +55,7 @@ def sync_photometry(file_photometry, file_digital_input, trials=None, region=Non
         tbpod = trials['stimOn_times'].values
     tbpod = tbpod[~np.isnan(tbpod)]  # sometimes the stimon time is NaN
     # synchronize photometry to bpod using events TODO: output a qc dictionary
-    fcn_nph_to_bpod_times, drift_ppm, iph, ibpod = neurodsp.utils.sync_timestamps(tph, tbpod, return_indices=True)
+    fcn_nph_to_bpod_times, drift_ppm, iph, ibpod = ibldsp.utils.sync_timestamps(tph, tbpod, return_indices=True, linear=True)
     print(f"{ntrials} trials, {tph.size} photometry TTLs, {tbpod.size} bpod TTLs, {iph.size} matched TTLs")
     print('max deviation:', np.max(np.abs(fcn_nph_to_bpod_times(tph[iph]) - tbpod[ibpod]) * 1e6), 'drift: ', drift_ppm, 'ppm')
 
