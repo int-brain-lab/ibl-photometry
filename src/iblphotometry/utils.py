@@ -7,6 +7,8 @@ from ibldsp.utils import WindowGenerator
 def z(A: np.array):
     return (A - np.average(A)) / np.std(A)
 
+def mad(A: np.array):
+    return np.median(np.absolute(A - np.median(A)))
 
 def zscore(F: nap.Tsd):
     """pynapple friendly zscore
@@ -18,25 +20,17 @@ def zscore(F: nap.Tsd):
         _type_: z-scored nap.Tsd
     """
     y, t = F.values, F.times()
-    mu, sig = np.average(y), np.std(y)
+    # mu, sig = np.average(y), np.std(y)
     return nap.Tsd(t=t, d=z(y))
 
 
-def filt(F: nap.Tsd, order: int, fc: float, kind="low"):
+def filt(F: nap.Tsd, N: int, Wn: float, btype="low"):
     """a pynapple friendly wrapper for scipy.signal.butter and subsequent sosfiltfilt
 
-    Args:
-        S (nap.Tsd): a pynapple time series with data
-        order (_type_): butter order
-        fc (_type_): butter cutoff
-        kind (str, optional): filter kind. Defaults to "low".
-
-    Returns:
-        _type_: the filtered nap.Tsd
     """
     y, t = F.values, F.times()
-    fs = 1 / np.average(np.diff(t))
-    sos = signal.butter(order, fc, kind, fs=fs, output="sos")
+    fs = 1 / np.median(np.diff(t))
+    sos = signal.butter(N, Wn, btype, fs=fs, output="sos")
     y_filt = signal.sosfiltfilt(sos, y)
     return nap.Tsd(t=t, d=y_filt)
 
