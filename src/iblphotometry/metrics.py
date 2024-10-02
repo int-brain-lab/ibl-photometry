@@ -1,6 +1,6 @@
 import numpy as np
 import pynapple as nap
-from scipy.stats import linregress
+from scipy.stats import linregress, skew
 from utils import make_sliding_window, z
 import outlier_detection
 
@@ -63,7 +63,9 @@ def number_of_outliers(A: np.array, w_size: int = 1000, alpha: float = 0.0005):
     """
     return outlier_detection.grubbs_sliding(A, w_size=w_size, alpha=alpha).shape[0]
     
-    
+def signal_skew(A: np.array):
+    return skew(A)
+
 # funcs to run
 def sliding_metric(
     F: nap.Tsd, w_size: int, metric: callable = None, n_wins: int = -1, **metric_kwargs
@@ -105,8 +107,6 @@ def eval_metric(
         r = np.NaN
         p = np.NaN
 
-    # name = metric.__name__
-    # return {f'{name}':m, f'{name}_rval':r, f'{name}_pval':p}
     return dict(value=m, rval=r, pval=p)
 
 

@@ -32,26 +32,26 @@ class AbstractBleachingModel(ABC):
         if self.p0 is None:
             self.p0 = self.estimate_p0(y, t)
 
-        if self.method == "L-BFGS-B":
-            self.minimize_result = minimize(
-                self._obj_fun,
-                self.p0,
-                args=(t, y),
-                bounds=self.bounds,
-                method="L-BFGS-B",
-            )
+        # if self.method == "L-BFGS-B":
+        self.minimize_result = minimize(
+            self._obj_fun,
+            self.p0,
+            args=(t, y),
+            bounds=self.bounds,
+            method=self.method,
+        )
 
-        if self.method == "least_squares":
-            bounds = np.array(self.bounds)
-            bounds = (bounds[:, 0], bounds[:, 1])
-            self.minimize_result = least_squares(
-                self._obj_fun,
-                self.p0,
-                loss=self.method_kwargs.get('loss', 'soft_l1'),
-                f_scale=self.method_kwargs.get('f_scale', 1.0),
-                bounds=bounds,
-                args=(t, y),
-            )
+        # if self.method == "least_squares":
+        #     bounds = np.array(self.bounds)
+        #     bounds = (bounds[:, 0], bounds[:, 1])
+        #     self.minimize_result = least_squares(
+        #         self._obj_fun,
+        #         self.p0,
+        #         loss=self.method_kwargs.get('loss', 'soft_l1'),
+        #         f_scale=self.method_kwargs.get('f_scale', 1.0),
+        #         bounds=bounds,
+        #         args=(t, y),
+        #     )
             
         # print(f"fitting using {self.method}")
         if not self.minimize_result.success:
@@ -179,27 +179,17 @@ def isosbestic_correct(
     # of different variants
     if regressor == "RANSAC":
         reg = RANSACRegressor(random_state=42)
-        reg_type = "sklearn"
     if regressor == "linear":
         reg = LinearRegression()
-        reg_type = "sklearn"
     if regressor == "Theil-Sen":  # very slow ...
         reg = TheilSenRegressor(random_state=42)
-        reg_type = "sklearn"
-    if regressor == "soft_l1":
-        reg_type = "least_squares"
 
     ca = F_ca.values[:, np.newaxis]
     iso = F_iso.values[:, np.newaxis]
 
-    if reg_type == "sklearn":
-        reg.fit(iso, ca)
-        iso_fit = reg.predict(iso)
-        iso_fit = nap.Tsd(t=F_ca.times(), d=iso_fit.flatten())
-
-    if reg_type == "least_squares":
-        # res_robust = least_squares(fun, x0, loss='soft_l1', loss_scale=0.1, args=(t_train, y_train))
-        ...
+    reg.fit(iso, ca)
+    iso_fit = reg.predict(iso)
+    iso_fit = nap.Tsd(t=F_ca.times(), d=iso_fit.flatten())
 
     iso_fit_filt = filt(iso_fit, butter_params["order"], butter_params["fc"])
 
