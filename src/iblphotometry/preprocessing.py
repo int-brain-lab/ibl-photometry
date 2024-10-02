@@ -134,8 +134,8 @@ def isosbestic_regression(
     #     output="sos",
     # )
     butterworth_regression = params.get(
-            "butterworth_regression", {"N": 3, "Wn": 0.1, "btype": "lowpass", "fs": fs}
-        )
+        "butterworth_regression", {"N": 3, "Wn": 0.1, "btype": "lowpass", "fs": fs}
+    )
     calcium_lp = utils.filter(raw_calcium, **butterworth_regression)
     # calcium_lp = scipy.signal.sosfiltfilt(sos, raw_calcium)
     # isosbestic_lp = scipy.signal.sosfiltfilt(sos, raw_isosbestic)
@@ -143,15 +143,15 @@ def isosbestic_regression(
     m = np.polyfit(isosbestic_lp, calcium_lp, 1)
 
     ref = isosbestic_lp * m[0] + m[1]
-    ph = nap.Tsd(t=times, d= (raw_calcium - ref) / ref)
-    
+    ph = nap.Tsd(t=times, d=(raw_calcium - ref) / ref)
+
     butterworth_signal = params.get(
         "butterworth_signal", {"N": 3, "Wn": 10, "btype": "lowpass", "fs": fs}
     )
     ph = utils.filter(ph, **butterworth_signal)
     # if butterworth_signal is not None:
-        # sosbp = scipy.signal.butter(**butterworth_signal, output="sos")
-        # ph = scipy.signal.sosfiltfilt(sosbp, ph)
+    # sosbp = scipy.signal.butter(**butterworth_signal, output="sos")
+    # ph = scipy.signal.sosfiltfilt(sosbp, ph)
     return ph
 
 

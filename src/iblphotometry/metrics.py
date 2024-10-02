@@ -4,6 +4,7 @@ from scipy.stats import linregress, skew
 from utils import make_sliding_window, z
 import outlier_detection
 
+
 # metrics: - common definition: all receive a np.array as first argument, all other must be keyword arguments
 def percentile_dist(A: np.array, pc: tuple = (50, 95), axis=-1):
     """the distance between two percentiles in units of z
@@ -50,6 +51,7 @@ def number_unique_samples(A: np.array):
     """
     return np.unique(A).shape[0]
 
+
 def number_of_outliers(A: np.array, w_size: int = 1000, alpha: float = 0.0005):
     """implements a sliding version of using grubbs test to detect outliers.
 
@@ -62,9 +64,11 @@ def number_of_outliers(A: np.array, w_size: int = 1000, alpha: float = 0.0005):
         _type_: _description_
     """
     return outlier_detection.grubbs_sliding(A, w_size=w_size, alpha=alpha).shape[0]
-    
+
+
 def signal_skew(A: np.array):
     return skew(A)
+
 
 # funcs to run
 def sliding_metric(
@@ -78,10 +82,10 @@ def sliding_metric(
         yw = yw[inds, :]
     else:
         inds = np.arange(yw.shape[0], dtype="int64")
-    
+
     if metric_kwargs is not None:
         m = metric(yw, **metric_kwargs)
-    else: 
+    else:
         m = metric(yw)
 
     # return m, inds
@@ -99,7 +103,7 @@ def eval_metric(
         m = metric(F, **metric_kwargs)
     else:
         m = metric(F)
-    
+
     if sliding_kwargs is not None:
         S = sliding_metric(F, metric=metric, **sliding_kwargs, **metric_kwargs)
         r, p = linregress(S.times(), S.values)[2:4]
@@ -118,7 +122,7 @@ def eval_pipeline(F_processed: nap.Tsd):
         [percentile_dist, dict(pc=(50, 99)), sliding_kwargs],
         [signal_asymmetry, dict(pc_comp=95), sliding_kwargs],
         [number_unique_samples, None, None],
-        [number_of_outliers, dict(w_size=1000, alpha=0.005), None]
+        [number_of_outliers, dict(w_size=1000, alpha=0.005), None],
     ]
 
     res = {}

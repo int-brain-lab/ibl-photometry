@@ -10,8 +10,7 @@ from utils import filt
 
 
 class AbstractBleachingModel(ABC):
-
-    def __init__(self, method='L-BFGS-B', **method_kwargs):
+    def __init__(self, method="L-BFGS-B", **method_kwargs):
         self.p0 = None
         self.popt = None
         self.perr = None
@@ -52,7 +51,7 @@ class AbstractBleachingModel(ABC):
         #         bounds=bounds,
         #         args=(t, y),
         #     )
-            
+
         # print(f"fitting using {self.method}")
         if not self.minimize_result.success:
             raise Exception(f"Fitting failed. {self.minimize_result.message}")
@@ -151,55 +150,44 @@ class DoubleExponDecayBleachingModel(AbstractBleachingModel):
         b_est = y[-1]
         return (A_est, tau_est, A_est / 2, tau_est / 2, b_est)
 
-# turn this into a class
-# other
-def isosbestic_correct(
-    F_ca: nap.Tsd,
-    F_iso: nap.Tsd,
-    regressor="RANSAC",
-    correction="deltaF",
-    butter_params=dict(order=3, fc=0.1),
-):
-    """preprocessing using isosbestic correction
-    allows to choose regression type
-    and correction type
 
+class IsosbesticCorrection:
+    def __init__(self, regressor="RANSAC", correction="deltaF"):
+        self.regressor = regressor
+        self.correction = correction
 
-    Args:
-        F_ca (nap.Tsd): _description_
-        F_iso (nap.Tsd): _description_
-        regressor (str, optional): _description_. Defaults to "RANSAC".
-        correction (str, optional): _description_. Defaults to "deltaF".
-        butter_params (_type_, optional): _description_. Defaults to dict(order=3, fc=0.1).
+    def _fit(self, F_ca: nap.Tsd, F_iso: nap.Tsd):
+        # this will allow for easy drop in replacement
+        if self.regressor == "RANSAC":
+            reg = RANSACRegressor(random_state=42)
+        if self.regressor == "linear":
+            reg = LinearRegression()
 
-    Returns:
-        _type_: _description_
-    """
+        # fit
+        ca = F_ca.values[:, np.newaxis]
+        iso = F_iso.values[:, np.newaxis]
 
-    # of different variants
-    if regressor == "RANSAC":
-        reg = RANSACRegressor(random_state=42)
-    if regressor == "linear":
-        reg = LinearRegression()
-    if regressor == "Theil-Sen":  # very slow ...
-        reg = TheilSenRegressor(random_state=42)
+        reg.fit(iso, ca)
+        iso_fit = reg.predict(iso)
+        return nap.Tsd(t=F_ca.times(), d=iso_fit.flatten())
 
-    ca = F_ca.values[:, np.newaxis]
-    iso = F_iso.values[:, np.newaxis]
+    def correct(
+        self,
+        F_ca: nap.Tsd,
+        F_iso: nap.Tsd,
+        lowpass_isosbestic=dict(N=3, Wn=0.01, btype="lowpass"),
+    ):
+        if lowpass_isosbestic is not None:
+            F_iso = filt(F_iso, **lowpass_isosbestic)
+            iso_fit = self._fit(F_ca, F_iso)
 
-    reg.fit(iso, ca)
-    iso_fit = reg.predict(iso)
-    iso_fit = nap.Tsd(t=F_ca.times(), d=iso_fit.flatten())
+        if self.correction == "deltaF":
+            F_corr = (F_ca.values - iso_fit.values) / iso_fit.values
 
-    iso_fit_filt = filt(iso_fit, butter_params["order"], butter_params["fc"])
+        if self.correction == "subtract":
+            F_corr = F_ca.values - iso_fit.values
 
-    if correction == "deltaF":
-        F_corr = (F_ca.values - iso_fit_filt.values) / iso_fit_filt.values
+        if self.correction == "divide":
+            F_corr = F_ca.values / iso_fit.values
 
-    if correction == "subtract":
-        F_corr = F_ca.values - iso_fit_filt.values
-
-    if correction == "divide":
-        F_corr = F_ca.values / iso_fit_filt.values
-
-    return nap.Tsd(t=F_ca.times(), d=F_corr)
+        return nap.Tsd(t=F_ca.times(), d=F_corr)
