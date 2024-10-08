@@ -10,7 +10,7 @@ import numpy as np
 import ibldsp.utils
 from iblutil.numerical import rcoeff
 
-import utils
+import iblphotometry.utils as utils
 import pynapple as nap
 
 
@@ -55,17 +55,20 @@ def jove2019(raw_calcium: nap.Tsd, raw_isosbestic: nap.Tsd, fs: float, **params)
     """
     # DOCME more
     # the first step is to remove the photobleaching w
-    # replace with utils filt
-    sos = scipy.signal.butter(
-        fs=fs,
-        output="sos",
+    calcium_lp = utils.filter(
+        raw_calcium,
         **params.get("butterworth_lowpass", {"N": 3, "Wn": 0.01, "btype": "lowpass"}),
     )
-    calcium = raw_calcium - scipy.signal.sosfiltfilt(sos, raw_calcium)
-    isosbestic = raw_isosbestic - scipy.signal.sosfiltfilt(sos, raw_isosbestic)
+    calcium = raw_calcium - calcium_lp
+    
+    isosbestic_lp = utils.filter(
+        raw_isosbestic,
+        **params.get("butterworth_lowpass", {"N": 3, "Wn": 0.01, "btype": "lowpass"}),
+    )
+    isosbestic = raw_isosbestic - isosbestic_lp
 
     # zscoring using median instead of mean
-    # this is apparently not hte same as the modified zscore
+    # this is not the same as the modified zscore
     calcium = (calcium - np.median(calcium)) / np.std(calcium)
     isosbestic = (isosbestic - np.median(isosbestic)) / np.std(isosbestic)
     m = np.polyfit(isosbestic, calcium, 1)
@@ -89,8 +92,7 @@ def photobleaching_lowpass(raw_calcium: nap.Tsd, fs: float, **params):
     ph (np.array): the corrected calcium signal
     """
     params = {} if params is None else params
-    # TODO replace this with utils.filt
-    calcium_lp = utils.filt(
+    calcium_lp = utils.filter(
         raw_calcium,
         **params.get("butterworth_lowpass", {"N": 3, "Wn": 0.01, "btype": "lowpass"}),
     )

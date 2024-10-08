@@ -26,10 +26,11 @@ def zscore(F: nap.Tsd):
     return nap.Tsd(t=t, d=z(y))
 
 
-def filter(F: nap.Tsd, N: int, Wn: float, fs: float, btype="low"):
+def filter(F: nap.Tsd, N: int, Wn: float, fs: float = None, btype="low"):
     """a pynapple friendly wrapper for scipy.signal.butter and subsequent sosfiltfilt"""
     y, t = F.values, F.times()
-    fs = 1 / np.median(np.diff(t))
+    if fs is None:
+        fs = 1 / np.median(np.diff(t))
     sos = signal.butter(N, Wn, btype, fs=fs, output="sos")
     y_filt = signal.sosfiltfilt(sos, y)
     return nap.Tsd(t=t, d=y_filt)
