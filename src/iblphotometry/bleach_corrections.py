@@ -1,19 +1,20 @@
 import numpy as np
 import pynapple as nap
-from scipy.optimize import minimize, curve_fit, least_squares
+from scipy.optimize import minimize, curve_fit
 from abc import ABC, abstractmethod
 from tqdm import tqdm
 from scipy.stats.distributions import norm
 from scipy.stats import gaussian_kde
 from sklearn.linear_model import RANSACRegressor, LinearRegression, TheilSenRegressor
-from utils import filt
+from utils import filter
 
 
 class AbstractBleachingModel(ABC):
+    p0 = None
+    popt = None
+    perr = None
+
     def __init__(self, method="L-BFGS-B", **method_kwargs):
-        self.p0 = None
-        self.popt = None
-        self.perr = None
         self.method = method
         self.method_kwargs = method_kwargs
 
@@ -21,7 +22,7 @@ class AbstractBleachingModel(ABC):
     def model(self, t: np.ndarray, *args): ...
 
     @abstractmethod
-    def estimate_p0(self, y: np.array, t: np.array): ...
+    def estimate_p0(self, y: np.array, t: np.array) -> tuple: ...
 
     def _obj_fun(self, p, t, y):
         y_hat = self.model(t, *p)
@@ -119,12 +120,29 @@ class AbstractBleachingModel(ABC):
         self.model_ci = np.percentile(Y, ci, axis=1)
 
     def bleach_correct(self, F: nap.Tsd, refit=True):
-        # method will have to be changed into a class attribute
         y, t = F.values, F.times()
         # if self.popt is None and refit:
         self._fit(y, t)
         y_hat = self._predict(t)
         return nap.Tsd(t=t, d=y - y_hat)
+
+    def bleach_correct_logspace(self, F: nap.Tsd, refit=True):
+        # bleach correction not by regular subtraction, but rather by subtraction in logspace
+        # -> multiplicative / division
+        y, t = F.values, F.times()
+        # if self.popt is None and refit:
+        self._fit(y, t)
+        y_hat = self._predict(t)
+
+        def logsp(y):
+            return 20 * np.log10(y)
+
+        def linsp(yl):
+            return 10 ** (yl / 20)
+
+        y_corr = linsp(logsp(y) - logsp(y_hat))
+
+        return nap.Tsd(t=t, d=y_corr)
 
 
 # bleach correction models
@@ -178,7 +196,7 @@ class IsosbesticCorrection:
         lowpass_isosbestic=dict(N=3, Wn=0.01, btype="lowpass"),
     ):
         if lowpass_isosbestic is not None:
-            F_iso = filt(F_iso, **lowpass_isosbestic)
+            F_iso = filter(F_iso, **lowpass_isosbestic)
             iso_fit = self._fit(F_ca, F_iso)
 
         if self.correction == "deltaF":

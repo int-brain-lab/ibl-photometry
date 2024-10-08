@@ -40,7 +40,7 @@ def signal_asymmetry(A: np.array, pc_comp: int = 95, axis=-1):
     return a - b
 
 
-def number_unique_samples(A: np.array):
+def n_unique_samples(A: np.array):
     """_summary_
 
     Args:
@@ -52,7 +52,11 @@ def number_unique_samples(A: np.array):
     return np.unique(A).shape[0]
 
 
-def number_of_outliers(A: np.array, w_size: int = 1000, alpha: float = 0.0005):
+def n_spikes(A: np.array, sd: int):
+    return outlier_detection.detect_spikes(A, sd=sd).shape[0]
+
+
+def n_outliers(A: np.array, w_size: int = 1000, alpha: float = 0.0005):
     """implements a sliding version of using grubbs test to detect outliers.
 
     Args:
@@ -121,8 +125,8 @@ def eval_pipeline(F_processed: nap.Tsd):
     eval_metrics = [
         [percentile_dist, dict(pc=(50, 99)), sliding_kwargs],
         [signal_asymmetry, dict(pc_comp=95), sliding_kwargs],
-        [number_unique_samples, None, None],
-        [number_of_outliers, dict(w_size=1000, alpha=0.005), None],
+        [n_unique_samples, None, None],
+        [n_outliers, dict(w_size=1000, alpha=0.005), None],
     ]
 
     res = {}

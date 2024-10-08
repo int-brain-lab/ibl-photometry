@@ -5,6 +5,7 @@ from ibldsp.utils import WindowGenerator
 from copy import copy
 import pandas as pd
 from scipy.stats import gaussian_kde as kde
+import warnings
 
 
 def grubbs_single(y, alpha=0.005, mode="median"):
@@ -30,20 +31,19 @@ def grubbs_single(y, alpha=0.005, mode="median"):
 def grubbs_it(y, alpha=0.05, mode="median"):
     # apply grubbs test iteratively until no more outliers are found
     outliers = []
-    j = 0
     while grubbs_single(y, alpha=alpha):
         # get the outlier index
         if mode == "classic":
             ix = np.argmax(np.absolute(y - np.average(y)))
         if mode == "median":
             ix = np.argmax(np.absolute(y - np.median(y)))
-        outliers.append(ix + j)
-        j += 1
-        y = np.delete(y, ix)
+        outliers.append(ix)
+        y[ix] = np.median(y)
     return np.sort(outliers)
 
 
 def grubbs_sliding(y: np.array, w_size: int, alpha: float):
+    # rename to "detect_outliers"
     # sliding grubbs test for a np.array
     n_samples = y.shape[0]
     wg = WindowGenerator(n_samples - (n_samples % w_size), w_size, 0)
@@ -53,45 +53,38 @@ def grubbs_sliding(y: np.array, w_size: int, alpha: float):
     # sliding window outlier detection
     outlier_ix = []
     for i in range(B.shape[0]):
-        outlier_ix.append((grubbs_it(B[i, :], alpha=alpha) + i * w_size))
+        outlier_ix.append(grubbs_it(B[i, :], alpha=alpha) + i * w_size)
 
-    # last window TODO FIXME - this gave an index error, but as it is right now,
-    # it leaves the remainder unchecked
-    # outlier_ix.append(grubbs_it(y[-(n_samples % w_size):], alpha = alpha)+B.shape[0]*w_size)
+    # explicitly taking care of the remaining samples
+    outlier_ix.append(
+        grubbs_it(y[np.prod(B.shape) :], alpha=alpha) + B.shape[0] * w_size
+    )
 
     outlier_ix = np.concatenate(outlier_ix).astype("int64")
     return np.unique(outlier_ix)
+
+
+def remove_nans(y: np.array):
+    y = y[~pd.isna(y)]  # nanfilter
+    if y.shape[0] == 0:
+        warnings.warn("y was all NaN and is now empty")
+    return y
 
 
 def fillnan_kde(y: np.array, w: int = 25):
     # fill nans with KDE from edges
     inds = np.where(pd.isna(y))[0]
     if inds.shape[0] > 0:
-        if inds[0] < w or inds[-1] > y.shape[0] - w:
-            # first ix
-            y_ = y[inds[0] : inds[0] + 2 * w]
-            y_ = y_[~pd.isna(y_)]  # nanfilter
-            y[inds[0]] = kde(y_).resample(1)[0][0]
-
-            # all middle inds
-            for ix in inds[1:-1]:
-                y_ = y[ix - w : ix + w]
-                y_ = y_[~pd.isna(y_)]  # nanfilter
-                y[ix] = kde(y_).resample(1)[0][0]
-
-            # last ix
-            y_ = y[inds[-1] - 2 * w : inds[-1]]
-            y_ = y_[~pd.isna(y_)]  # nanfilter
-            y[inds[-1]] = kde(y_).resample(1)[0][0]
-
-        else:  # all fine, just iterate over all inds
-            for ix in inds:
-                y_ = y[ix - w : ix + w]
-                y_ = y_[~pd.isna(y_)]  # nanfilter
-                y[ix] = kde(y_).resample(1)[0][0]
+        for ix in inds:
+            ix_start = np.clip(ix - w, 0, y.shape[0] - 1)
+            ix_stop = np.clip(ix + w, 0, y.shape[0] - 1)
+            y_ = y[ix_start:ix_stop]
+            y_ = remove_nans(y_)
+            y[ix] = kde(y_).resample(1)[0][0]
 
         return y
     else:
+        # no NaNs present, doing nothing
         return y
 
 
@@ -103,4 +96,19 @@ def remove_outliers(F: nap.Tsd, w_size: int, alpha: float = 0.005, w: int = 25):
         y[outliers] = np.NaN
         y = fillnan_kde(y, w=w)
         outliers = grubbs_sliding(y, w_size=w_size, alpha=alpha)
+    return nap.Tsd(t=t, d=y)
+
+
+def detect_spikes(t: np.array, sd: int = 5):
+    dt = np.diff(t)
+    bad_inds = dt < np.average(dt) - sd * np.std(dt)
+    return np.where(bad_inds)[0]
+
+
+def remove_spikes(F: nap.Tsd, sd: int = 5, w: int = 25):
+    y, t = F.values, F.times()
+    y = copy(y)
+    outliers = detect_spikes(y, sd=sd)
+    y[outliers] = np.NaN
+    y = fillnan_kde(y, w=w)
     return nap.Tsd(t=t, d=y)
