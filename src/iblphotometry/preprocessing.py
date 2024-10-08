@@ -59,13 +59,13 @@ def jove2019(raw_calcium: nap.Tsd, raw_isosbestic: nap.Tsd, fs: float, **params)
         raw_calcium,
         **params.get("butterworth_lowpass", {"N": 3, "Wn": 0.01, "btype": "lowpass"}),
     )
-    calcium = raw_calcium - calcium_lp
+    calcium = nap.Tsd(t=raw_calcium.times(), d=raw_calcium.values - calcium_lp.values)
     
     isosbestic_lp = utils.filter(
         raw_isosbestic,
         **params.get("butterworth_lowpass", {"N": 3, "Wn": 0.01, "btype": "lowpass"}),
     )
-    isosbestic = raw_isosbestic - isosbestic_lp
+    isosbestic = nap.Tsd(raw_isosbestic.times(), raw_isosbestic.values - isosbestic_lp.values)
 
     # zscoring using median instead of mean
     # this is not the same as the modified zscore
