@@ -1,3 +1,7 @@
+import numpy as np
+import scipy.stats as stats
+from iblphotometry.preprocessing import psth
+
 def ttest_pre_post(calcium, times, t_events, fs, pre_w=[-1, -0.2], post_w=[0.2, 1], confid=0.001):
     """
     :param calcium: np array, trace of the signal to be used
