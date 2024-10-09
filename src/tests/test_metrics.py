@@ -8,6 +8,8 @@ import numpy as np
 # Set the seed
 np.random.seed(seed=0)
 
+DATA_PATH = Path(__file__).parent / 'data'
+
 def load_data_run_ttest(eid, nph_path, one=None, event='feedback_times',
                         pre_w=np.array([-1, -0.2]), post_w=np.array([0.2, 1])):
     # Get data
@@ -50,18 +52,18 @@ def test_ttest_pre_post():
     # Get data
     eid = '77a6741c-81cc-475f-9454-a9b997be02a4'  # Good response to feedback times
     pname = 'Region3G'
-    # - TODO: local directory
-    # nph_path = Path(f'../src/tests/data/{eid}/{pname}')
-    nph_path = Path(f'/Users/gaellechapuis/Desktop/FiberPhotometry/{eid}/{pname})
-
+    nph_path = DATA_PATH.joinpath(Path(f'{eid}/{pname}'))
     pass_test, random_test = load_data_run_ttest(eid, nph_path, one=one)
-
     assert pass_test == True
     assert random_test == False
 
     # Check the bad session with no response does not pass the pass_test
-    eid = '0717df63-aa43-479b-aa59-202e10f30e3f'
+    eid = '3e675f34-9b6f-47b4-9064-e9c9c5e17872' # Bad response, flat
     pname = 'Region1G'
+    nph_path = DATA_PATH.joinpath(Path(f'{eid}/{pname}'))
+    pass_test, random_test = load_data_run_ttest(eid, nph_path, one=one)
+    assert pass_test == False
+    assert random_test == False
 
 
 # Remove, written here to check rapidly
