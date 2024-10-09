@@ -3,6 +3,7 @@ from pathlib import Path
 from one.api import ONE
 from iblphotometry.preprocessing import jove2019
 from iblphotometry.metrics import ttest_pre_post
+import numpy as np
 
 
 def test_ttest_pre_post():
@@ -10,7 +11,7 @@ def test_ttest_pre_post():
     one = ONE()
     eid = '77a6741c-81cc-475f-9454-a9b997be02a4'
 
-    # Load NP file locally - TODO: this is local directory to Github
+    # Load NP file locally - TODO: local directory to Github
     # nph_path = Path(f'../src/tests/data/{eid}')
     nph_path = Path(f'/Users/gaellechapuis/Desktop/FiberPhotometry/{eid}')
     df_nph = pd.read_parquet(nph_path.joinpath(f'raw_photometry.pqt'))
@@ -37,3 +38,14 @@ def test_ttest_pre_post():
 
     pass_test = ttest_pre_post(calcium, times, t_events, fs, pre_w=pre_w, post_w=post_w)
     assert pass_test == True
+
+    # Check that if we input random time point for event, the test fail
+    np.random.seed(seed=0)
+    # Take first/last event as anchor, same N times
+    t_random = np.sort(times[0] + np.random.sample(len(times)) * (times[-1] - times[0]))
+    no_pass_test = ttest_pre_post(calcium, times, t_random, fs, pre_w=pre_w, post_w=post_w)
+    assert no_pass_test == False
+
+
+# Remove, written here to check rapidly
+test_ttest_pre_post()

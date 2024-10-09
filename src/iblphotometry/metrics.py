@@ -23,3 +23,4 @@ def ttest_pre_post(calcium, times, t_events, fs, pre_w=[-1, -0.2], post_w=[0.2, 
     ttest = stats.ttest_rel(pre, post)
     passed_confg = ttest.pvalue < confid
     return passed_confg
+
