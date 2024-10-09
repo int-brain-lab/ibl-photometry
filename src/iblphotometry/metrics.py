@@ -1,8 +1,10 @@
 import numpy as np
 import scipy.stats as stats
 from iblphotometry.preprocessing import psth
+import ibldsp.waveforms as waveforms
 
-def ttest_pre_post(calcium, times, t_events, fs, pre_w=[-1, -0.2], post_w=[0.2, 1], confid=0.001):
+def ttest_pre_post(calcium, times, t_events, fs,
+                   pre_w=np.array([-1, -0.2]), post_w=np.array([0.2, 1]), confid=0.001):
     """
     :param calcium: np array, trace of the signal to be used
     :param times: np array, times of the signal to be used
@@ -24,3 +26,24 @@ def ttest_pre_post(calcium, times, t_events, fs, pre_w=[-1, -0.2], post_w=[0.2, 
     passed_confg = ttest.pvalue < confid
     return passed_confg
 
+
+def modulation_index_peak(calcium, times, t_events, fs,
+                          pre_w = np.array([-1, -0.2]), post_w = np.array([0.2, 20]), w_size=1.):
+    """
+    Steps:
+    - Find the peak value post within a large window. For this, re-use the waveform peak-finder code,
+    considering each trial as a waveform, i.e. N trace per waveform = 1.
+    - Take a number of sample around that peak index per trial
+    - Average those samples
+    - Take the same amount of samples in the pre-condition, and average similarly
+    - compute a modulation index pre/post: MI = (pre-post)/(pre+post) : if 0, similar
+    - threshold the MI (TBD what is a good value), and count how many trials pass that threshold
+    """
+
+    psth_pre = psth(calcium, times, t_events, fs=fs, peri_event_window=pre_w)[0]
+    psth_post = psth(calcium, times, t_events, fs=fs, peri_event_window=post_w)[0]
+
+    # Find peak index in post
+    arr = np.expand_dims(psth_post, axis=2)  # dimension have to be (wav, time, trace)
+    df = waveforms.compute_spike_features(arr[0, :, :])
+    print('t')

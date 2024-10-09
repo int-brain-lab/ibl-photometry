@@ -2,16 +2,15 @@ import pandas as pd
 from pathlib import Path
 from one.api import ONE
 from iblphotometry.preprocessing import jove2019
-from iblphotometry.metrics import ttest_pre_post
+import iblphotometry.metrics as metrics
 import numpy as np
 
 # Set the seed
 np.random.seed(seed=0)
-
+one = ONE()
 DATA_PATH = Path(__file__).parent / 'data'
 
-def load_data_run_ttest(eid, nph_path, one=None, event='feedback_times',
-                        pre_w=np.array([-1, -0.2]), post_w=np.array([0.2, 1])):
+def get_data(eid, nph_path, event, one=None):
     # Get data
     if one is None:
         one = ONE()
@@ -35,19 +34,25 @@ def load_data_run_ttest(eid, nph_path, one=None, event='feedback_times',
     times = df_nph['times'].values
     t_events = df_trials[event]
 
+    return calcium, times, t_events, fs
+
+
+def load_data_run_ttest(eid, nph_path, one=None, event='feedback_times'):
+
+    calcium, times, t_events, fs = get_data(eid, nph_path, event, one)
+
     # T-test if responsive to event
-    pass_test = ttest_pre_post(calcium, times, t_events, fs, pre_w=pre_w, post_w=post_w)
+    pass_test = metrics.ttest_pre_post(calcium, times, t_events, fs)
 
     # Check that if we input random time point for event, the T-test fails
     # Take first/last times as anchor, same N times as t_events
     t_random = np.sort(times[0] + np.random.sample(len(t_events)) * (times[-1] - times[0]))
-    random_test = ttest_pre_post(calcium, times, t_random, fs, pre_w=pre_w, post_w=post_w)
+    random_test = metrics.ttest_pre_post(calcium, times, t_random, fs)
 
     return pass_test, random_test
 
 
 def test_ttest_pre_post():
-    one = ONE()
 
     # Get data
     eid = '77a6741c-81cc-475f-9454-a9b997be02a4'  # Good response to feedback times
@@ -66,5 +71,16 @@ def test_ttest_pre_post():
     assert random_test == False
 
 
+def test_modulation_index_peak():
+
+    # Get data
+    eid = '77a6741c-81cc-475f-9454-a9b997be02a4'  # Good response to feedback times
+    pname = 'Region3G'
+    nph_path = DATA_PATH.joinpath(Path(f'{eid}/{pname}'))
+    event = 'feedback_times'
+    calcium, times, t_events, fs = get_data(eid, nph_path, event, one)
+    metrics.modulation_index_peak(calcium, times, t_events, fs)
+
 # Remove, written here to check rapidly
 test_ttest_pre_post()
+test_modulation_index_peak()
