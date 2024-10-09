@@ -3,6 +3,7 @@ from pathlib import Path
 from one.api import ONE
 from iblphotometry.preprocessing import jove2019
 import iblphotometry.metrics as metrics
+from iblphotometry.preprocessing import psth
 import numpy as np
 
 # Set the seed
@@ -71,6 +72,28 @@ def test_ttest_pre_post():
     assert random_test == False
 
 
+def test_peak_indx_post():
+    # Get data
+    eid = '77a6741c-81cc-475f-9454-a9b997be02a4'  # Good response to feedback times
+    pname = 'Region3G'
+    nph_path = DATA_PATH.joinpath(Path(f'{eid}/{pname}'))
+    event = 'feedback_times'
+    calcium, times, t_events, fs = get_data(eid, nph_path, event, one)
+    # Load precomputed results
+
+    # Test
+    post_w = np.array([0.2, 20])
+    psth_post = psth(calcium, times, t_events, fs=fs, peri_event_window=post_w)[0]
+    # Compute
+    df_trial, df_avg = metrics.peak_indx_post(psth_post)
+    # Load previous run
+    df_trial_load = pd.read_parquet(nph_path.joinpath('df_trial_load.pqt'))
+    df_avg_load = pd.read_parquet(nph_path.joinpath('df_avg_load.pqt'))
+
+    assert df_trial.equals(df_trial)
+    assert df_avg.equals(df_avg_load)
+
+
 def test_modulation_index_peak():
 
     # Get data
@@ -81,6 +104,9 @@ def test_modulation_index_peak():
     calcium, times, t_events, fs = get_data(eid, nph_path, event, one)
     metrics.modulation_index_peak(calcium, times, t_events, fs)
 
+
+
 # Remove, written here to check rapidly
 test_ttest_pre_post()
+test_peak_indx_post()
 test_modulation_index_peak()

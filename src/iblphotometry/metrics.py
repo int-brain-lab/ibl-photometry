@@ -27,6 +27,22 @@ def ttest_pre_post(calcium, times, t_events, fs,
     return passed_confg
 
 
+def peak_indx_post(psth_post):
+    # Find peak index in post for each trial
+    # 3D dimension have to be (wav, time, trace)
+    arr_in = np.expand_dims(np.swapaxes(psth_post, axis1=1, axis2=0), axis=2)
+    df_trial = waveforms.find_peak(arr_in)
+
+    # Find peak index in post for average PSTH
+    # Average over trials
+    avg_psth_post = np.median(psth_post, axis=1)
+    arr_in = np.expand_dims(avg_psth_post,  axis=[0, 2])
+    df_avg = waveforms.find_peak(arr_in)
+
+    return df_trial, df_avg
+
+
+
 def modulation_index_peak(calcium, times, t_events, fs,
                           pre_w = np.array([-1, -0.2]), post_w = np.array([0.2, 20]), w_size=1.):
     """
@@ -44,15 +60,7 @@ def modulation_index_peak(calcium, times, t_events, fs,
     psth_pre = psth(calcium, times, t_events, fs=fs, peri_event_window=pre_w)[0]
     psth_post = psth(calcium, times, t_events, fs=fs, peri_event_window=post_w)[0]
 
-    # Find peak index in post for each trial
-    # 3D dimension have to be (wav, time, trace)
-    arr_in = np.expand_dims(np.swapaxes(psth_post, axis1=1, axis2=0), axis=2)
-    df = waveforms.find_peak(arr_in)
-
-    # Find peak index in post for average PSTH
-    # Average over trials
-    avg_psth_post = np.median(psth_post, axis=1)
-    arr_in = np.expand_dims(avg_psth_post,  axis=[0, 2])
-    df_avg = waveforms.find_peak(arr_in)
+    # Find peak index in post for each trial and average PSTH
+    df_trial, df_avg = peak_indx_post(psth_post)
 
     
