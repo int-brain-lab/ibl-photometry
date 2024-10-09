@@ -5,7 +5,7 @@ from utils import make_sliding_window, z
 import outlier_detection
 import scipy.stats as stats
 from iblphotometry.preprocessing import psth
-
+from iblphotometry.bleach_corrections import ExponDecayBleachingModel, DoubleExponDecayBleachingModel
 
 # metrics: - common definition: all receive a np.array as first argument, all other must be keyword arguments
 def percentile_dist(A: np.array, pc: tuple = (50, 95), axis=-1):
@@ -96,7 +96,21 @@ def n_outliers(A: np.array, w_size: int = 1000, alpha: float = 0.0005):
 
 
 def signal_skew(A: np.array):
+    """to be described
+
+    Args:
+        A (np.array): _description_
+
+    Returns:
+        _type_: _description_
+    """
     return skew(A)
+
+def bleaching_tau(A: np.array):
+    bleaching_model = ExponDecayBleachingModel()
+    bleaching_model._fit(A)
+    
+    
 
 
 # funcs to run

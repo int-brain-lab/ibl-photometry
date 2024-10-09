@@ -30,7 +30,7 @@ def preprocess_sliding_mad(
     times = raw_calcium.times()
     fs = 1 / np.median(np.diff(times)) if fs is None else fs
 
-    calcium = photobleaching_lowpass(raw_calcium, fs, **params)
+    calcium = photobleaching_lowpass(raw_calcium, fs, **params).values
 
     wg = ibldsp.utils.WindowGenerator(
         ns=calcium.size, nswin=int(wlen * fs), overlap=overlap
@@ -59,13 +59,13 @@ def jove2019(raw_calcium: nap.Tsd, raw_isosbestic: nap.Tsd, fs: float, **params)
         raw_calcium,
         **params.get("butterworth_lowpass", {"N": 3, "Wn": 0.01, "btype": "lowpass"}),
     )
-    calcium = nap.Tsd(t=raw_calcium.times(), d=raw_calcium.values - calcium_lp.values)
+    calcium = raw_calcium.values - calcium_lp.values
     
     isosbestic_lp = utils.filter(
         raw_isosbestic,
         **params.get("butterworth_lowpass", {"N": 3, "Wn": 0.01, "btype": "lowpass"}),
     )
-    isosbestic = nap.Tsd(raw_isosbestic.times(), raw_isosbestic.values - isosbestic_lp.values)
+    isosbestic = raw_isosbestic.values - isosbestic_lp.values
 
     # zscoring using median instead of mean
     # this is not the same as the modified zscore
@@ -74,7 +74,7 @@ def jove2019(raw_calcium: nap.Tsd, raw_isosbestic: nap.Tsd, fs: float, **params)
     m = np.polyfit(isosbestic, calcium, 1)
     ref = isosbestic * m[0] + m[1]
     ph = (calcium - ref) / 100
-    return ph
+    return nap.Tsd(t=raw_calcium.times(), d=ph)
 
 
 def photobleaching_lowpass(raw_calcium: nap.Tsd, fs: float, **params):
