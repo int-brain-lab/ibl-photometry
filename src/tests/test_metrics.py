@@ -4,7 +4,6 @@ from one.api import ONE
 from iblphotometry.preprocessing import jove2019
 from iblphotometry.metrics import ttest_pre_post
 
-print(Path.parent())
 
 def test_ttest_pre_post():
     # Get data
@@ -12,8 +11,9 @@ def test_ttest_pre_post():
     eid = '77a6741c-81cc-475f-9454-a9b997be02a4'
 
     # Load NP file locally - TODO: this is local directory to Github
-    nph_path = Path('../src/tests/data')
-    df_nph = pd.read_parquet(nph_path.joinpath(f'{eid}__raw_photometry.pqt'))
+    # nph_path = Path(f'../src/tests/data/{eid}')
+    nph_path = Path(f'/Users/gaellechapuis/Desktop/FiberPhotometry/{eid}')
+    df_nph = pd.read_parquet(nph_path.joinpath(f'raw_photometry.pqt'))
 
     # Load trial from ONE
     a = one.load_object(eid, 'trials')
