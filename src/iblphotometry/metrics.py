@@ -38,12 +38,21 @@ def modulation_index_peak(calcium, times, t_events, fs,
     - Take the same amount of samples in the pre-condition, and average similarly
     - compute a modulation index pre/post: MI = (pre-post)/(pre+post) : if 0, similar
     - threshold the MI (TBD what is a good value), and count how many trials pass that threshold
-    """
 
+    Then do the same, but use as fixed time window the max found on average PSTH
+    """
     psth_pre = psth(calcium, times, t_events, fs=fs, peri_event_window=pre_w)[0]
     psth_post = psth(calcium, times, t_events, fs=fs, peri_event_window=post_w)[0]
 
-    # Find peak index in post
-    arr = np.expand_dims(psth_post, axis=2)  # dimension have to be (wav, time, trace)
-    df = waveforms.compute_spike_features(arr[0, :, :])
-    print('t')
+    # Find peak index in post for each trial
+    # 3D dimension have to be (wav, time, trace)
+    arr_in = np.expand_dims(np.swapaxes(psth_post, axis1=1, axis2=0), axis=2)
+    df = waveforms.find_peak(arr_in)
+
+    # Find peak index in post for average PSTH
+    # Average over trials
+    avg_psth_post = np.median(psth_post, axis=1)
+    arr_in = np.expand_dims(avg_psth_post,  axis=[0, 2])
+    df_avg = waveforms.find_peak(arr_in)
+
+    
