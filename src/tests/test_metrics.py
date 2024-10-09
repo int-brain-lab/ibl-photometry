@@ -37,8 +37,8 @@ def load_data_run_ttest(eid, nph_path, one=None, event='feedback_times',
     pass_test = ttest_pre_post(calcium, times, t_events, fs, pre_w=pre_w, post_w=post_w)
 
     # Check that if we input random time point for event, the T-test fails
-    # Take first/last event as anchor, same N times
-    t_random = np.sort(times[0] + np.random.sample(len(times)) * (times[-1] - times[0]))
+    # Take first/last times as anchor, same N times as t_events
+    t_random = np.sort(times[0] + np.random.sample(len(t_events)) * (times[-1] - times[0]))
     random_test = ttest_pre_post(calcium, times, t_random, fs, pre_w=pre_w, post_w=post_w)
 
     return pass_test, random_test
@@ -49,14 +49,19 @@ def test_ttest_pre_post():
 
     # Get data
     eid = '77a6741c-81cc-475f-9454-a9b997be02a4'  # Good response to feedback times
+    pname = 'Region3G'
     # - TODO: local directory
-    # nph_path = Path(f'../src/tests/data/{eid}')
-    nph_path = Path(f'/Users/gaellechapuis/Desktop/FiberPhotometry/{eid}')
+    # nph_path = Path(f'../src/tests/data/{eid}/{pname}')
+    nph_path = Path(f'/Users/gaellechapuis/Desktop/FiberPhotometry/{eid}/{pname})
 
     pass_test, random_test = load_data_run_ttest(eid, nph_path, one=one)
 
     assert pass_test == True
     assert random_test == False
+
+    # Check the bad session with no response does not pass the pass_test
+    eid = '0717df63-aa43-479b-aa59-202e10f30e3f'
+    pname = 'Region1G'
 
 
 # Remove, written here to check rapidly
