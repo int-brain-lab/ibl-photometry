@@ -1,9 +1,10 @@
 import pandas as pd
 from pathlib import Path
 from one.api import ONE
-from iblphotometry.preprocessing import jove2019, psth
+from iblphotometry.preprocessing import jove2019
 from iblphotometry.metrics import ttest_pre_post
 
+print(Path.parent())
 
 def test_ttest_pre_post():
     # Get data
