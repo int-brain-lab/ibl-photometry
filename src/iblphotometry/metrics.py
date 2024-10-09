@@ -1,8 +1,8 @@
 import numpy as np
 import pynapple as nap
 from scipy.stats import linregress, skew
-from utils import make_sliding_window, z
-import outlier_detection
+# from utils import make_sliding_window, z
+# import outlier_detection
 import scipy.stats as stats
 from iblphotometry.preprocessing import psth
 from iblphotometry.bleach_corrections import ExponDecayBleachingModel, DoubleExponDecayBleachingModel
