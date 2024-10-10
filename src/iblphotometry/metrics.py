@@ -43,9 +43,9 @@ def peak_indx_post(psth_post):
 
 
 
-def modulation_index_peak(calcium, times, t_events, fs,
-                          pre_w = np.array([-1, -0.2]), post_w = np.array([0.2, 20]),
-                          wind_around=np.array([-0.2, 2])):
+def modulation_prepost_peak(calcium, times, t_events, fs,
+                            pre_w = np.array([-1, -0.2]), post_w = np.array([0.2, 20]),
+                            wind_around=np.array([-0.2, 2])):
     """
     Steps:
     - Find the peak value post within a large window. For this, re-use the waveform peak-finder code,

@@ -102,8 +102,8 @@ def test_modulation_index_peak():
     nph_path = DATA_PATH.joinpath(Path(f'{eid}/{pname}'))
     event = 'feedback_times'
     calcium, times, t_events, fs = get_data(eid, nph_path, event, one)
-    metrics.modulation_index_peak(calcium, times, t_events, fs)
-
+    metrics.modulation_prepost_peak(calcium, times, t_events, fs)
+    # TODO expected output
 
 
 # Remove, written here to check rapidly
