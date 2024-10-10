@@ -3,11 +3,28 @@ This modules offers pre-processing for raw photometry data.
 It implements different kinds of pre-processings depending on the preference of the user.
 Where applicable, I have indicated a publication with the methods.
 """
+import pandas as pd
 import scipy.signal
 import numpy as np
 
 import ibldsp.utils
 from iblutil.numerical import rcoeff
+
+
+def preprocessing_alejandro(f_ca, fs, window=30):
+    # https://www.biorxiv.org/content/10.1101/2024.02.26.582199v1
+    """
+    Fluorescence signals recorded during each session from each location were
+    transformed to dF/F using the following formula: dF = (F-F0)/F0
+    𝐹0 was the +/- 30 s rolling average of the raw fluorescence signal.
+    """
+    # Convert to Series to apply the rolling avg
+    f_ca = pd.Series(f_ca)
+    f0 = f_ca.rolling(int(fs * window), center=True).mean()
+    delta_f = (f_ca - f0) / f0
+    # Convert to numpy for output
+    delta_f = delta_f.to_numpy()
+    return delta_f
 
 
 def preprocess_sliding_mad(raw_calcium, times, fs=None, wlen=120, overlap=90, returns_gain=False, **params):
