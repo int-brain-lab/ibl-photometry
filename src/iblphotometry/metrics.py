@@ -50,14 +50,15 @@ def modulation_index_peak(calcium, times, t_events, fs,
     Steps:
     - Find the peak value post within a large window. For this, re-use the waveform peak-finder code,
     considering each trial as a waveform, i.e. N trace per waveform = 1.
-    - Take a number of sample around that peak index per trial
-    - Average those samples
-    - Take the same amount of samples in the pre-condition, and average similarly
-    - compute a modulation index pre/post: MI = (pre-post)/(pre+post) : if 0, similar
-    - threshold the MI (TBD what is a good value), and count how many trials pass that threshold
+    - Do this peak finding both at each trial, and for the average PSTH
 
-    Then do the same, but use as fixed time window the max found on average PSTH
-    - Compute signal STD around time of max peak found on average PSTH
+    - Compute the time difference between the peak at each trial and the average peak ; return mean and STD
+
+    - Take a number of sample around that peak avg-PSTH index for each trial
+    - Average those samples over time
+    - Take the samples in the pre-condition (note: different window size), and average over time
+    - Compute signal variation compared to baseline around time of max peak found on average PSTH
+    (abs difference and zscore)
     """
     # TODO assert if window[0] negative, cannot have abs value > post_w[0] ?
 
