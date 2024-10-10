@@ -52,13 +52,14 @@ def modulation_index_peak(calcium, times, t_events, fs,
     considering each trial as a waveform, i.e. N trace per waveform = 1.
     - Do this peak finding both at each trial, and for the average PSTH
 
+    1. Assess jitter of peak in time
     - Compute the time difference between the peak at each trial and the average peak ; return mean and STD
 
-    - Take a number of sample around that peak avg-PSTH index for each trial
-    - Average those samples over time
-    - Take the samples in the pre-condition (note: different window size), and average over time
-    - Compute signal variation compared to baseline around time of max peak found on average PSTH
-    (abs difference and zscore)
+    2. Assess amplitude of the signal
+    - For each trial, take a number of sample around the peak avg-PSTH index
+    - Average those samples over time; return mean and STD
+    - Take the samples in the pre-condition (note: different window size pre/post), and average over time
+    - Compute signal variation compared to baseline (abs difference and zscore)
     """
     # TODO assert if window[0] negative, cannot have abs value > post_w[0] ?
 
