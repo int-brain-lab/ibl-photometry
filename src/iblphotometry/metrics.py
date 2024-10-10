@@ -44,7 +44,8 @@ def peak_indx_post(psth_post):
 
 
 def modulation_index_peak(calcium, times, t_events, fs,
-                          pre_w = np.array([-1, -0.2]), post_w = np.array([0.2, 20]), w_size=1.):
+                          pre_w = np.array([-1, -0.2]), post_w = np.array([0.2, 20]),
+                          wind_around=np.array([-0.2, 2])):
     """
     Steps:
     - Find the peak value post within a large window. For this, re-use the waveform peak-finder code,
@@ -56,11 +57,55 @@ def modulation_index_peak(calcium, times, t_events, fs,
     - threshold the MI (TBD what is a good value), and count how many trials pass that threshold
 
     Then do the same, but use as fixed time window the max found on average PSTH
+    - Compute signal STD around time of max peak found on average PSTH
     """
+    # TODO assert if window[0] negative, cannot have abs value > post_w[0] ?
+
     psth_pre = psth(calcium, times, t_events, fs=fs, peri_event_window=pre_w)[0]
     psth_post = psth(calcium, times, t_events, fs=fs, peri_event_window=post_w)[0]
 
     # Find peak index in post for each trial and average PSTH
     df_trial, df_avg = peak_indx_post(psth_post)
 
-    
+    # Compute time difference between peak-average PSTH and peak at each trace; then take STD
+    df_trial['time_diff'] = 1/fs * (df_trial.peak_time_idx - df_avg.peak_time_idx.values[0])
+    std_peak_time_diff = df_trial['time_diff'].std()
+    mean_peak_time_diff = df_trial['time_diff'].mean()
+
+    # Find window around avg PSTH peak and average signal within it; then take STD
+    window_idx = np.floor(wind_around * fs) + df_avg.peak_time_idx.values[0]
+    window_idx = window_idx.astype(int)
+    w_range = range(window_idx[0], window_idx[1])
+    w_psth = psth_post[w_range, :]
+    # Average over time
+    avg_psth_post = np.median(w_psth, axis=0)
+    # Compute mean and std
+    mean_peak_amplitude = np.mean(avg_psth_post)
+    std_peak_amplitude = np.std(avg_psth_post)
+
+    # Compare peak values to baseline pre
+    # Average pre over time
+    avg_psth_pre = np.median(psth_pre, axis=0)
+    std_pre = np.std(psth_pre)
+    mean_pre = np.mean(psth_pre)
+    # Mean and std of absolute difference pre/post
+    absdiff_post = np.abs(avg_psth_post - avg_psth_pre)
+    mean_absdiff = np.mean(absdiff_post)
+    std_absdiff = np.std(absdiff_post)
+
+    # Z score
+    z_score_post = (avg_psth_post - mean_pre) / std_pre
+    mean_z_score = np.mean(z_score_post)
+
+
+    # Output variable containing metrics
+    out_dict = {
+        'mean_peak_time_diff': mean_peak_time_diff,
+        'std_peak_time_diff' : std_peak_time_diff,
+        'mean_peak_amplitude' : mean_peak_amplitude,
+        'std_peak_amplitude' : std_peak_amplitude,
+        'mean_absdiff' : mean_absdiff,
+        'std_absdiff' : std_absdiff,
+        'mean_z_score' : mean_z_score
+    }
+    return out_dict
