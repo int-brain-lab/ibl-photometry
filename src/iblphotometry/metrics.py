@@ -61,7 +61,6 @@ def modulation_prepost_peak(calcium, times, t_events, fs,
     - Take the samples in the pre-condition (note: different window size pre/post), and average over time
     - Compute signal variation compared to baseline (abs difference and zscore)
     """
-    # TODO assert if window[0] negative, cannot have abs value > post_w[0] ?
 
     psth_pre = psth(calcium, times, t_events, fs=fs, peri_event_window=pre_w)[0]
     psth_post = psth(calcium, times, t_events, fs=fs, peri_event_window=post_w)[0]
@@ -75,7 +74,19 @@ def modulation_prepost_peak(calcium, times, t_events, fs,
     mean_peak_time_diff = df_trial['time_diff'].mean()
 
     # Find window around avg PSTH peak and average signal within it; then take STD
-    window_idx = np.floor(wind_around * fs) + df_avg.peak_time_idx.values[0]
+    w_idx = np.floor(wind_around * fs)
+    if not w_idx[1] - w_idx[0] < psth_post.shape[0]:
+        raise AssertionError("The window chosen for computing around the peak is larger than the post-psth window")
+
+    window_idx = w_idx + df_avg.peak_time_idx.values[0]
+    # Correct for cases where the peak is found close to the edges
+    if window_idx[0] < 0:
+        window_idx[0] = 0
+        window_idx[1] = w_idx[1] - w_idx[0]
+    if window_idx[1] > psth_post.shape[0]:
+        window_idx[0] = psth_post.shape[0] - 1 - (w_idx[1] - w_idx[0])
+        window_idx[1] = psth_post.shape[0] - 1
+
     window_idx = window_idx.astype(int)
     w_range = range(window_idx[0], window_idx[1])
     w_psth = psth_post[w_range, :]
