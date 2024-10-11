@@ -3,8 +3,9 @@ import scipy.stats as stats
 from iblphotometry.preprocessing import psth
 import ibldsp.waveforms as waveforms
 
-def ttest_pre_post(calcium, times, t_events, fs,
-                   pre_w=np.array([-1, -0.2]), post_w=np.array([0.2, 1]), confid=0.001):
+def qc_ttest_pre_post(calcium, times, t_events, fs,
+                      pre_w=np.array([-1, -0.2]), post_w=np.array([0.2, 1]), confid=0.001):
+    #TODO change window pre/post so as to be 20 s long for pre, 40 s long for post
     """
     :param calcium: np array, trace of the signal to be used
     :param times: np array, times of the signal to be used
@@ -122,6 +123,17 @@ def modulation_prepost_peak(calcium, times, t_events, fs,
         'mean_z_score' : mean_z_score
     }
     return out_dict
+
+
+def qc_modulation_prepost(mi_dict, zscore_threshold):
+    """
+    :param mi_dict : dict computed from the function modulation_prepost()
+    :return: pass_test: bool, whether the tests are passing
+    """
+    # For now, testing only the z-score
+    pass_test = np.abs(mi_dict['mean_z_score']) > zscore_threshold
+
+    return pass_test
 
 
 def qc_alejandro_dff(dff, thres=0.01, thres_z=3, frame_interval=20):

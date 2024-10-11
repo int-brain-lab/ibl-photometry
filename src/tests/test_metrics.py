@@ -43,12 +43,12 @@ def load_data_run_ttest(eid, nph_path, one=None, event='feedback_times'):
     calcium, times, t_events, fs = get_data(eid, nph_path, event, one)
 
     # T-test if responsive to event
-    pass_test = metrics.ttest_pre_post(calcium, times, t_events, fs)
+    pass_test = metrics.qc_ttest_pre_post(calcium, times, t_events, fs)
 
     # Check that if we input random time point for event, the T-test fails
     # Take first/last times as anchor, same N times as t_events
     t_random = np.sort(times[0] + np.random.sample(len(t_events)) * (times[-1] - times[0]))
-    random_test = metrics.ttest_pre_post(calcium, times, t_random, fs)
+    random_test = metrics.qc_ttest_pre_post(calcium, times, t_random, fs)
 
     return pass_test, random_test
 
