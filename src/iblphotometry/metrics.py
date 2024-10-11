@@ -7,7 +7,7 @@ from bleach_corrections import (
     ExponDecayBleachingModel,
     DoubleExponDecayBleachingModel,
 )
-from iblphotometry.outlier_detection import detect_spikes, grubbs_sliding
+from outlier_detection import detect_spikes, grubbs_sliding
 
 
 def percentile_dist(A: np.array, pc: tuple = (50, 95), axis=-1):

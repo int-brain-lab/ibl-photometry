@@ -18,18 +18,28 @@ one = ONE(cache_dir=one_dir)
 # %% setup metrics
 import metrics
 
+# can be applied at all times
 raw_metrics = [
     [metrics.n_unique_samples, None, None],
     [metrics.n_outliers, dict(w_size=1000, alpha=0.000005), None],
     [metrics.n_spikes, dict(sd=5), None],
-    [metrics.bleaching_tau, None, None],
+    [
+        metrics.bleaching_tau,
+        None,
+        None,
+    ],  # <- problem: this one has a different call signature
 ]
 
+# only apply after some form of processing
 processed_metrics = [
     [metrics.signal_asymmetry, dict(pc_comp=95), None],
     [metrics.percentile_dist, dict(pc=(5, 95)), None],
     [metrics.signal_skew, None, None],
-    # [metrics.ttest_pre_post, dict()]
+]
+
+# apply after providing trial information
+signal_metrics = [
+    # [metrics.ttest_pre_post, dict()] # <- to be included
 ]
 
 
@@ -51,20 +61,18 @@ for i, eid in enumerate(tqdm(eids)):
     regions = [reg.name for reg in session_path.joinpath("alf").glob("Region*")]
 
     for i, region in enumerate(regions):
+        # io related
         pqt_path = session_path / "alf" / region / "raw_photometry.pqt"
-
         raw_photometry = pd.read_parquet(pqt_path)
-
-        # convert to Tsd
         raw_photometry = nap.TsdFrame(raw_photometry.set_index("times"))
 
-        # restricting the fluorescence data to the time within the task +-1s
+        # restricting the fluorescence data to the time within the task
         t_start = trials.iloc[0]["intervals_0"] - 10
         t_stop = trials.iloc[-1]["intervals_1"] + 10
         session_interval = nap.IntervalSet(t_start, t_stop)
         raw_photometry = raw_photometry.restrict(session_interval)
 
-        # metrics on raw metrics
+        # raw metrics
         for metric, params, _ in raw_metrics:
             for ch in ["calcium", "isosbestic"]:
                 try:
@@ -104,5 +112,3 @@ for i, eid in enumerate(tqdm(eids)):
 
 # %%
 qc_df.to_csv("qc.csv")
-
-# %%
