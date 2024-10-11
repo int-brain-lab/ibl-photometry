@@ -122,3 +122,22 @@ def modulation_prepost_peak(calcium, times, t_events, fs,
         'mean_z_score' : mean_z_score
     }
     return out_dict
+
+
+def qc_alejandro_dff(dff, thres=0.01, thres_z=3, frame_interval=20):
+    """
+    Check if there is a transient 3x s.d or higher every 10 min if not exclude
+    Alejandro P. Vasquez, cite  https://www.biorxiv.org/content/10.1101/2024.02.26.582199v1
+    """
+    peaks = np.where(dff > thres)[0]
+    peaks_std = np.where((dff / np.nanstd(dff)) > thres_z)[0]
+    ten_min_window = 10 * 60 * 1000 / frame_interval
+    bins = np.arange(0, len(dff), ten_min_window)
+    qc = True
+    for i in np.arange(1, len(bins)):
+        if len(np.where(np.logical_and(peaks >= bins[i - 1], peaks <= bins[i]))[0]) < 1:
+            qc = False
+    for i in np.arange(1, len(bins)):
+        if len(np.where(np.logical_and(peaks_std >= bins[i - 1], peaks_std <= bins[i]))[0]) < 1:
+            qc = False
+    return qc
