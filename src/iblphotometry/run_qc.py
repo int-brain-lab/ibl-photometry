@@ -3,12 +3,7 @@ import sys
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from pathlib import Path
-
-import iblphotometry.preprocessing
-import iblphotometry.plots
-
 import pynapple as nap
 
 from utils import *  # don't
@@ -21,23 +16,33 @@ one_dir = Path("/mnt/h0/kb/data/one")
 one = ONE(cache_dir=one_dir)
 
 # %% setup metrics
-from metrics import n_unique_samples, n_spikes, n_outliers
+import metrics
 
-eval_metrics = [
-    [n_unique_samples, None, None],
-    [n_outliers, dict(w_size=1000, alpha=0.000005), None],
-    [n_spikes, dict(sd=5), None],
+raw_metrics = [
+    [metrics.n_unique_samples, None, None],
+    [metrics.n_outliers, dict(w_size=1000, alpha=0.000005), None],
+    [metrics.n_spikes, dict(sd=5), None],
+    [metrics.bleaching_tau, None, None],
 ]
 
-metrics_names = [m[0].__name__ for m in eval_metrics]
+processed_metrics = [
+    [metrics.signal_asymmetry, dict(pc_comp=95), None],
+    [metrics.percentile_dist, dict(pc=(5, 95)), None],
+    [metrics.signal_skew, None, None],
+    # [metrics.ttest_pre_post, dict()]
+]
+
 
 # %% get all eids in the correct order
 df = pd.read_csv("website.csv")
 eids = list(df["eid"])
 
 # %%
+import outlier_detection
+import pipelines
+
 qc_df = pd.DataFrame(index=eids)
-problem_eids = []
+problems = []
 
 for i, eid in enumerate(tqdm(eids)):
     # trials = one.load_dataset(eid, "_ibl_trials.table.pqt", collection='alf')
@@ -59,8 +64,8 @@ for i, eid in enumerate(tqdm(eids)):
         session_interval = nap.IntervalSet(t_start, t_stop)
         raw_photometry = raw_photometry.restrict(session_interval)
 
-        # metrics
-        for metric, params, _ in eval_metrics:
+        # metrics on raw metrics
+        for metric, params, _ in raw_metrics:
             for ch in ["calcium", "isosbestic"]:
                 try:
                     F = raw_photometry[f"raw_{ch}"]
@@ -70,8 +75,32 @@ for i, eid in enumerate(tqdm(eids)):
                         )
                     else:
                         qc_df.loc[eid, f"{metric.__name__}_{ch}"] = metric(F.values)
-                except:
-                    problem_eids.append(eid)
+                except Exception as e:
+                    problems.append(f"{eid}_{metric.__name__}_{e}")
+
+        # metrics on processed
+        for ch in ["calcium", "isosbestic"]:
+            F = raw_photometry[f"raw_{ch}"]
+
+            # package this into a pipeline
+            try:
+                Fpp = outlier_detection.remove_spikes(F)
+                Fc = pipelines.bc_lp_sliding_mad(Fpp)
+            except Exception as e:
+                problems.append(f"{eid}_{'preproccessing'}_{e}")
+                continue
+
+            for metric, params, _ in processed_metrics:
+                try:
+                    if params is not None:
+                        qc_df.loc[eid, f"{metric.__name__}_{ch}"] = metric(
+                            Fc.values, **params
+                        )
+                    else:
+                        qc_df.loc[eid, f"{metric.__name__}_{ch}"] = metric(Fc.values)
+                except Exception as e:
+                    problems.append(f"{eid}_{metric.__name__}_{e}")
+
 
 # %%
 qc_df.to_csv("qc.csv")

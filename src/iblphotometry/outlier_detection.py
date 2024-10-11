@@ -110,5 +110,9 @@ def remove_spikes(F: nap.Tsd, sd: int = 5, w: int = 25):
     y = copy(y)
     outliers = detect_spikes(y, sd=sd)
     y[outliers] = np.NaN
-    y = fillnan_kde(y, w=w)
+    try:
+        y = fillnan_kde(y, w=w)
+    except np.linalg.LinAlgError:
+        y[outliers] = np.median(y)
+        warnings.warn("KDE fillnan failed, using global median")
     return nap.Tsd(t=t, d=y)

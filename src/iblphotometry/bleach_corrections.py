@@ -1,12 +1,15 @@
+from abc import ABC, abstractmethod
+import warnings
+from tqdm import tqdm
+
 import numpy as np
 import pynapple as nap
 from scipy.optimize import minimize, curve_fit
-from abc import ABC, abstractmethod
-from tqdm import tqdm
 from scipy.stats.distributions import norm
 from scipy.stats import gaussian_kde
 from sklearn.linear_model import RANSACRegressor, LinearRegression, TheilSenRegressor
-from utils import filter
+
+from utils import filt
 
 
 class AbstractBleachingModel(ABC):
@@ -32,7 +35,6 @@ class AbstractBleachingModel(ABC):
         if self.p0 is None:
             self.p0 = self.estimate_p0(y, t)
 
-        # if self.method == "L-BFGS-B":
         self.minimize_result = minimize(
             self._obj_fun,
             self.p0,
@@ -41,19 +43,6 @@ class AbstractBleachingModel(ABC):
             method=self.method,
         )
 
-        # if self.method == "least_squares":
-        #     bounds = np.array(self.bounds)
-        #     bounds = (bounds[:, 0], bounds[:, 1])
-        #     self.minimize_result = least_squares(
-        #         self._obj_fun,
-        #         self.p0,
-        #         loss=self.method_kwargs.get('loss', 'soft_l1'),
-        #         f_scale=self.method_kwargs.get('f_scale', 1.0),
-        #         bounds=bounds,
-        #         args=(t, y),
-        #     )
-
-        # print(f"fitting using {self.method}")
         if not self.minimize_result.success:
             raise Exception(f"Fitting failed. {self.minimize_result.message}")
 
@@ -88,8 +77,9 @@ class AbstractBleachingModel(ABC):
         if use_kde is True:
             # explicit estimation of the distribution of residuals
             if n_samples == -1:
-                # raise a warning? KDE estimation on many samples is slow
-                ...
+                warnings.warn(
+                    f"calculating KDE on {F.values.shape[0]} samples. This might be slow"
+                )
             dist = gaussian_kde(rs)
         else:
             # using RSME
@@ -104,9 +94,7 @@ class AbstractBleachingModel(ABC):
 
     def calc_model_stats(self, F: nap.Tsd, n_samples: int = -1, use_kde: bool = False):
         if self.popt is None:
-            # have it like this for now
-            raise NameError("model has not yet been fitted.")
-            # self._fit(y, t)
+            raise ValueError("model has not yet been fitted.")
         r_sq = self._calc_r_squared(F)
         ll = self._calc_likelihood(F, n_samples, use_kde)
         aic = self._calc_aic(ll)
@@ -119,54 +107,59 @@ class AbstractBleachingModel(ABC):
             Y[:, i] = self.model(t, *p)
         self.model_ci = np.percentile(Y, ci, axis=1)
 
-    def bleach_correct(self, F: nap.Tsd, refit=True):
+    def bleach_correct(self, F: nap.Tsd):
         y, t = F.values, F.times()
-        # if self.popt is None and refit:
         self._fit(y, t)
         y_hat = self._predict(t)
         return nap.Tsd(t=t, d=y - y_hat)
 
-    def bleach_correct_logspace(self, F: nap.Tsd, refit=True):
-        # bleach correction not by regular subtraction, but rather by subtraction in logspace
-        # -> multiplicative / division
-        y, t = F.values, F.times()
-        # if self.popt is None and refit:
-        self._fit(y, t)
-        y_hat = self._predict(t)
+    # def bleach_correct_logspace(self, F: nap.Tsd):
+    #     # bleach correction not by regular subtraction, but rather by subtraction in logspace
+    #     # -> multiplicative / division
+    #     y, t = F.values, F.times()
+    #     self._fit(y, t)
+    #     y_hat = self._predict(t)
 
-        def logsp(y):
-            return 20 * np.log10(y)
+    #     def logsp(y):
+    #         return 20 * np.log10(y)
 
-        def linsp(yl):
-            return 10 ** (yl / 20)
+    #     def linsp(yl):
+    #         return 10 ** (yl / 20)
 
-        y_corr = linsp(logsp(y) - logsp(y_hat))
+    #     y_corr = linsp(logsp(y) - logsp(y_hat))
 
-        return nap.Tsd(t=t, d=y_corr)
+    #     return nap.Tsd(t=t, d=y_corr)
 
 
 # bleach correction models
 class ExponDecayBleachingModel(AbstractBleachingModel):
-    bounds = ((0, np.Inf), (0, np.Inf), (-np.Inf, np.Inf))
+    bounds = ((0, np.Inf), (0, np.Inf), (-np.Inf, np.Inf), (-np.Inf, np.Inf))
 
-    def model(self, t, A, tau, b):
-        return A * np.exp(-t / tau) + b
+    def model(self, t, A, tau, b, t_s):
+        return A * np.exp(-(t - t_s) / tau) + b
 
     def estimate_p0(self, y: np.array, t: np.array):
-        return (y[0], t[int(t.shape[0] / 3)], y[-1])
+        return (y[0], t[int(t.shape[0] / 3)], y[-1], 0)
 
 
 class DoubleExponDecayBleachingModel(AbstractBleachingModel):
-    bounds = ((0, np.Inf), (0, np.Inf), (0, np.Inf), (0, np.Inf), (-np.Inf, np.Inf))
+    bounds = (
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (-np.Inf, np.Inf),
+        (-np.Inf, np.Inf),
+    )
 
-    def model(self, t, A1, tau1, A2, tau2, b):
-        return A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2) + b
+    def model(self, t, A1, tau1, A2, tau2, b, t_s):
+        return A1 * np.exp(-(t - t_s) / tau1) + A2 * np.exp(-(t - t_s) / tau2) + b
 
     def estimate_p0(self, y: np.array, t: np.array):
         A_est = y[0]
         tau_est = t[int(t.shape[0] / 3)]
         b_est = y[-1]
-        return (A_est, tau_est, A_est / 2, tau_est / 2, b_est)
+        return (A_est, tau_est, A_est / 2, tau_est / 2, b_est, 0)
 
 
 class IsosbesticCorrection:
@@ -196,7 +189,7 @@ class IsosbesticCorrection:
         lowpass_isosbestic=dict(N=3, Wn=0.01, btype="lowpass"),
     ):
         if lowpass_isosbestic is not None:
-            F_iso = filter(F_iso, **lowpass_isosbestic)
+            F_iso = filt(F_iso, **lowpass_isosbestic)
             iso_fit = self._fit(F_ca, F_iso)
 
         if self.correction == "deltaF":
@@ -209,3 +202,13 @@ class IsosbesticCorrection:
             F_corr = F_ca.values / iso_fit.values
 
         return nap.Tsd(t=F_ca.times(), d=F_corr)
+
+
+class LowpassCorrection:
+    def __init__(self, filter_params=dict(N=3, Wn=0.01, btype="lowpass")):
+        self.filter_params = filter_params
+
+    def bleach_correct(self, F: nap.Tsd):
+        F_filt = filt(F, **self.filter_params)
+        d = (F.values - F_filt.values) / F_filt.values
+        return nap.Tsd(t=F.times(), d=d)
