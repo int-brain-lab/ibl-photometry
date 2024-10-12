@@ -28,7 +28,8 @@ one = ONE(cache_dir="/mnt/h0/kb/data/one")
 """ useful""" 
 # eids = one.search(project='ibl_fibrephotometry') 
 
-#%%
+#%% 
+####################################################################################################################
 """ EDIT THE VARS - eid, ROI, photometry file path (.csv or .pqt) """
 eid = '47c02dcc-337b-4964-937f-39928c057fff' #example eid 
 region_number = "4" #the ROI number you recorded from 
@@ -37,6 +38,11 @@ nph_bnc = 0 #or 1, the BNC input you use to sync the data; "Input0" or "Input1"
 nph_file_path = '/mnt/h0/kb/data/one/mainenlab/Subjects/ZFM-06275/2023-09-18/001/raw_photometry_data/raw_photometry.csv' 
 df_nph = pd.read_csv(nph_file_path) 
 # df_nph = pd.read_parquet(nph_file_path) 
+
+""" SELECT THE EVENT AND WHAT INTERVAL TO PLOT IN THE PSTH """ 
+EVENT = "feedback_times" 
+time_bef = -1
+time_aft = 2
 
 # ##### if you dont know the eid, do it by mouse and date #####
 # mouse = "ZFM-06275"
@@ -49,7 +55,9 @@ df_nph = pd.read_csv(nph_file_path)
 #     print(eid)
 #     print(ref) 
 #     return eid 
-#eid = get_eid(mouse, date)
+#eid = get_eid(mouse, date) 
+
+####################################################################################################################
 
 #%%
 """ LOAD TRIALS """
