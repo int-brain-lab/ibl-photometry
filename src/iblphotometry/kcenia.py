@@ -63,7 +63,9 @@ def get_eid(rec):
         session_path_behav = session_paths[0]  # or handle multiple matches as needed
     else:
         session_path_behav = None  # or handle the case where no matching path is found
-    file_path = '/mnt/h0/kb/data/one/mainenlab/Subjects/ZFM-04022/2022-12-30/001/alf/_ibl_trials.table.pqt'
+    # file_path = '/mnt/h0/kb/data/one/mainenlab/Subjects/ZFM-04022/2022-12-30/001/alf/_ibl_trials.table.pqt' #KB commented 04Aug2024 
+    file_path = session_path_behav+'alf/_ibl_trials.table.pqt' #KB added 04Aug2024 
+
     df = pd.read_parquet(file_path)
 
 
