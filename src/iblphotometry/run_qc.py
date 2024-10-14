@@ -7,16 +7,31 @@ from pathlib import Path
 import pynapple as nap
 
 from utils import *  # don't
+import metrics
+import outlier_detection
+import pipelines
 
 from one.api import ONE
 from tqdm import tqdm
+
+import logging
+
+# logging related
+logger = logging.get_logger()
+filemode = "a"  # append 'w' is overwrite
+filename = Path("fphot_qc.log")
+file_handler = logging.FileHandler(filename=filename, mode=filemode)
+log_fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+date_fmt = "%Y-%m-%d %H:%M:%S"
+formatter = logging.Formatter(log_fmt, datefmt=date_fmt)
+file_handler.setFormatter(formatter)
+logger.addHandler(file_handler)
 
 # one = ONE(base_url="https://alyx.internationalbrainlab.org")
 one_dir = Path("/mnt/h0/kb/data/one")
 one = ONE(cache_dir=one_dir)
 
 # %% setup metrics
-import metrics
 
 # can be applied at all times
 raw_metrics = [
@@ -48,11 +63,7 @@ df = pd.read_csv("website.csv")
 eids = list(df["eid"])
 
 # %%
-import outlier_detection
-import pipelines
-
 qc_df = pd.DataFrame(index=eids)
-problems = []
 
 for i, eid in enumerate(tqdm(eids)):
     # trials = one.load_dataset(eid, "_ibl_trials.table.pqt", collection='alf')
@@ -84,7 +95,7 @@ for i, eid in enumerate(tqdm(eids)):
                     else:
                         qc_df.loc[eid, f"{metric.__name__}_{ch}"] = metric(F.values)
                 except Exception as e:
-                    problems.append(f"{eid}_{metric.__name__}_{e}")
+                    logger.warning(f"{eid}_{metric.__name__}_{e}")
 
         # metrics on processed
         for ch in ["calcium", "isosbestic"]:
@@ -95,7 +106,7 @@ for i, eid in enumerate(tqdm(eids)):
                 Fpp = outlier_detection.remove_spikes(F)
                 Fc = pipelines.bc_lp_sliding_mad(Fpp)
             except Exception as e:
-                problems.append(f"{eid}_{'preproccessing'}_{e}")
+                logger.warning(f"{eid}_{'preproccessing'}_{e}")
                 continue
 
             for metric, params, _ in processed_metrics:
@@ -107,7 +118,7 @@ for i, eid in enumerate(tqdm(eids)):
                     else:
                         qc_df.loc[eid, f"{metric.__name__}_{ch}"] = metric(Fc.values)
                 except Exception as e:
-                    problems.append(f"{eid}_{metric.__name__}_{e}")
+                    logger.warning(f"{eid}_{metric.__name__}_{e}")
 
 
 # %%
