@@ -8,7 +8,12 @@ from sliding_operations import make_sliding_window
 
 # funcs to run
 def sliding_metric(
-    F: nap.Tsd, w_size: int, metric: callable = None, n_wins: int = -1, **metric_kwargs
+    F: nap.Tsd,
+    w_len: float,
+    fs: float = None,
+    metric: callable = None,
+    n_wins: int = -1,
+    **metric_kwargs,
 ):
     """applies a metric along time.
 
@@ -22,6 +27,9 @@ def sliding_metric(
         _type_: _description_
     """
     y, t = F.values, F.times()
+    fs = 1 / np.median(np.diff(t)) if fs is None else fs
+    w_size = int(w_len * fs)
+
     yw = make_sliding_window(y, w_size)
     if n_wins > 0:
         n_samples = y.shape[0]
@@ -43,13 +51,10 @@ def sliding_metric(
 def eval_metric(
     F: nap.Tsd,
     metric: callable = None,
-    metric_kwargs=None,
-    sliding_kwargs=None,
+    metric_kwargs: dict = None,
+    sliding_kwargs: dict = None,
 ):
-    if metric_kwargs is not None:
-        m = metric(F, **metric_kwargs)
-    else:
-        m = metric(F)
+    m = metric(F, **metric_kwargs) if metric_kwargs is not None else metric(F)
 
     if sliding_kwargs is not None:
         S = sliding_metric(F, metric=metric, **sliding_kwargs, **metric_kwargs)

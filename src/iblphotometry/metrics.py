@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pynapple as nap
 from scipy import stats
 from utils import z, psth
@@ -60,7 +61,9 @@ def n_spikes(A: nap.Tsd, sd: int):
 
 def ttest_pre_post(
     A: nap.Tsd,
-    t_events: np.array,
+    trials: pd.Dataframe,
+    # t_events: np.array,
+    event_name: str,
     fs=None,
     pre_w=[-1, -0.2],
     post_w=[0.2, 1],
@@ -77,6 +80,10 @@ def ttest_pre_post(
     :return: boolean, True if metric passes
     """
     y, t = A.values, A.times()
+    fs = 1 / np.median(np.diff(t)) if fs is None else fs
+
+    t_events = trials[event_name].values
+
     psth_pre = psth(y, t, t_events, fs=fs, peri_event_window=pre_w)[0]
     psth_post = psth(y, t, t_events, fs=fs, peri_event_window=post_w)[0]
 

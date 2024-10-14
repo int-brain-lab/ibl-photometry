@@ -10,6 +10,7 @@ from utils import *  # don't
 import metrics
 import outlier_detection
 import pipelines
+from evaluation import eval_metric
 
 from one.api import ONE
 from tqdm import tqdm
@@ -33,31 +34,27 @@ one = ONE(cache_dir=one_dir)
 
 # %% setup metrics
 
-# can be applied at all times
+# to be applied on the raw signal
 raw_metrics = [
-    [metrics.n_unique_samples, None, None],
-    [metrics.n_outliers, dict(w_size=1000, alpha=0.000005), None],
-    [metrics.n_spikes, dict(sd=5), None],
-    [
-        metrics.bleaching_tau,
-        None,
-        None,
-    ],  # <- problem: this one has a different call signature
+    [metrics.n_unique_samples, None],
+    [metrics.n_outliers, dict(w_size=1000, alpha=0.000005)],
+    [metrics.n_spikes, dict(sd=5)],
+    [metrics.bleaching_tau, None],
 ]
 
 # only apply after some form of processing
 processed_metrics = [
-    [metrics.signal_asymmetry, dict(pc_comp=95), None],
-    [metrics.percentile_dist, dict(pc=(5, 95)), None],
-    [metrics.signal_skew, None, None],
+    [metrics.signal_asymmetry, dict(pc_comp=95)],
+    [metrics.percentile_dist, dict(pc=(5, 95))],
+    [metrics.signal_skew, None],
 ]
 
 # apply after providing trial information
-signal_metrics = [
-    # [metrics.ttest_pre_post, dict()] # <- to be included
+response_metrics = [
+    [metrics.ttest_pre_post, dict(event_name="feedback_time")]  # <- to be included
 ]
 
-
+sliding_kwargs = dict(w_len=10, n_wins=15)  # 10 seconds
 # %% get all eids in the correct order
 df = pd.read_csv("website.csv")
 eids = list(df["eid"])
@@ -83,43 +80,42 @@ for i, eid in enumerate(tqdm(eids)):
         session_interval = nap.IntervalSet(t_start, t_stop)
         raw_photometry = raw_photometry.restrict(session_interval)
 
-        # raw metrics
-        for metric, params, _ in raw_metrics:
-            for ch in ["calcium", "isosbestic"]:
-                try:
-                    F = raw_photometry[f"raw_{ch}"]
-                    if params is not None:
-                        qc_df.loc[eid, f"{metric.__name__}_{ch}"] = metric(
-                            F.values, **params
-                        )
-                    else:
-                        qc_df.loc[eid, f"{metric.__name__}_{ch}"] = metric(F.values)
-                except Exception as e:
-                    logger.warning(f"{eid}_{metric.__name__}_{e}")
-
         # metrics on processed
         for ch in ["calcium", "isosbestic"]:
             F = raw_photometry[f"raw_{ch}"]
 
-            # package this into a pipeline
-            try:
+            # raw metrics
+            for metric, params in raw_metrics:
+                try:
+                    res = eval_metric(F, metric, params)
+                    qc_df.loc[eid, f"{metric.__name__}_{ch}"] = res["value"]
+                except Exception as e:
+                    logger.warning(f"{eid}: {metric.__name__} failure: {e}")
+
+            # metrics on preprocessed data
+            try:  # this is essentially the pipeline
                 Fpp = outlier_detection.remove_spikes(F)
                 Fc = pipelines.bc_lp_sliding_mad(Fpp)
             except Exception as e:
-                logger.warning(f"{eid}_{'preproccessing'}_{e}")
+                logger.warning(f"{eid}: preproccessing failure: {e}")
                 continue
 
-            for metric, params, _ in processed_metrics:
+            for metric, params in processed_metrics:
                 try:
-                    if params is not None:
-                        qc_df.loc[eid, f"{metric.__name__}_{ch}"] = metric(
-                            Fc.values, **params
-                        )
-                    else:
-                        qc_df.loc[eid, f"{metric.__name__}_{ch}"] = metric(Fc.values)
+                    res = eval_metric(Fc, metric, params, sliding_kwargs)
+                    qc_df.loc[eid, f"{metric.__name__}_{ch}"] = res["value"]
+                    qc_df.loc[eid, f"{metric.__name__}_{ch}_r"] = res["r"]
+                    qc_df.loc[eid, f"{metric.__name__}_{ch}_p"] = res["p"]
                 except Exception as e:
-                    logger.warning(f"{eid}_{metric.__name__}_{e}")
+                    logger.warning(f"{eid}: {metric.__name__} failure: {e}")
 
+            # metrics that factor in behavior
+            for metric, params in response_metrics:
+                try:
+                    res = eval_metric(Fc, metric, params)
+                    qc_df.loc[eid, f"{metric.__name__}_{ch}"] = res["value"]
+                except Exception as e:
+                    logger.warning(f"{eid}: {metric.__name__} failure: {e}")
 
 # %%
 qc_df.to_csv("qc.csv")
