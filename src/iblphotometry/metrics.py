@@ -7,6 +7,7 @@ from bleach_corrections import (
     ExponDecayBleachingModel,
 )
 from outlier_detection import detect_spikes, grubbs_sliding
+from sciy.stats import ttest_ind
 
 
 def percentile_dist(A: nap.Tsd, pc: tuple = (50, 95), axis=-1):
@@ -119,3 +120,57 @@ def bleaching_tau(A: nap.Tsd):
     bleaching_model = ExponDecayBleachingModel()
     bleaching_model._fit(y, t)
     return bleaching_model.popt[1]
+
+
+def has_response_to_event(
+    A: nap.Tsd,
+    event_times: nap.Ts,
+    fs: float = None,
+    window: tuple = (-1, 1),
+    alpha: float = 0.005,
+    mode="mean",
+):
+    # checks if there is a significant response to an event
+
+    # ibldsb way
+    y, t = A.values, A.times()
+    fs = 1 / np.median(np.diff(t)) if fs is None else fs
+    P = psth(y, t, event_times.times(), fs=fs, peri_event_window=window)[0]
+
+    # or: pynapple style
+    P = nap.compute_perievent_continuous(A, event_times, window).values
+
+    # assuming time is on dim 1
+    if mode == "mean":
+        sig_samples = np.average(P, axis=1)
+    if mode == "peak":
+        sig_samples = np.max(P, axis=1) - np.std(y)
+
+    # baseline is all samples that are not part of the response
+    ts = event_times.times()
+    gaps = nap.Intervalset(start=ts + window[0], end=ts + window[1])
+    base_samples = A.restrict(A.time_support.set_diff(gaps)).values
+
+    res = ttest_ind(sig_samples, base_samples)
+    return res.pvalue < alpha
+
+
+def has_responses(
+    A: nap.Tsd,
+    trials: pd.Dataframe,
+    event_names: list = None,
+    fs: float = None,
+    window: tuple = (-1, 1),
+    alpha: float = 0.005,
+):
+    y, t = A.values, A.times()
+    fs = 1 / np.median(np.diff(t)) if fs is None else fs
+
+    res = []
+    for event_name in event_names:
+        event_times = nap.Ts(t=trials[event_name])
+        res.append(
+            has_response_to_event(A, event_times, fs=fs, window=window, alpha=alpha)
+        )
+
+    return np.any(res)
