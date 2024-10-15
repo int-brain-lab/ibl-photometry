@@ -2,57 +2,55 @@ import numpy as np
 import pandas as pd
 import pynapple as nap
 from scipy import stats
-from utils import z, psth
-from bleach_corrections import (
-    ExponDecayBleachingModel,
-)
-from outlier_detection import detect_spikes, grubbs_sliding
-from sciy.stats import ttest_ind
+from iblphotometry.utils import z, psth
+from iblphotometry.bleach_corrections import ExponDecayBleachingModel
+from iblphotometry.outlier_detection import detect_spikes, grubbs_sliding
+from scipy.stats import ttest_ind
+from functools import singledispatch
 
 
-def percentile_dist(A: nap.Tsd, pc: tuple = (50, 95), axis=-1):
+# @singledispatch
+# def percentile_dist(A: nap.Tsd, pc: tuple = (50, 95), axis: None = None) -> float:
+#     """the distance between two percentiles in units of z
+#     should be proportional to SNR, assuming the signal is
+#     in the positive 5th percentile
+#     """
+#     P = np.percentile(z(A.values), pc)
+#     return P[1] - P[0]
+
+# @percentile_dist.register
+# def _(A: np.ndarray, pc: tuple = (50, 95), axis: int = -1) -> float:
+#     P = np.percentile(z(A), pc, axis=axis)
+#     return P[1] - P[0]
+
+
+def percentile_dist(A: nap.Tsd | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
     """the distance between two percentiles in units of z
     should be proportional to SNR, assuming the signal is
     in the positive 5th percentile
-
-    Args:
-        A (np.array): _description_
-        pc (tuple, optional): _description_. Defaults to (50, 95).
-        axis (int, optional): _description_. Defaults to -1.
-
-    Returns:
-        _type_: _description_
     """
-
-    P = np.percentile(z(A.values), pc, axis=axis)
+    if isinstance(A, nap.Tsd):  # "overloading"
+        P = np.percentile(z(A.values), pc)
+    if isinstance(A, np.ndarray):
+        P = np.percentile(z(A), pc, axis=axis)
     return P[1] - P[0]
 
 
-def signal_asymmetry(A: nap.Tsd, pc_comp: int = 95, axis=-1):
-    """_summary_
-
-    Args:
-        A (np.array): _description_
-        pc_comp (int, optional): _description_. Defaults to 95.
-        axis (int, optional): _description_. Defaults to -1.
-
-    Returns:
-        _type_: _description_
-    """
+def signal_asymmetry(A: nap.Tsd | np.ndarray, pc_comp: int = 95, axis=-1) -> float:
     a = percentile_dist(A, (50, pc_comp), axis=axis)
     b = percentile_dist(A, (100 - pc_comp, 50), axis=axis)
     return a / b
 
 
-def n_unique_samples(A: nap.Tsd):
-    """_summary_
+def signal_skew(A: nap.Tsd | np.ndarray, axis=-1) -> float:
+    if isinstance(A, nap.Tsd):
+        P = stats.skew(A.values)
+    if isinstance(A, np.ndarray):
+        P = stats.skew(A, axis=axis)
+    return P
 
-    Args:
-        A (np.array): _description_
 
-    Returns:
-        _type_: _description_
-    """
+def n_unique_samples(A: nap.Tsd) -> int:
     return np.unique(A.values).shape[0]
 
 
@@ -62,14 +60,14 @@ def n_spikes(A: nap.Tsd, sd: int):
 
 def ttest_pre_post(
     A: nap.Tsd,
-    trials: pd.Dataframe,
+    trials: pd.DataFrame,
     # t_events: np.array,
     event_name: str,
     fs=None,
     pre_w=[-1, -0.2],
     post_w=[0.2, 1],
     alpha=0.001,
-):
+) -> bool:
     """
     :param calcium: np array, trace of the signal to be used
     :param times: np array, times of the signal to be used
@@ -97,25 +95,12 @@ def ttest_pre_post(
     return passed_confg
 
 
-def n_outliers(A: np.Tsd, w_size: int = 1000, alpha: float = 0.0005):
-    """implements a sliding version of using grubbs test to detect outliers.
-
-    Args:
-        A (np.array): _description_
-        w_size (int, optional): _description_. Defaults to 1000.
-        alpha (float, optional): _description_. Defaults to 0.0005.
-
-    Returns:
-        _type_: _description_
-    """
+def n_outliers(A: nap.Tsd, w_size: int = 1000, alpha: float = 0.0005) -> int:
+    """implements a sliding version of using grubbs test to detect outliers."""
     return grubbs_sliding(A.values, w_size=w_size, alpha=alpha).shape[0]
 
 
-def signal_skew(A: nap.Tsd):
-    return stats.skew(A.values)
-
-
-def bleaching_tau(A: nap.Tsd):
+def bleaching_tau(A: nap.Tsd) -> float:
     y, t = A.values, A.times()
     bleaching_model = ExponDecayBleachingModel()
     bleaching_model._fit(y, t)
@@ -128,8 +113,8 @@ def has_response_to_event(
     fs: float = None,
     window: tuple = (-1, 1),
     alpha: float = 0.005,
-    mode="mean",
-):
+    mode='mean',
+) -> bool:
     # checks if there is a significant response to an event
 
     # ibldsb way
@@ -141,9 +126,9 @@ def has_response_to_event(
     P = nap.compute_perievent_continuous(A, event_times, window).values
 
     # assuming time is on dim 1
-    if mode == "mean":
+    if mode == 'mean':
         sig_samples = np.average(P, axis=1)
-    if mode == "peak":
+    if mode == 'peak':
         sig_samples = np.max(P, axis=1) - np.std(y)
 
     # baseline is all samples that are not part of the response
@@ -157,12 +142,12 @@ def has_response_to_event(
 
 def has_responses(
     A: nap.Tsd,
-    trials: pd.Dataframe,
+    trials: pd.DataFrame,
     event_names: list = None,
     fs: float = None,
     window: tuple = (-1, 1),
     alpha: float = 0.005,
-):
+) -> bool:
     y, t = A.values, A.times()
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
 

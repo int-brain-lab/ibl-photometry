@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 import pynapple as nap
-from utils import z, psth
+from iblphotometry.utils import z, psth
 from ibldsp.utils import WindowGenerator
 
 

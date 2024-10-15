@@ -9,7 +9,7 @@ from scipy.stats.distributions import norm
 from scipy.stats import gaussian_kde
 from sklearn.linear_model import RANSACRegressor, LinearRegression, TheilSenRegressor
 
-from utils import filt
+from iblphotometry.utils import filt
 
 
 class AbstractBleachingModel(ABC):

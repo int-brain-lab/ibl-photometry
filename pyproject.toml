@@ -19,6 +19,9 @@ classifiers = [
 version = "1.0.0"
 dynamic = ["dependencies"]
 
+[project.scripts]
+run_qc = "iblphotometry.run_qc:main"
+
 
 [project.urls]
 "Homepage" = "https://github.com/int-brain-lab/iblphotometry"
@@ -33,3 +36,9 @@ include-package-data = true
 
 [options.packages.find]
 where = "src"
+
+[tool.ruff.lint.isort]
+known-first-party = [ "ibl*", "one*", "pybpod*" ]
+
+[tool.ruff.format]
+quote-style = "single"

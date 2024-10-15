@@ -3,7 +3,7 @@
 import numpy as np
 from scipy import stats
 import pynapple as nap
-from sliding_operations import make_sliding_window
+from iblphotometry.sliding_operations import make_sliding_window
 
 
 # funcs to run
@@ -13,7 +13,7 @@ def sliding_metric(
     fs: float = None,
     metric: callable = None,
     n_wins: int = -1,
-    **metric_kwargs,
+    metric_kwargs: dict = None,
 ):
     """applies a metric along time.
 
@@ -33,17 +33,13 @@ def sliding_metric(
     yw = make_sliding_window(y, w_size)
     if n_wins > 0:
         n_samples = y.shape[0]
-        inds = np.linspace(0, n_samples - w_size, n_wins, dtype="int64")
+        inds = np.linspace(0, n_samples - w_size, n_wins, dtype='int64')
         yw = yw[inds, :]
     else:
-        inds = np.arange(yw.shape[0], dtype="int64")
+        inds = np.arange(yw.shape[0], dtype='int64')
 
-    if metric_kwargs is not None:
-        m = metric(yw, **metric_kwargs)
-    else:
-        m = metric(yw)
+    m = metric(yw, **metric_kwargs) if metric_kwargs is not None else metric(yw)
 
-    # return m, inds
     return nap.Tsd(t=t[inds + int(w_size / 2)], d=m)
 
 
@@ -57,7 +53,9 @@ def eval_metric(
     m = metric(F, **metric_kwargs) if metric_kwargs is not None else metric(F)
 
     if sliding_kwargs is not None:
-        S = sliding_metric(F, metric=metric, **sliding_kwargs, **metric_kwargs)
+        S = sliding_metric(
+            F, metric=metric, **sliding_kwargs, metric_kwargs=metric_kwargs
+        )
         r, p = stats.linregress(S.times(), S.values)[2:4]
     else:
         r = np.NaN
@@ -66,10 +64,10 @@ def eval_metric(
     return dict(value=m, rval=r, pval=p)
 
 
-def eval_metrics_given_pipeline(
-    F: nap.Tsd, pipeline: callable, metrics: list[callable]
-):
-    pass
+# def eval_metrics_given_pipeline(
+#     F: nap.Tsd, pipeline: callable, metrics: list[callable]
+# ):
+#     pass
 
 
 # def eval_pipeline(F_processed: nap.Tsd):
