@@ -65,7 +65,7 @@ def modulation_prepost_peak(calcium, times, t_events, fs,
 
     psth_pre = psth(calcium, times, t_events, fs=fs, peri_event_window=pre_w)[0]
     psth_post = psth(calcium, times, t_events, fs=fs, peri_event_window=post_w)[0]
-
+    # TODO return index out of bound and remove NAN trials
     # Find peak index in post for each trial and average PSTH
     df_trial, df_avg = peak_indx_post(psth_post)
 
@@ -91,17 +91,18 @@ def modulation_prepost_peak(calcium, times, t_events, fs,
     window_idx = window_idx.astype(int)
     w_range = range(window_idx[0], window_idx[1])
     w_psth = psth_post[w_range, :]
-    # Average over time
-    avg_psth_post = np.median(w_psth, axis=0)
-    # Compute mean and std
-    mean_peak_amplitude = np.mean(avg_psth_post)
-    std_peak_amplitude = np.std(avg_psth_post)
 
     # Compare peak values to baseline pre
     # Average pre over time
     avg_psth_pre = np.median(psth_pre, axis=0)
     std_pre = np.std(psth_pre)
     mean_pre = np.mean(psth_pre)
+
+    # Average post over time
+    avg_psth_post = np.median(w_psth, axis=0)
+    mean_peak_amplitude = np.mean(avg_psth_post)
+    std_peak_amplitude = np.std(avg_psth_post)
+
     # Mean and std of absolute difference pre/post
     absdiff_post = np.abs(avg_psth_post - avg_psth_pre)
     mean_absdiff = np.mean(absdiff_post)
@@ -111,6 +112,10 @@ def modulation_prepost_peak(calcium, times, t_events, fs,
     z_score_post = (avg_psth_post - mean_pre) / std_pre
     mean_z_score = np.mean(z_score_post)
 
+    # MAD per trial, average over n time samples, u: median amplitude per trial in pre window
+    # [abs(x1 - u) + abs(x2 = u) ...] / n
+    mad_post =  np.mean(np.abs(w_psth - avg_psth_pre), axis=0)
+    mean_mad_post = np.mean(mad_post)
 
     # Output variable containing metrics
     out_dict = {
@@ -120,7 +125,8 @@ def modulation_prepost_peak(calcium, times, t_events, fs,
         'std_peak_amplitude' : std_peak_amplitude,
         'mean_absdiff' : mean_absdiff,
         'std_absdiff' : std_absdiff,
-        'mean_z_score' : mean_z_score
+        'mean_z_score' : mean_z_score,
+        'mean_mad_post': mean_mad_post
     }
     return out_dict
 
