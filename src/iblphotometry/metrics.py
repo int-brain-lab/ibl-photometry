@@ -113,7 +113,7 @@ def modulation_prepost_peak(calcium, times, t_events, fs,
     mean_z_score = np.mean(z_score_post)
 
     # MAD per trial, average over n time samples, u: median amplitude per trial in pre window
-    # [abs(x1 - u) + abs(x2 = u) ...] / n
+    # [abs(x1 - u) + abs(x2 - u) ...] / n
     mad_post =  np.mean(np.abs(w_psth - avg_psth_pre), axis=0)
     mean_mad_post = np.mean(mad_post)
 
