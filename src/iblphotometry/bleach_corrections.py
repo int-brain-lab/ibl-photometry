@@ -17,7 +17,7 @@ class AbstractBleachingModel(ABC):
     popt = None
     perr = None
 
-    def __init__(self, method="L-BFGS-B", **method_kwargs):
+    def __init__(self, method='L-BFGS-B', **method_kwargs):
         self.method = method
         self.method_kwargs = method_kwargs
 
@@ -44,7 +44,7 @@ class AbstractBleachingModel(ABC):
         )
 
         if not self.minimize_result.success:
-            raise Exception(f"Fitting failed. {self.minimize_result.message}")
+            raise Exception(f'Fitting failed. {self.minimize_result.message}')
 
         self.popt = self.minimize_result.x
 
@@ -78,7 +78,7 @@ class AbstractBleachingModel(ABC):
             # explicit estimation of the distribution of residuals
             if n_samples == -1:
                 warnings.warn(
-                    f"calculating KDE on {F.values.shape[0]} samples. This might be slow"
+                    f'calculating KDE on {F.values.shape[0]} samples. This might be slow'
                 )
             dist = gaussian_kde(rs)
         else:
@@ -89,12 +89,12 @@ class AbstractBleachingModel(ABC):
         return ll
 
     def _calc_aic(self, ll):
-        aic = 2 * self.popt.shape[0] - 2 * np.log(ll)
+        aic = 2 * self.popt.shape[0] - 2 * ll  # np.log(ll)
         return aic
 
     def calc_model_stats(self, F: nap.Tsd, n_samples: int = -1, use_kde: bool = False):
         if self.popt is None:
-            raise ValueError("model has not yet been fitted.")
+            raise ValueError('model has not yet been fitted.')
         r_sq = self._calc_r_squared(F)
         ll = self._calc_likelihood(F, n_samples, use_kde)
         aic = self._calc_aic(ll)
@@ -107,11 +107,27 @@ class AbstractBleachingModel(ABC):
             Y[:, i] = self.model(t, *p)
         self.model_ci = np.percentile(Y, ci, axis=1)
 
-    def bleach_correct(self, F: nap.Tsd):
+    def bleach_correct(self, F: nap.Tsd, mode='subtract'):
         y, t = F.values, F.times()
         self._fit(y, t)
         y_hat = self._predict(t)
-        return nap.Tsd(t=t, d=y - y_hat)
+        if mode == 'divide':
+            yc = y / y_hat
+        if mode == 'subtract':
+            yc = y - y_hat
+        if mode == 'subtract-divide':
+            yc = (y - y_hat) / y_hat
+        return nap.Tsd(t=t, d=yc)
+
+
+class ExponDecayBleachingModel(AbstractBleachingModel):
+    bounds = ((0, np.Inf), (0, np.Inf), (-np.Inf, np.Inf))
+
+    def model(self, t, A, tau, b):
+        return A * np.exp(-t / tau) + b
+
+    def estimate_p0(self, y: np.array, t: np.array):
+        return (y[0], t[int(t.shape[0] / 3)], y[-1])
 
     # def bleach_correct_logspace(self, F: nap.Tsd):
     #     # bleach correction not by regular subtraction, but rather by subtraction in logspace
@@ -132,7 +148,7 @@ class AbstractBleachingModel(ABC):
 
 
 # bleach correction models
-class ExponDecayBleachingModel(AbstractBleachingModel):
+class ExponDecayBleachingModelX(AbstractBleachingModel):
     bounds = ((0, np.Inf), (0, np.Inf), (-np.Inf, np.Inf), (-np.Inf, np.Inf))
 
     def model(self, t, A, tau, b, t_s):
@@ -142,7 +158,7 @@ class ExponDecayBleachingModel(AbstractBleachingModel):
         return (y[0], t[int(t.shape[0] / 3)], y[-1], 0)
 
 
-class DoubleExponDecayBleachingModel(AbstractBleachingModel):
+class DoubleExponDecayBleachingModelX(AbstractBleachingModel):
     bounds = (
         (0, np.Inf),
         (0, np.Inf),
@@ -162,16 +178,102 @@ class DoubleExponDecayBleachingModel(AbstractBleachingModel):
         return (A_est, tau_est, A_est / 2, tau_est / 2, b_est, 0)
 
 
+class TripleExponDecayBleachingModelX(AbstractBleachingModel):
+    bounds = (
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (-np.Inf, np.Inf),
+        (-np.Inf, np.Inf),
+    )
+
+    def model(self, t, A1, tau1, A2, tau2, A3, tau3, b, t_s):
+        return (
+            A1 * np.exp(-(t - t_s) / tau1)
+            + A2 * np.exp(-(t - t_s) / tau2)
+            + A3 * np.exp(-(t - t_s) / tau3)
+            + b
+        )
+
+    def estimate_p0(self, y: np.array, t: np.array):
+        A_est = y[0]
+        tau_est = t[int(t.shape[0] / 3)]
+        b_est = y[-1]
+        return (
+            A_est,
+            tau_est,
+            A_est * 0.66,
+            tau_est * 0.66,
+            A_est * 0.33,
+            tau_est * 0.33,
+            b_est,
+            0,
+        )
+
+
+class DoubleExponDecayBleachingModel(AbstractBleachingModel):
+    bounds = (
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (-np.Inf, np.Inf),
+    )
+
+    def model(self, t, A1, tau1, A2, tau2, b):
+        return A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2) + b
+
+    def estimate_p0(self, y: np.array, t: np.array):
+        A_est = y[0]
+        tau_est = t[int(t.shape[0] / 3)]
+        b_est = y[-1]
+        return (A_est, tau_est, A_est / 2, tau_est / 2, b_est)
+
+
+class TripleExponDecayBleachingModel(AbstractBleachingModel):
+    bounds = (
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (-np.Inf, np.Inf),
+    )
+
+    def model(self, t, A1, tau1, A2, tau2, A3, tau3, b):
+        return (
+            A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2) + A3 * np.exp(-t / tau3) + b
+        )
+
+    def estimate_p0(self, y: np.array, t: np.array):
+        A_est = y[0]
+        tau_est = t[int(t.shape[0] / 3)]
+        b_est = y[-1]
+        return (
+            A_est,
+            tau_est,
+            A_est * 0.66,
+            tau_est * 0.66,
+            A_est * 0.33,
+            tau_est * 0.33,
+            b_est,
+        )
+
+
 class IsosbesticCorrection:
-    def __init__(self, regressor="RANSAC", correction="deltaF"):
+    def __init__(self, regressor='RANSAC', correction='subtract-divide'):
         self.regressor = regressor
         self.correction = correction
 
     def _fit(self, F_ca: nap.Tsd, F_iso: nap.Tsd):
         # this will allow for easy drop in replacement
-        if self.regressor == "RANSAC":
+        if self.regressor == 'RANSAC':
             reg = RANSACRegressor(random_state=42)
-        if self.regressor == "linear":
+        if self.regressor == 'linear':
             reg = LinearRegression()
 
         # fit
@@ -186,29 +288,32 @@ class IsosbesticCorrection:
         self,
         F_ca: nap.Tsd,
         F_iso: nap.Tsd,
-        lowpass_isosbestic=dict(N=3, Wn=0.01, btype="lowpass"),
+        lowpass_isosbestic=dict(N=3, Wn=0.01, btype='lowpass'),
     ):
         if lowpass_isosbestic is not None:
             F_iso = filt(F_iso, **lowpass_isosbestic)
             iso_fit = self._fit(F_ca, F_iso)
 
-        if self.correction == "deltaF":
+        if self.correction == 'subtract-divide':
             F_corr = (F_ca.values - iso_fit.values) / iso_fit.values
 
-        if self.correction == "subtract":
+        if self.correction == 'subtract':
             F_corr = F_ca.values - iso_fit.values
 
-        if self.correction == "divide":
+        if self.correction == 'divide':
             F_corr = F_ca.values / iso_fit.values
 
         return nap.Tsd(t=F_ca.times(), d=F_corr)
 
 
 class LowpassCorrection:
-    def __init__(self, filter_params=dict(N=3, Wn=0.01, btype="lowpass")):
+    def __init__(self, filter_params=dict(N=3, Wn=0.01, btype='lowpass')):
         self.filter_params = filter_params
 
-    def bleach_correct(self, F: nap.Tsd):
+    def bleach_correct(self, F: nap.Tsd, mode='subtract'):
         F_filt = filt(F, **self.filter_params)
-        d = (F.values - F_filt.values) / F_filt.values
+        if mode == 'subtract':
+            d = F.values - F_filt.values
+        if mode == 'subtract-divide':
+            d = (F.values - F_filt.values) / F_filt.values
         return nap.Tsd(t=F.times(), d=d)

@@ -6,9 +6,9 @@ from iblphotometry.utils import z, psth
 from iblphotometry.bleach_corrections import ExponDecayBleachingModel
 from iblphotometry.outlier_detection import detect_spikes, grubbs_sliding
 from scipy.stats import ttest_ind
-from functools import singledispatch
 
-
+## this approach works as well
+# from functools import singledispatch
 # @singledispatch
 # def percentile_dist(A: nap.Tsd, pc: tuple = (50, 95), axis: None = None) -> float:
 #     """the distance between two percentiles in units of z
@@ -26,8 +26,14 @@ from functools import singledispatch
 
 def percentile_dist(A: nap.Tsd | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
     """the distance between two percentiles in units of z
-    should be proportional to SNR, assuming the signal is
-    in the positive 5th percentile
+
+    Args:
+        A (nap.Tsd | np.ndarray): the input data, np.ndarray for stride tricks sliding windows
+        pc (tuple, optional): percentiles to be computed. Defaults to (50, 95).
+        axis (int, optional): only for arrays, the axis to be computed. Defaults to -1.
+
+    Returns:
+        float: the value of the metric
     """
     if isinstance(A, nap.Tsd):  # "overloading"
         P = np.percentile(z(A.values), pc)
@@ -37,6 +43,16 @@ def percentile_dist(A: nap.Tsd | np.ndarray, pc: tuple = (50, 95), axis=-1) -> f
 
 
 def signal_asymmetry(A: nap.Tsd | np.ndarray, pc_comp: int = 95, axis=-1) -> float:
+    """_summary_
+
+    Args:
+        A (nap.Tsd | np.ndarray): _description_
+        pc_comp (int, optional): _description_. Defaults to 95.
+        axis (int, optional): _description_. Defaults to -1.
+
+    Returns:
+        float: _description_
+    """
     a = percentile_dist(A, (50, pc_comp), axis=axis)
     b = percentile_dist(A, (100 - pc_comp, 50), axis=axis)
     return a / b
@@ -51,11 +67,57 @@ def signal_skew(A: nap.Tsd | np.ndarray, axis=-1) -> float:
 
 
 def n_unique_samples(A: nap.Tsd) -> int:
+    """number of unique samples in the signal. Low values indicate that the signal during acquisition was not within the range of the digitizer.
+
+    Args:
+        A (nap.Tsd): _description_
+
+    Returns:
+        int: _description_
+    """
     return np.unique(A.values).shape[0]
 
 
 def n_spikes(A: nap.Tsd, sd: int):
+    """count the number of spike artifacts in the recording
+
+    Args:
+        A (nap.Tsd): _description_
+        sd (int): _description_
+
+    Returns:
+        _type_: _description_
+    """
     return detect_spikes(A.values, sd=sd).shape[0]
+
+
+def n_outliers(A: nap.Tsd, w_size: int = 1000, alpha: float = 0.0005) -> int:
+    """_summary_
+
+    Args:
+        A (nap.Tsd): _description_
+        w_size (int, optional): _description_. Defaults to 1000.
+        alpha (float, optional): _description_. Defaults to 0.0005.
+
+    Returns:
+        int: _description_
+    """
+    return grubbs_sliding(A.values, w_size=w_size, alpha=alpha).shape[0]
+
+
+def bleaching_tau(A: nap.Tsd) -> float:
+    """overall tau of bleaching
+
+    Args:
+        A (nap.Tsd): _description_
+
+    Returns:
+        float: _description_
+    """
+    y, t = A.values, A.times()
+    bleaching_model = ExponDecayBleachingModel()
+    bleaching_model._fit(y, t)
+    return bleaching_model.popt[1]
 
 
 def ttest_pre_post(
@@ -93,18 +155,6 @@ def ttest_pre_post(
     ttest = stats.ttest_rel(pre, post)
     passed_confg = ttest.pvalue < alpha
     return passed_confg
-
-
-def n_outliers(A: nap.Tsd, w_size: int = 1000, alpha: float = 0.0005) -> int:
-    """implements a sliding version of using grubbs test to detect outliers."""
-    return grubbs_sliding(A.values, w_size=w_size, alpha=alpha).shape[0]
-
-
-def bleaching_tau(A: nap.Tsd) -> float:
-    y, t = A.values, A.times()
-    bleaching_model = ExponDecayBleachingModel()
-    bleaching_model._fit(y, t)
-    return bleaching_model.popt[1]
 
 
 def has_response_to_event(

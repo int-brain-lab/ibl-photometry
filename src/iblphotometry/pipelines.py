@@ -9,11 +9,14 @@ from iblphotometry import sliding_operations
 from iblphotometry import bleach_corrections
 
 
+# def iso_dff
+
+
 def bc_lp_sliding_mad(
     F: nap.Tsd,
     w_len: float = 120,
     overlap: int = 90,
-    butterworth_lowpass=dict(N=3, Wn=0.01, btype="lowpass"),
+    butterworth_lowpass=dict(N=3, Wn=0.01, btype='lowpass'),
 ):
     """_summary_
 
@@ -32,7 +35,7 @@ def bc_lp_sliding_mad(
     return F_res
 
 
-def jove2019(raw_calcium: nap.Tsd, raw_isosbestic: nap.Tsd, fs: float, **params):
+def jove2019(raw_calcium: nap.Tsd, raw_isosbestic: nap.Tsd, **params):
     """
     Martianova, Ekaterina, Sage Aronson, and Christophe D. Proulx. "Multi-fiber photometry to record neural activity in freely-moving animals." JoVE (Journal of Visualized Experiments) 152 (2019): e60278.
     :param raw_calcium:
@@ -44,13 +47,13 @@ def jove2019(raw_calcium: nap.Tsd, raw_isosbestic: nap.Tsd, fs: float, **params)
     # the first step is to remove the photobleaching w
     calcium_lp = filt(
         raw_calcium,
-        **params.get("butterworth_lowpass", {"N": 3, "Wn": 0.01, "btype": "lowpass"}),
+        **params.get('butterworth_lowpass', {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}),
     )
     calcium = raw_calcium.values - calcium_lp.values
 
     isosbestic_lp = filt(
         raw_isosbestic,
-        **params.get("butterworth_lowpass", {"N": 3, "Wn": 0.01, "btype": "lowpass"}),
+        **params.get('butterworth_lowpass', {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}),
     )
     isosbestic = raw_isosbestic.values - isosbestic_lp.values
 
@@ -65,19 +68,23 @@ def jove2019(raw_calcium: nap.Tsd, raw_isosbestic: nap.Tsd, fs: float, **params)
 
 
 def isosbestic_regression(
-    raw_isosbestic: nap.Tsd, raw_calcium: nap.Tsd, fs: float, **params
+    raw_isosbestic: nap.Tsd, raw_calcium: nap.Tsd, fs: float = None, **params
 ):
+    t = raw_isosbestic.times()
+    fs = 1 / np.median(np.diff(t)) if fs is None else fs
+
     isosbestic_correction = bleach_corrections.IsosbesticCorrection(
-        regressor="linear", correction="deltaF"
+        regressor='RANSAC', correction='subtract-divide'
     )
     F_corr = isosbestic_correction.correct(
         raw_calcium,
         raw_isosbestic,
-        lowpass_isosbestic=dict(N=3, Wn=0.01, btype="lowpass"),
+        lowpass_isosbestic=dict(N=3, Wn=0.01, btype='lowpass'),
     )
 
     butterworth_signal = params.get(
-        "butterworth_signal", {"N": 3, "Wn": 10, "btype": "lowpass", "fs": fs}
+        'butterworth_signal',
+        {'N': 3, 'Wn': 7, 'btype': 'lowpass', 'fs': fs},  # changed from 10
     )
 
     F_corr = filt(F_corr, **butterworth_signal)

@@ -8,7 +8,11 @@ from ibldsp.utils import WindowGenerator
 
 
 def make_sliding_window(
-    A: np.ndarray, w_size: int, pad_mode="edge", method="stride_tricks"
+    A: np.ndarray,
+    w_size: int,
+    pad_mode='edge',
+    method='stride_tricks',
+    warning=None,
 ):
     """use np.stride_tricks to make a sliding window view of a 1-d np.array A
     full overlap, step size 1
@@ -27,12 +31,15 @@ def make_sliding_window(
     """
     n_samples = A.shape[0]
 
-    if method == "stride_tricks":
+    if method == 'stride_tricks':
         if w_size % 2 != 0:
-            raise ValueError("w_size needs to be an even number")
+            if warning == 'raise_exception':
+                raise ValueError('w_size needs to be an even number')
+            else:
+                w_size += 1  # dangerous
         B = np.lib.stride_tricks.as_strided(A, ((n_samples - w_size), w_size), (8, 8))
 
-    if method == "window_generator":
+    if method == 'window_generator':
         wg = WindowGenerator(n_samples - 1, w_size, w_size - 1)
         dtype = np.dtype((np.float64, w_size))
         B = np.fromiter(wg.slice_array(A), dtype=dtype)

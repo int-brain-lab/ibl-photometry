@@ -5,7 +5,7 @@ from ibldsp.utils import WindowGenerator
 from iblutil.numerical import rcoeff
 
 
-def z(A: np.array):
+def z(A: np.array, mode='classic'):
     """classic z-score. Deviation from sample mean in units of sd
 
     Args:
@@ -14,7 +14,10 @@ def z(A: np.array):
     Returns:
         _type_: _description_
     """
-    return (A - np.average(A)) / np.std(A)
+    if mode == 'classic':
+        return (A - np.average(A)) / np.std(A)
+    if mode == 'median':
+        return (A - np.median(A)) / np.std(A)
 
 
 def mad(A: np.array):
@@ -28,10 +31,15 @@ def mad(A: np.array):
     Returns:
         _type_: _description_
     """
-    return np.median(np.absolute(A - np.median(A)))
+    return np.median(np.absolute(A - np.median(A)), axis=-1)
 
 
-def zscore(F: nap.Tsd):
+def madscore(F: nap.Tsd):
+    y, t = F.values, F.times()
+    return nap.Tsd(t=t, d=mad(y))
+
+
+def zscore(F: nap.Tsd, mode='classic'):
     """pynapple friendly zscore
 
     Args:
@@ -42,10 +50,10 @@ def zscore(F: nap.Tsd):
     """
     y, t = F.values, F.times()
     # mu, sig = np.average(y), np.std(y)
-    return nap.Tsd(t=t, d=z(y))
+    return nap.Tsd(t=t, d=z(y, mode=mode))
 
 
-def filt(F: nap.Tsd, N: int, Wn: float, fs: float = None, btype="low"):
+def filt(F: nap.Tsd, N: int, Wn: float, fs: float = None, btype='low'):
     """a pynapple friendly wrapper for scipy.signal.butter and sosfiltfilt
 
     Args:
@@ -61,7 +69,7 @@ def filt(F: nap.Tsd, N: int, Wn: float, fs: float = None, btype="low"):
     y, t = F.values, F.times()
     if fs is None:
         fs = 1 / np.median(np.diff(t))
-    sos = signal.butter(N, Wn, btype, fs=fs, output="sos")
+    sos = signal.butter(N, Wn, btype, fs=fs, output='sos')
     y_filt = signal.sosfiltfilt(sos, y)
     return nap.Tsd(t=t, d=y_filt)
 
