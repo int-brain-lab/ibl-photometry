@@ -5,7 +5,6 @@ import ibldsp.waveforms as waveforms
 
 def qc_ttest_pre_post(calcium, times, t_events, fs,
                       pre_w=np.array([-1, -0.2]), post_w=np.array([0.0, 1]), confid=0.001):
-    #TODO change window pre/post so as to be 20 s long for pre, 40 s long for post
     """
     :param calcium: np array, trace of the signal to be used
     :param times: np array, times of the signal to be used
@@ -20,8 +19,8 @@ def qc_ttest_pre_post(calcium, times, t_events, fs,
     psth_post = psth(calcium, times, t_events, fs=fs, peri_event_window=post_w)[0]
 
     # Take median value of signal over time
-    pre = np.median(psth_pre, axis=0)
-    post = np.median(psth_post, axis=0)
+    pre = np.nanmedian(psth_pre, axis=0)
+    post = np.nanmedian(psth_post, axis=0)
     # Paired t-test
     ttest = stats.ttest_rel(pre, post)
     passed_confg = ttest.pvalue < confid
@@ -46,7 +45,8 @@ def peak_indx_post(psth_post):
 
 def modulation_prepost_peak(calcium, times, t_events, fs,
                             pre_w = np.array([-1, -0.2]), post_w = np.array([0.05, 2]),
-                            wind_around=np.array([-0.1, 0.1])):
+                            wind_around=np.array([-0.1, 0.1]),
+                            confid = 0.001):
     """
     Steps:
     - Find the peak value post within a large window. For this, re-use the waveform peak-finder code,
@@ -94,31 +94,41 @@ def modulation_prepost_peak(calcium, times, t_events, fs,
 
     # Compare peak values to baseline pre
     # Average pre over time
-    avg_psth_pre = np.median(psth_pre, axis=0)
-    std_pre = np.std(psth_pre, axis=0)
-    mean_pre = np.mean(psth_pre)
+    avg_psth_pre = np.nanmedian(psth_pre, axis=0)
+    std_pre = np.nanstd(psth_pre, axis=0)
+    mean_pre = np.nanmean(psth_pre)
 
     # Z score
     z_score_post = (psth_post - mean_pre) / std_pre
-    mean_z_score_post_all = np.mean(np.median(z_score_post, axis=0)) # Average post over time
-    mean_z_score_post_peakwindow = np.mean(np.median(z_score_post[w_range, :], axis=0))
+    mean_z_score_post_all = np.nanmean(np.nanmedian(z_score_post, axis=0)) # Average post over time
+    mean_z_score_post_peakwindow = np.nanmean(np.nanmedian(z_score_post[w_range, :], axis=0))
+
+    mean_psth = np.nanmean(z_score_post, axis=1)
+    peak_point_zscore = mean_psth[df_avg.peak_time_idx.values[0]]
 
     # Average post over time in window around peak
-    avg_psth_post = np.median(w_psth, axis=0)
-    mean_peak_amplitude = np.mean(avg_psth_post)
-    std_peak_amplitude = np.std(avg_psth_post)
+    avg_psth_post = np.nanmedian(w_psth, axis=0)
+    mean_peak_amplitude = np.nanmean(avg_psth_post)
+    std_peak_amplitude = np.nanstd(avg_psth_post)
+
+    # Paired t-test pre / post in window
+    ttest = stats.ttest_rel(avg_psth_pre, avg_psth_post)
+    passed_confg = ttest.pvalue < confid
+
+    # Z score (legacy)
+    z_score_post = (avg_psth_post - mean_pre) / std_pre
+    mean_z_score = np.nanmean(z_score_post)
 
     # Mean and std of absolute difference pre/post
     absdiff_post = np.abs(avg_psth_post - avg_psth_pre)
-    mean_absdiff = np.mean(absdiff_post)
-    std_absdiff = np.std(absdiff_post)
+    mean_absdiff = np.nanmean(absdiff_post)
+    std_absdiff = np.nanstd(absdiff_post)
 
     # MAD per trial, average over n time samples, u: median amplitude per trial in pre window
     # [abs(x1 - u) + abs(x2 - u) ...] / n
-    mad_post =  np.mean(np.abs(w_psth - avg_psth_pre), axis=0)
-    mean_mad_post = np.mean(mad_post)
-    mean_mad_zscore = np.mean(mad_post / std_pre)
-    # TODO divide by STD or RMS to get z-score
+    mad_post =  np.nanmean(np.abs(w_psth - avg_psth_pre), axis=0)
+    mean_mad_post = np.nanmean(mad_post)
+    mean_mad_zscore = np.nanmean(mad_post / std_pre)
 
     # Output variable containing metrics
     out_dict = {
@@ -130,10 +140,22 @@ def modulation_prepost_peak(calcium, times, t_events, fs,
         'std_absdiff' : std_absdiff,
         'mean_z_score_post_all' : mean_z_score_post_all,
         'mean_z_score_post_peakwindow': mean_z_score_post_peakwindow,
+        'mean_z_score': mean_z_score,
         'mean_mad_post': mean_mad_post,
-        'mean_mad_zscore': mean_mad_zscore
+        'mean_mad_zscore': mean_mad_zscore,
+        'peak_point_zscore': peak_point_zscore,
+        'test__ttest_peak': passed_confg
     }
     return out_dict
+
+def compute_pass_metrics(df_mi):
+    df_mi["test__peak_point_zscore"] = df_mi["peak_point_zscore"].values[0] > 1.0
+    # df_mi["test__ttest"] = df_mi["ttest"].values[0]
+    # df_mi["pass_tests"] = df_mi["test__peak_point_zscore"].values[0] and df_mi["test__ttest"].values[0]
+    df_mi["pass_tests"] = df_mi["test__peak_point_zscore"].values[0] and df_mi["test__ttest_peak"].values[0]
+    # TODO case for multi rows
+    return df_mi
+
 
 
 def qc_modulation_prepost(mi_dict, zscore_threshold):

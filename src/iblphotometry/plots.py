@@ -62,3 +62,41 @@ def plot_photometry_traces(times, isosbestic, calcium, event_times=None, suptitl
         fig.savefig(output_file)
     plt.show()
     return fig, axd
+
+
+def plot_psth(psth_mat, fs, axs=None, vmin=-0.01, vmax=0.01, cmap='PuOr'):
+    time = np.arange(0, psth_mat.shape[0]) / fs
+    if axs is None:
+        _, axs = plt.subplots(2, 1)
+
+    sns.heatmap(psth_mat.T, cbar=False, ax=axs[0], cmap=cmap, vmin=vmin, vmax=vmax)
+
+    mean_psth = np.nanmean(psth_mat, axis=1)
+    std_psth = np.nanstd(psth_mat, axis=1)
+    axs[1].plot(time, mean_psth, 'k')
+    axs[1].plot(time, mean_psth + std_psth, 'k--')
+    axs[1].plot(time, mean_psth - std_psth, 'k--')
+
+    return axs
+
+
+def plot_psth_summary(all_psth, psth_pre, fs, df_mi, eid, pname, event, preproc_key):
+    fig, axs = plt.subplots(2, 2)
+
+    axs_in = [axs[0, 0], axs[1, 0]]
+    plot_psth(all_psth, fs, axs=axs_in)
+
+    # Compute deviation z-score
+    # Average pre over time
+    avg_psth_pre = np.nanmedian(psth_pre, axis=0)
+    std_psth_pre = np.nanstd(psth_pre, axis=0)
+    c = (all_psth - avg_psth_pre) / std_psth_pre
+
+    axs_in = [axs[0, 1], axs[1, 1]]
+    plot_psth(c, fs, vmin=-1.5, vmax=1.5, axs=axs_in)
+
+    fig.suptitle(f'{eid[0:7]} {pname}: {df_mi["pass_tests"].values[0]}   => '
+                 f'peak zscore: {df_mi["test__peak_point_zscore"].values[0]} , '
+                 f'ttest: {df_mi["test__ttest_peak"].values[0]} \n'
+                 f'{event}, {preproc_key}')
+    return fig, axs
