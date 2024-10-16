@@ -4,7 +4,7 @@ from iblphotometry.preprocessing import psth
 import ibldsp.waveforms as waveforms
 
 def qc_ttest_pre_post(calcium, times, t_events, fs,
-                      pre_w=np.array([-1, -0.2]), post_w=np.array([0.2, 1]), confid=0.001):
+                      pre_w=np.array([-1, -0.2]), post_w=np.array([0.0, 1]), confid=0.001):
     #TODO change window pre/post so as to be 20 s long for pre, 40 s long for post
     """
     :param calcium: np array, trace of the signal to be used
@@ -45,8 +45,8 @@ def peak_indx_post(psth_post):
 
 
 def modulation_prepost_peak(calcium, times, t_events, fs,
-                            pre_w = np.array([-1, -0.2]), post_w = np.array([0.2, 20]),
-                            wind_around=np.array([-0.2, 2])):
+                            pre_w = np.array([-1, -0.2]), post_w = np.array([0.05, 2]),
+                            wind_around=np.array([-0.1, 0.1])):
     """
     Steps:
     - Find the peak value post within a large window. For this, re-use the waveform peak-finder code,
@@ -95,10 +95,15 @@ def modulation_prepost_peak(calcium, times, t_events, fs,
     # Compare peak values to baseline pre
     # Average pre over time
     avg_psth_pre = np.median(psth_pre, axis=0)
-    std_pre = np.std(psth_pre)
+    std_pre = np.std(psth_pre, axis=0)
     mean_pre = np.mean(psth_pre)
 
-    # Average post over time
+    # Z score
+    z_score_post = (psth_post - mean_pre) / std_pre
+    mean_z_score_post_all = np.mean(np.median(z_score_post, axis=0)) # Average post over time
+    mean_z_score_post_peakwindow = np.mean(np.median(z_score_post[w_range, :], axis=0))
+
+    # Average post over time in window around peak
     avg_psth_post = np.median(w_psth, axis=0)
     mean_peak_amplitude = np.mean(avg_psth_post)
     std_peak_amplitude = np.std(avg_psth_post)
@@ -108,14 +113,12 @@ def modulation_prepost_peak(calcium, times, t_events, fs,
     mean_absdiff = np.mean(absdiff_post)
     std_absdiff = np.std(absdiff_post)
 
-    # Z score
-    z_score_post = (avg_psth_post - mean_pre) / std_pre
-    mean_z_score = np.mean(z_score_post)
-
     # MAD per trial, average over n time samples, u: median amplitude per trial in pre window
     # [abs(x1 - u) + abs(x2 - u) ...] / n
     mad_post =  np.mean(np.abs(w_psth - avg_psth_pre), axis=0)
     mean_mad_post = np.mean(mad_post)
+    mean_mad_zscore = np.mean(mad_post / std_pre)
+    # TODO divide by STD or RMS to get z-score
 
     # Output variable containing metrics
     out_dict = {
@@ -125,8 +128,10 @@ def modulation_prepost_peak(calcium, times, t_events, fs,
         'std_peak_amplitude' : std_peak_amplitude,
         'mean_absdiff' : mean_absdiff,
         'std_absdiff' : std_absdiff,
-        'mean_z_score' : mean_z_score,
-        'mean_mad_post': mean_mad_post
+        'mean_z_score_post_all' : mean_z_score_post_all,
+        'mean_z_score_post_peakwindow': mean_z_score_post_peakwindow,
+        'mean_mad_post': mean_mad_post,
+        'mean_mad_zscore': mean_mad_zscore
     }
     return out_dict
 
