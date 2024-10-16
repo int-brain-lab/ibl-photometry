@@ -149,7 +149,7 @@ def modulation_prepost_peak(calcium, times, t_events, fs,
     return out_dict
 
 def compute_pass_metrics(df_mi):
-    df_mi["test__peak_point_zscore"] = df_mi["peak_point_zscore"].values[0] > 1.0
+    df_mi["test__peak_point_zscore"] = np.abs(df_mi["peak_point_zscore"].values[0]) > 1.0
     # df_mi["test__ttest"] = df_mi["ttest"].values[0]
     # df_mi["pass_tests"] = df_mi["test__peak_point_zscore"].values[0] and df_mi["test__ttest"].values[0]
     df_mi["pass_tests"] = df_mi["test__peak_point_zscore"].values[0] and df_mi["test__ttest_peak"].values[0]
