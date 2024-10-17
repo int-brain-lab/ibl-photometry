@@ -9,15 +9,21 @@ Updates:
         one = ONE(directory) to save them there 
     2024-June-21
         changed neurodsp to ibldsp 
+    ...
+    2024-October-14 
+        review functions
+        add new functions from kb_allthecode.py 
 """ 
 import numpy as np
 import pandas as pd 
+import matplotlib.pyplot as plt 
+import seaborn as sns 
 import glob
 from ibllib.io.extractors.biased_trials import extract_all 
 from brainbox.io.one import SessionLoader
 import ibldsp.utils
-from one.api import ONE
-one = ONE(base_url="/mnt/h0/kb/data/one")
+# from one.api import ONE
+# one = ONE(base_url="/mnt/h0/kb/data/one")
 
 # #extracting a session OW 
 # sl = SessionLoader(one=one, eid=eid)
@@ -34,6 +40,122 @@ one = ONE(base_url="/mnt/h0/kb/data/one")
 #         regions.append(f"Region{rec.region2}G")
 #     return regions 
 
+def load_trials_updated(eid, one=None):
+    print('toto')
+    assert one is not None 
+    trials = one.load_object(eid, 'trials')
+    ref = one.eid2ref(eid)
+    subject = ref.subject
+    session_date = str(ref.date) 
+    if len(trials['intervals'].shape) == 2: 
+        trials['intervals_0'] = trials['intervals'][:, 0]
+        trials['intervals_1'] = trials['intervals'][:, 1]
+        del trials['intervals']  # Remove original nested array 
+    df_trials = pd.DataFrame(trials) 
+    idx = 2
+    new_col = df_trials['contrastLeft'].fillna(df_trials['contrastRight']) 
+    df_trials.insert(loc=idx, column='allContrasts', value=new_col) 
+    # create allSContrasts 
+    df_trials['allSContrasts'] = df_trials['allContrasts']
+    df_trials.loc[df_trials['contrastRight'].isna(), 'allSContrasts'] = df_trials['allContrasts'] * -1
+    df_trials.insert(loc=3, column='allSContrasts', value=df_trials.pop('allSContrasts'))
+    df_trials[["subject", "date", "eid"]] = [subject, session_date, eid]    
+    df_trials["reactionTime"] = df_trials["firstMovement_times"] - df_trials["stimOnTrigger_times"]
+    df_trials["responseTime"] = df_trials["response_times"] - df_trials["stimOnTrigger_times"] 
+    df_trials["trialTime"] = df_trials["intervals_1"] - df_trials["intervals_0"]  
+    df_trials["trialNumber"] = range(1, len(df_trials) + 1) 
+    return df_trials, subject, session_date
+
+
+
+def get_eid(mouse,date): 
+    """to get the eid from mouse and date"""
+    eids = one.search(subject=mouse, date=date) 
+    eid = eids[0]
+    ref = one.eid2ref(eid)
+    print(eid)
+    print(ref) 
+    return eid 
+
+def cut_photometry_session(df_nph, df_trials, time_to_cut=10): 
+    # df_trials = df_trials[0:len(df_trials)-1] #to avoid the last trial not having photometry data 
+    session_start = df_trials.intervals_0.values[0] - time_to_cut  # Start time
+    session_end = df_trials.intervals_1.values[-1] + time_to_cut   # End time
+    # Select data within the specified time range
+    selected_data = df_nph[
+        (df_nph['bpod_frame_times'] >= session_start) &
+        (df_nph['bpod_frame_times'] <= session_end)
+    ] 
+    df_nph = selected_data.reset_index(drop=True) 
+    return df_nph 
+
+
+def plot_heatmap_psth(preprocessingtype, df_trials, psth_idx, EVENT, subject, session_date, region, eid): 
+    psth_good = preprocessingtype.values[psth_idx[:,(df_trials.feedbackType == 1)]]
+    psth_error = preprocessingtype.values[psth_idx[:,(df_trials.feedbackType == -1)]]
+    # Calculate averages and SEM
+    psth_good_avg = psth_good.mean(axis=1)
+    sem_good = psth_good.std(axis=1) / np.sqrt(psth_good.shape[1])
+    psth_error_avg = psth_error.mean(axis=1)
+    sem_error = psth_error.std(axis=1) / np.sqrt(psth_error.shape[1])
+
+    # Create the figure and gridspec
+    fig = plt.figure(figsize=(10, 12))
+    gs = fig.add_gridspec(2, 2, height_ratios=[3, 1])
+
+    # Plot the heatmap and line plot for correct trials
+    ax1 = fig.add_subplot(gs[0, 0])
+    sns.heatmap(psth_good.T, cbar=False, ax=ax1) #, center = 0.0)
+    ax1.invert_yaxis()
+    ax1.axvline(x=30, color="white", alpha=0.9, linewidth=3, linestyle="dashed") 
+    ax1.set_title('Correct Trials')
+
+    ax2 = fig.add_subplot(gs[1, 0], sharex=ax1)
+    ax2.plot(psth_good_avg, color='#2f9c95', linewidth=3) 
+    # ax2.plot(psth_good, color='#2f9c95', linewidth=0.1, alpha=0.2)
+    ax2.fill_between(range(len(psth_good_avg)), psth_good_avg - sem_good, psth_good_avg + sem_good, color='#2f9c95', alpha=0.15)
+    ax2.axvline(x=30, color="black", alpha=0.9, linewidth=3, linestyle="dashed")
+    ax2.set_ylabel('Average Value')
+    ax2.set_xlabel('Time')
+
+    # Plot the heatmap and line plot for incorrect trials
+    ax3 = fig.add_subplot(gs[0, 1], sharex=ax1)
+    sns.heatmap(psth_error.T, cbar=False, ax=ax3) #, center = 0.0)
+    ax3.invert_yaxis()
+    ax3.axvline(x=30, color="white", alpha=0.9, linewidth=3, linestyle="dashed") 
+    ax3.set_title('Incorrect Trials')
+
+    ax4 = fig.add_subplot(gs[1, 1], sharex=ax3, sharey=ax2)
+    ax4.plot(psth_error_avg, color='#d62828', linewidth=3)
+    ax4.fill_between(range(len(psth_error_avg)), psth_error_avg - sem_error, psth_error_avg + sem_error, color='#d62828', alpha=0.15)
+    ax4.axvline(x=30, color="black", alpha=0.9, linewidth=3, linestyle="dashed")
+    ax4.set_ylabel('Average Value')
+    ax4.set_xlabel('Time')
+
+    fig.suptitle(f'{preprocessingtype}_{EVENT}_{subject}_{session_date}_{region}_{eid}', y=1, fontsize=14)
+    plt.tight_layout()
+    # plt.savefig(f'/mnt/h0/kb/data/psth_npy/Fig02_{EVENT}_{mouse}_{date}_{region}_{eid}.png')
+    plt.show() 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+####################################################################################
+####################################################################################
+####################################################################################
 def get_regions(rec): 
     """ 
     extracts in string format the mouse name, date of the session, nph file number, bnc file number and regions
@@ -49,24 +171,24 @@ def get_nph(source_path, rec):
     df_nphttl = pd.read_csv(source_folder+f"bonsai_DI{rec.nph_bnc}{rec.nph_file}.csv") 
     return df_nph, df_nphttl 
 
-def get_eid(rec): 
-    eids = one.search(subject=rec.mouse, date=rec.date) 
-    eid = eids[0]
-    ref = one.eid2ref(eid)
-    print(eid)
-    print(ref) 
-    # session_path_behav = f'/home/kceniabougrova/Documents/nph/Behav_2024Mar20/{rec.mouse}/{rec.date}/001/' 
-    base_path = f'/mnt/h0/kb/data/one/mainenlab/Subjects/{rec.mouse}/{rec.date}/' 
-    session_path_pattern = f'{base_path}00*/'
-    session_paths = glob.glob(session_path_pattern)
-    if session_paths:
-        session_path_behav = session_paths[0]  # or handle multiple matches as needed
-    else:
-        session_path_behav = None  # or handle the case where no matching path is found
-    # file_path = '/mnt/h0/kb/data/one/mainenlab/Subjects/ZFM-04022/2022-12-30/001/alf/_ibl_trials.table.pqt' #KB commented 04Aug2024 
-    file_path = session_path_behav+'alf/_ibl_trials.table.pqt' #KB added 04Aug2024 
+# def get_eid(rec): 
+#     eids = one.search(subject=rec.mouse, date=rec.date) 
+#     eid = eids[0]
+#     ref = one.eid2ref(eid)
+#     print(eid)
+#     print(ref) 
+#     # session_path_behav = f'/home/kceniabougrova/Documents/nph/Behav_2024Mar20/{rec.mouse}/{rec.date}/001/' 
+#     base_path = f'/mnt/h0/kb/data/one/mainenlab/Subjects/{rec.mouse}/{rec.date}/' 
+#     session_path_pattern = f'{base_path}00*/'
+#     session_paths = glob.glob(session_path_pattern)
+#     if session_paths:
+#         session_path_behav = session_paths[0]  # or handle multiple matches as needed
+#     else:
+#         session_path_behav = None  # or handle the case where no matching path is found
+#     # file_path = '/mnt/h0/kb/data/one/mainenlab/Subjects/ZFM-04022/2022-12-30/001/alf/_ibl_trials.table.pqt' #KB commented 04Aug2024 
+#     file_path = session_path_behav+'alf/_ibl_trials.table.pqt' #KB added 04Aug2024 
 
-    df = pd.read_parquet(file_path)
+#     df = pd.read_parquet(file_path)
 
 
 

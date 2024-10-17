@@ -18,26 +18,38 @@ import matplotlib.pyplot as plt
 import seaborn as sns 
 from brainbox.behavior.training import compute_performance 
 from brainbox.io.one import SessionLoader 
-import iblphotometry.kcenia as kcenia
+import iblphotometry.kcenia as kcenia 
 import ibldsp.utils
-import scipy.signal
+import scipy.signal 
+import re
 from iblutil.numerical import rcoeff
+from iblphotometry.preprocessing import preprocessing_alejandro, jove2019, psth, preprocess_sliding_mad, photobleaching_lowpass 
 from one.api import ONE #always after the imports 
-one = ONE(cache_dir="/mnt/h0/kb/data/one") 
+one = ONE(base_url='https://alyx.internationalbrainlab.org', cache_dir="/mnt/h0/kb/data/one", mode='remote')
 
 """ useful""" 
 # eids = one.search(project='ibl_fibrephotometry') 
-
-#%% 
-####################################################################################################################
-""" EDIT THE VARS - eid, ROI, photometry file path (.csv or .pqt) """
+#%% ####################################################################################################################
+""" EDIT THE VARS - eid, ROI, photometry file path (.csv or .pqt) """ 
 eid = '47c02dcc-337b-4964-937f-39928c057fff' #example eid 
-region_number = "4" #the ROI number you recorded from 
+# eid = 'a1ccc8ed-9829-4af8-91fd-cc1c83b74b98' 
+""" LOAD TRIALS """ 
+df_trials, subject, session_date = kcenia.load_trials_updated(eid, one=one) 
+
+region_number = "3" #the ROI number you recorded from 
 nph_bnc = 0 #or 1, the BNC input you use to sync the data; "Input0" or "Input1" 
-#choose one: .csv or .pqt
-nph_file_path = '/mnt/h0/kb/data/one/mainenlab/Subjects/ZFM-06275/2023-09-18/001/raw_photometry_data/raw_photometry.csv' 
-df_nph = pd.read_csv(nph_file_path) 
-# df_nph = pd.read_parquet(nph_file_path) 
+#choose one: .csv or .pqt 
+base_path = f'/mnt/h0/kb/data/one/mainenlab/Subjects/{subject}/{session_date}/'
+available_dirs = os.listdir(base_path) # List all directories in the base path
+match = [d for d in available_dirs if re.match(r'^00\d$', d)] # Use regex to match the directories that start with 00 and end with a digit
+
+if match:
+    matched_dir = match[0]     # Select the first match (assuming only one 00X folder exists)
+    nph_file_path = os.path.join(base_path, matched_dir, 'raw_photometry_data', 'raw_photometry.csv')     # Construct the full file path with the matched directory
+    df_nph = pd.read_csv(nph_file_path)
+    # df_nph = pd.read_parquet(nph_file_path)
+else:
+    print(f"No directories matching the pattern '00X' were found in {base_path}")
 
 """ SELECT THE EVENT AND WHAT INTERVAL TO PLOT IN THE PSTH """ 
 EVENT = "feedback_times" 
@@ -47,68 +59,38 @@ time_aft = 2
 # ##### if you dont know the eid, do it by mouse and date #####
 # mouse = "ZFM-06275"
 # date = '2023-09-18'
-# def get_eid(mouse,date): 
-#     """to get the eid from mouse and date"""
-#     eids = one.search(subject=mouse, date=date) 
-#     eid = eids[0]
-#     ref = one.eid2ref(eid)
-#     print(eid)
-#     print(ref) 
-#     return eid 
 #eid = get_eid(mouse, date) 
-
-####################################################################################################################
-
-#%%
-""" LOAD TRIALS """
-def load_trials_updated(eid=eid): 
-    trials = one.load_object(eid, 'trials')
-    ref = one.eid2ref(eid)
-    subject = ref.subject
-    session_date = str(ref.date) 
-    if len(trials['intervals'].shape) == 2: 
-        trials['intervals_0'] = trials['intervals'][:, 0]
-        trials['intervals_1'] = trials['intervals'][:, 1]
-        del trials['intervals']  # Remove original nested array 
-    df_trials = pd.DataFrame(trials) 
-    idx = 2
-    new_col = df_trials['contrastLeft'].fillna(df_trials['contrastRight']) 
-    df_trials.insert(loc=idx, column='allContrasts', value=new_col) 
-    # create allSContrasts 
-    df_trials['allSContrasts'] = df_trials['allContrasts']
-    df_trials.loc[df_trials['contrastRight'].isna(), 'allSContrasts'] = df_trials['allContrasts'] * -1
-    df_trials.insert(loc=3, column='allSContrasts', value=df_trials.pop('allSContrasts'))
-    df_trials[["subject", "date", "eid"]] = [subject, session_date, eid]    
-    df_trials["reactionTime"] = df_trials["firstMovement_times"] - df_trials["stimOnTrigger_times"]
-    df_trials["responseTime"] = df_trials["response_times"] - df_trials["stimOnTrigger_times"] 
-    df_trials["trialTime"] = df_trials["intervals_1"] - df_trials["intervals_0"]  
-    df_trials["trialNumber"] = range(1, len(df_trials) + 1) 
-    return df_trials, subject, session_date
-
-df_trials, subject, session_date = load_trials_updated(eid) 
 
 #%% #########################################################################################################
 """ GET PHOTOMETRY DATA """ 
-
 region = f"Region{region_number}G"
-
 df_nph["mouse"] = subject
 df_nph["date"] = session_date
 df_nph["region"] = region
 df_nph["eid"] = eid 
 
-
 """
 CHANGE INPUT AUTOMATICALLY 
 """ 
+tbpod = df_trials['stimOnTrigger_times'].values #bpod TTL times
 iup = ibldsp.utils.rises(df_nph[f'Input{nph_bnc}'].values) #idx nph TTL times 
 tph = (df_nph['Timestamp'].values[iup] + df_nph['Timestamp'].values[iup - 1]) / 2 #nph TTL times computed for the midvalue 
-tbpod = np.sort(np.r_[
-    df_trials['intervals_0'].values,
-    df_trials['intervals_1'].values - 1,  # here is the trick
-    df_trials.loc[df_trials['feedbackType'] == 1, 'feedback_times'].values]
-)
-fcn_nph_to_bpod_times, drift_ppm = ibldsp.utils.sync_timestamps(tph, tbpod, linear=True)
+fcn_nph_to_bpod_times, drift_ppm = ibldsp.utils.sync_timestamps(tph, tbpod, linear=True) #interpolation 
+if len(tph)/len(tbpod) < .9: 
+    print("mismatch in sync, will try to add ITI duration to the sync")
+    tbpod = np.sort(np.r_[
+        df_trials['intervals_0'].values,
+        df_trials['intervals_1'].values - 1,  # here is the trick
+        df_trials.loc[df_trials['feedbackType'] == 1, 'feedback_times'].values]
+    )
+    fcn_nph_to_bpod_times, drift_ppm = ibldsp.utils.sync_timestamps(tph, tbpod, linear=True)
+    if len(tph)/len(tbpod) > .9:
+        print("still mismatch, maybe this is an old session")
+        tbpod = np.sort(np.r_[df_trials['stimOnTrigger_times'].values])
+        fcn_nph_to_bpod_times, drift_ppm, iph, ibpod = ibldsp.utils.sync_timestamps(tph, tbpod, linear=True, return_indices=True) 
+        assert len(iph)/len(tbpod) > .9
+        print("recovered from sync mismatch, continuing #2")
+assert abs(drift_ppm) < 100, "drift is more than 100 ppm"
 
 df_nph["bpod_frame_times"] = fcn_nph_to_bpod_times(df_nph["Timestamp"]) 
 
@@ -116,17 +98,7 @@ fcn_nph_to_bpod_times(df_nph["Timestamp"])
 
 df_nph["Timestamp"]
 
-
-# df_trials = df_trials[0:len(df_trials)-1] #to avoid the last trial not having photometry data 
-session_start = df_trials.intervals_0.values[0] - 10  # Start time, 100 seconds before the first tph value
-session_end = df_trials.intervals_1.values[-1] + 10   # End time, 100 seconds after the last tph value
-
-# Select data within the specified time range
-selected_data = df_nph[
-    (df_nph['bpod_frame_times'] >= session_start) &
-    (df_nph['bpod_frame_times'] <= session_end)
-] 
-df_nph = selected_data.reset_index(drop=True) 
+df_nph = kcenia.cut_photometry_session(df_nph=df_nph, df_trials=df_trials, time_to_cut=10) 
 
 
 #%%
@@ -196,63 +168,81 @@ raw_TTL_nph = tph
 
 my_array = np.c_[raw_timestamps_bpod, raw_reference, raw_signal]
 
-df_nph = pd.DataFrame(my_array, columns=['times', 'raw_isosbestic', 'raw_calcium']) #IMPORTANT DF
+df_nph = pd.DataFrame(my_array, columns=['times', 'raw_isosbestic', 'raw_calcium']) #IMPORTANT DF 
+df_nph['times_m'] = df_nph['times'] / 60 #from seconds to minutes 
 
-from iblphotometry.preprocessing import preprocessing_alejandro, jove2019, psth, preprocess_sliding_mad, photobleaching_lowpass 
-
-# def jove2019(raw_calcium, raw_isosbestic, fs, **params):
-#     """
-#     Martianova, Ekaterina, Sage Aronson, and Christophe D. Proulx. "Multi-fiber photometry to record neural activity in freely-moving animals." JoVE (Journal of Visualized Experiments) 152 (2019): e60278.
-#     :param raw_calcium:
-#     :param raw_isosbestic:
-#     :param params:
-#     :return:
-#     """
-#     # the first step is to remove the photobleaching w
-#     sos = scipy.signal.butter(fs=fs, output='sos', **params.get('butterworth_lowpass', {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}))
-#     calcium = raw_calcium - scipy.signal.sosfiltfilt(sos, raw_calcium)
-#     isosbestic = raw_isosbestic - scipy.signal.sosfiltfilt(sos, raw_isosbestic)
-#     calcium = (calcium - np.median(calcium)) / np.std(calcium)
-#     isosbestic = (isosbestic - np.median(isosbestic)) / np.std(isosbestic)
-#     m = np.polyfit(isosbestic, calcium, 1)
-#     ref = isosbestic * m[0] + m[1]
-#     ph = (calcium - ref) / 100
-#     return ph
-
-# def preprocessing_alejandro(f_ca, fs, window=30):
-#     # https://www.biorxiv.org/content/10.1101/2024.02.26.582199v1
-#     """
-#     Fluorescence signals recorded during each session from each location were
-#     transformed to dF/F using the following formula: dF = (F-F0)/F0
-#     𝐹0 was the +/- 30 s rolling average of the raw fluorescence signal.
-#     """
-#     # Convert to Series to apply the rolling avg
-#     f_ca = pd.Series(f_ca)
-#     f0 = f_ca.rolling(int(fs * window), center=True).mean()
-#     delta_f = (f_ca - f0) / f0
-#     # Convert to numpy for output
-#     delta_f = delta_f.to_numpy()
-#     return delta_f
-
-
-# df_nph['calcium_photobleach'] = photobleaching_lowpass(df_nph["raw_calcium"].values, fs=fs) #KB
-# df_nph['isosbestic_photobleach'] = photobleaching_lowpass(df_nph["raw_isosbestic"], fs=fs)
-# df_nph['calcium_jove2019'] = jove2019(df_nph["raw_calcium"], df_nph["raw_isosbestic"], fs=fs) 
-# df_nph['isosbestic_jove2019'] = jove2019(df_nph["raw_isosbestic"], df_nph["raw_calcium"], fs=fs)
+df_nph['calcium_photobleach'] = photobleaching_lowpass(df_nph["raw_calcium"].values, fs=fs) #KB
+df_nph['isosbestic_photobleach'] = photobleaching_lowpass(df_nph["raw_isosbestic"], fs=fs)
+df_nph['calcium_jove2019'] = jove2019(df_nph["raw_calcium"], df_nph["raw_isosbestic"], fs=fs) 
+df_nph['isosbestic_jove2019'] = jove2019(df_nph["raw_isosbestic"], df_nph["raw_calcium"], fs=fs)
 df_nph['calcium_mad'] = preprocess_sliding_mad(df_nph["raw_calcium"].values, df_nph["times"].values, fs=fs)
 df_nph['isosbestic_mad'] = preprocess_sliding_mad(df_nph["raw_isosbestic"].values, df_nph["times"].values, fs=fs)
-# df_nph['calcium_alex'] = preprocessing_alejandro(df_nph["raw_calcium"], fs=fs) 
-# df_nph['isos_alex'] = preprocessing_alejandro(df_nph['raw_isosbestic'], fs=fs)
+df_nph['calcium_alex'] = preprocessing_alejandro(df_nph["raw_calcium"].values, fs=fs) 
+df_nph['isos_alex'] = preprocessing_alejandro(df_nph['raw_isosbestic'].values, fs=fs)
 
-plt.figure(figsize=(20, 6))
-plt.plot(df_nph['times'][200:1000], df_nph['calcium_mad'][200:1000], linewidth=1.25, alpha=0.8, color='teal') 
-plt.plot(df_nph['times'][200:1000], df_nph['isosbestic_mad'][200:1000], linewidth=1.25, alpha=0.8, color='purple') 
-plt.show() 
+column_name = ["calcium_mad", "isosbestic_mad"]
+for name in column_name: 
+    plt.figure(figsize=(20, 6))
+    plt.plot(df_nph['times'], df_nph[name], linewidth=1.15, alpha=0.75, color='teal', label=name)
+    for feedback_time in df_trials['feedback_times']:
+            plt.axvline(x=feedback_time, color='gray', linewidth=1, linestyle='-', alpha=0.6)
+    plt.xlabel('Time')
+    plt.ylabel('Signal')
+    plt.xlim(200,1000)
+    plt.title(f'{name} with Feedback Times')
+    plt.show()
 
-""" SELECT THE EVENT AND WHAT INTERVAL TO PLOT IN THE PSTH """ 
-EVENT = "feedback_times" 
-time_bef = -1
-time_aft = 2
+
+#%%
+""" PLOTTING THE ENTIRE SIGNAL FOR ALL THE PREPROCESSING METHODS CALCIUM AND ISOSBESTIC """
+
+# Define the list of signal names for calcium and isosbestic
+calcium_columns = ['calcium_photobleach', 'calcium_jove2019', 'calcium_mad', 'calcium_alex']
+isosbestic_columns = ['isosbestic_photobleach', 'isosbestic_jove2019', 'isosbestic_mad', 'isos_alex']
+
+# Calculate the global y-axis limits for calcium and isosbestic signals
+calcium_min = min([df_nph[col].min() for col in calcium_columns])
+calcium_max = max([df_nph[col].max() for col in calcium_columns])
+isosbestic_min = min([df_nph[col].min() for col in isosbestic_columns])
+isosbestic_max = max([df_nph[col].max() for col in isosbestic_columns])
+
+# Create subplots (4 rows, 2 columns)
+fig, axes = plt.subplots(4, 2, figsize=(20, 20))
+fig.tight_layout(pad=5)
+
+# Plotting each calcium and corresponding isosbestic in subplots
+for i, (calcium, isosbestic) in enumerate(zip(calcium_columns, isosbestic_columns)):
+    # Plot calcium on the left (column 0)
+    axes[i, 0].plot(df_nph['times'], df_nph[calcium], linewidth=1.15, alpha=0.75, color='teal', label=calcium)
+    for feedback_time in df_trials['feedback_times']:
+        axes[i, 0].axvline(x=feedback_time, color='gray', linewidth=1, linestyle='-', alpha=0.6)
+    axes[i, 0].set_xlabel('Time')
+    axes[i, 0].set_ylabel('Signal')
+    axes[i, 0].set_xlim(200, 1000)
+    axes[i, 0].set_ylim(calcium_min, calcium_max)  # Set the y-axis limits for calcium
+    axes[i, 0].set_title(f'{calcium} with Feedback Times')
+
+    # Plot isosbestic on the right (column 1)
+    axes[i, 1].plot(df_nph['times'], df_nph[isosbestic], linewidth=1.15, alpha=0.75, color='purple', label=isosbestic)
+    for feedback_time in df_trials['feedback_times']:
+        axes[i, 1].axvline(x=feedback_time, color='gray', linewidth=1, linestyle='-', alpha=0.6)
+    axes[i, 1].set_xlabel('Time')
+    axes[i, 1].set_ylabel('Signal')
+    axes[i, 1].set_xlim(200, 1000)
+    axes[i, 1].set_ylim(isosbestic_min, isosbestic_max)  # Set the y-axis limits for isosbestic
+    axes[i, 1].set_title(f'{isosbestic} with Feedback Times')
+
+# Adjust the spacing between subplots
+plt.subplots_adjust(hspace=0.4)
+plt.show()
+
+
+
+
+
+
+
+#%%
 PERIEVENT_WINDOW = [time_bef,time_aft]
 SAMPLING_RATE = int(1/np.mean(np.diff(df_nph.times))) 
 
@@ -291,53 +281,329 @@ photometry_s_6 = df_nph.isosbestic_mad.values[psth_idx]
 # photometry_s_7 = df_nph.calcium_alex.values[psth_idx] 
 # photometry_s_8 = df_nph.isos_alex.values[psth_idx] 
 
-def plot_heatmap_psth(preprocessingtype=df_nph.calcium_mad): 
-    psth_good = preprocessingtype.values[psth_idx[:,(df_trials.feedbackType == 1)]]
-    psth_error = preprocessingtype.values[psth_idx[:,(df_trials.feedbackType == -1)]]
-    # Calculate averages and SEM
-    psth_good_avg = psth_good.mean(axis=1)
-    sem_good = psth_good.std(axis=1) / np.sqrt(psth_good.shape[1])
-    psth_error_avg = psth_error.mean(axis=1)
-    sem_error = psth_error.std(axis=1) / np.sqrt(psth_error.shape[1])
-
-    # Create the figure and gridspec
-    fig = plt.figure(figsize=(10, 12))
-    gs = fig.add_gridspec(2, 2, height_ratios=[3, 1])
-
-    # Plot the heatmap and line plot for correct trials
-    ax1 = fig.add_subplot(gs[0, 0])
-    sns.heatmap(psth_good.T, cbar=False, ax=ax1) #, center = 0.0)
-    ax1.invert_yaxis()
-    ax1.axvline(x=30, color="white", alpha=0.9, linewidth=3, linestyle="dashed") 
-    ax1.set_title('Correct Trials')
-
-    ax2 = fig.add_subplot(gs[1, 0], sharex=ax1)
-    ax2.plot(psth_good_avg, color='#2f9c95', linewidth=3) 
-    # ax2.plot(psth_good, color='#2f9c95', linewidth=0.1, alpha=0.2)
-    ax2.fill_between(range(len(psth_good_avg)), psth_good_avg - sem_good, psth_good_avg + sem_good, color='#2f9c95', alpha=0.15)
-    ax2.axvline(x=30, color="black", alpha=0.9, linewidth=3, linestyle="dashed")
-    ax2.set_ylabel('Average Value')
-    ax2.set_xlabel('Time')
-
-    # Plot the heatmap and line plot for incorrect trials
-    ax3 = fig.add_subplot(gs[0, 1], sharex=ax1)
-    sns.heatmap(psth_error.T, cbar=False, ax=ax3) #, center = 0.0)
-    ax3.invert_yaxis()
-    ax3.axvline(x=30, color="white", alpha=0.9, linewidth=3, linestyle="dashed") 
-    ax3.set_title('Incorrect Trials')
-
-    ax4 = fig.add_subplot(gs[1, 1], sharex=ax3, sharey=ax2)
-    ax4.plot(psth_error_avg, color='#d62828', linewidth=3)
-    ax4.fill_between(range(len(psth_error_avg)), psth_error_avg - sem_error, psth_error_avg + sem_error, color='#d62828', alpha=0.15)
-    ax4.axvline(x=30, color="black", alpha=0.9, linewidth=3, linestyle="dashed")
-    ax4.set_ylabel('Average Value')
-    ax4.set_xlabel('Time')
-
-    fig.suptitle(f'calcium_mad_{EVENT}_{subject}_{session_date}_{region}_{eid}', y=1, fontsize=14)
-    plt.tight_layout()
-    # plt.savefig(f'/mnt/h0/kb/data/psth_npy/Fig02_{EVENT}_{mouse}_{date}_{region}_{eid}.png')
-    plt.show() 
-
-plot_heatmap_psth(df_nph.calcium_mad)
+kcenia.plot_heatmap_psth(df_nph.calcium_mad,df_trials,psth_idx, EVENT, subject, session_date, region, eid)
 
 # %%
+""" PLOTS """ 
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+
+def plot_session_and_part(df_nph, df_trials, xlim_min, xlim_max, preprocessingmethod): 
+    # Filter the dataset based on xlim
+    mask = (df_nph['times'] >= xlim_min) & (df_nph['times'] <= xlim_max)
+    filtered_data = df_nph[mask]
+    y_min = filtered_data[preprocessingmethod].min()
+    y_max = filtered_data[preprocessingmethod].max()
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(df_nph.times, df_nph[preprocessingmethod], linewidth=0.1, alpha=0.75, color='#177e89', label=preprocessingmethod)
+    for feedback_time in df_trials['feedback_times']:
+        ax.axvline(x=feedback_time, color='gray', linewidth=1, linestyle='-', alpha=0.6) 
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Signal')
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    plt.title(preprocessingmethod)
+    # Add zoomed-in inset
+    axins = inset_axes(ax, width="50%", height="50%", loc="upper right")
+    axins.plot(df_nph.times, df_nph[preprocessingmethod], linewidth=0.25, alpha=0.75, color='#177e89')
+    axins.set_xlim(xlim_min, xlim_max)
+    axins.set_ylim(y_min, y_max)
+    # Plot the feedback times in the zoomed-in inset
+    for feedback_time in df_trials['feedback_times']:
+        if xlim_min <= feedback_time <= xlim_max:  # Only show feedback lines within the zoomed range
+            axins.axvline(x=feedback_time, color='gray', linewidth=1.05, linestyle='-', alpha=1)
+    # Add rectangle around zoomed-in area in the main plot
+    ax.indicate_inset_zoom(axins, edgecolor="black",)
+    plt.tight_layout()
+    plt.show() 
+
+plot_session_and_part(df_nph=df_nph, df_trials=df_trials, xlim_min=1105, xlim_max=1250, preprocessingmethod='raw_calcium')
+plot_session_and_part(df_nph=df_nph, df_trials=df_trials, xlim_min=1105, xlim_max=1250, preprocessingmethod='calcium_mad')
+plot_session_and_part(df_nph=df_nph, df_trials=df_trials, xlim_min=1105, xlim_max=1250, preprocessingmethod='calcium_jove2019')
+plot_session_and_part(df_nph=df_nph, df_trials=df_trials, xlim_min=1105, xlim_max=1250, preprocessingmethod='calcium_photobleach')
+plot_session_and_part(df_nph=df_nph, df_trials=df_trials, xlim_min=1105, xlim_max=1250, preprocessingmethod='calcium_alex')
+
+
+
+# %% 
+
+
+
+
+
+
+
+
+
+
+
+
+
+def smooth_signal1(x,window_len=10,window='flat'):
+
+    """smooth the data using a window with requested size.
+    region_number = "4" #the ROI number you recorded from 
+    nph_bnc = 0 #or 1, the BNC input you use to sync the data; "Input0" or "Input1" 
+    #choose one: .csv or .pqt
+    nph_file_path = '/mnt/h0/kb/data/one/mainenlab/Subjects/ZFM-06275/2023-09-18/001/raw_photometry_data/raw_photometry.csv' 
+    df_nph = pd.read_csv(nph_file_path) 
+    # df_nph = pd.read_parquet(nph_file_path) 
+        
+    This method is based on the convolution of a scaled window with the signal.
+    The signal is prepared by introducing reflected copies of the signal 
+    (with the window size) in both ends so that transient parts are minimized
+    in the begining and end part of the output signal.
+    The code taken from: https://scipy-cookbook.readthedocs.io/items/SignalSmooth.html
+
+    input:
+        x: the input signal 
+        window_len: the dimension of the smoothing window; should be an odd integer
+        window: the type of window from 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'
+                'flat' window will produce a moving average smoothing.
+
+    output:
+    the smoothed signal        
+    """
+
+    import numpy as np
+
+    if x.ndim != 1:
+        raise(ValueError, "smooth only accepts 1 dimension arrays.")
+
+    if x.size < window_len:
+        raise(ValueError, "Input vector needs to be bigger than window size.")
+
+    if window_len<3:
+        return x
+
+    if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
+        raise(ValueError, "Window is one of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
+
+    s=np.r_[x[window_len-1:0:-1],x,x[-2:-window_len-1:-1]]
+
+    if window == 'flat': # Moving average
+        w=np.ones(window_len,'d')
+    else:
+        w=eval('np.'+window+'(window_len)')
+
+    y=np.convolve(w/w.sum(),s,mode='valid')
+
+    return y[(int(window_len/2)-1):-int(window_len/2)]
+
+import numpy as np
+from scipy.sparse import csc_matrix, eye, diags
+from scipy.sparse.linalg import spsolve
+
+def WhittakerSmooth(x,w,lambda_,differences=1):
+    '''
+    Penalized least squares algorithm for background fitting
+    
+    input
+        x: input data (i.e. chromatogram of spectrum)
+        w: binary masks (value of the mask is zero if a point belongs to peaks and one otherwise)
+        lambda_: parameter that can be adjusted by user. The larger lambda is,  the smoother the resulting background
+        differences: integer indicating the order of the difference of penalties
+    
+    output
+        the fitted background vector
+    '''
+    X=np.matrix(x)
+    m=X.size
+    i=np.arange(0,m)
+    E=eye(m,format='csc')
+    D=E[1:]-E[:-1] # numpy.diff() does not work with sparse matrix. This is a workaround.
+    W=diags(w,0,shape=(m,m))
+    A=csc_matrix(W+(lambda_*D.T*D))
+    B=csc_matrix(W*X.T)
+    background=spsolve(A,B)
+    return np.array(background)
+
+def airPLS(x, lambda_=100, porder=1, itermax=15):
+    '''
+    Adaptive iteratively reweighted penalized least squares for baseline fitting
+    
+    input
+        x: input data (i.e. chromatogram of spectrum)
+        lambda_: parameter that can be adjusted by user. The larger lambda is,
+                 the smoother the resulting background, z
+        porder: adaptive iteratively reweighted penalized least squares for baseline fitting
+    
+    output
+        the fitted background vector
+    '''
+    m=x.shape[0]
+    w=np.ones(m)
+    for i in range(1,itermax+1):
+        z=WhittakerSmooth(x,w,lambda_, porder)
+        d=x-z
+        dssn=np.abs(d[d<0].sum())
+        if(dssn<0.001*(abs(x)).sum() or i==itermax):
+            if(i==itermax): print('WARING max iteration reached!')
+            break
+        w[d>=0]=0 # d>0 means that this point is part of a peak, so its weight is set to 0 in order to ignore it
+        w[d<0]=np.exp(i*np.abs(d[d<0])/dssn)
+        w[0]=np.exp(i*(d[d<0]).max()/dssn) 
+        w[-1]=w[0]
+    return z
+
+     
+
+
+df_nph['calcium_photobleach'] = photobleaching_lowpass(df_nph["raw_calcium"].values, fs=fs) #KB
+df_nph['isosbestic_photobleach'] = photobleaching_lowpass(df_nph["raw_isosbestic"], fs=fs)
+df_nph['calcium_jove2019'] = jove2019(df_nph["raw_calcium"], df_nph["raw_isosbestic"], fs=fs) 
+df_nph['isosbestic_jove2019'] = jove2019(df_nph["raw_isosbestic"], df_nph["raw_calcium"], fs=fs)
+df_nph['calcium_mad'] = preprocess_sliding_mad(df_nph["raw_calcium"].values, df_nph["times"].values, fs=fs)
+df_nph['isosbestic_mad'] = preprocess_sliding_mad(df_nph["raw_isosbestic"].values, df_nph["times"].values, fs=fs)
+df_nph['calcium_alex'] = preprocessing_alejandro(df_nph["raw_calcium"].values, fs=fs) 
+df_nph['isos_alex'] = preprocessing_alejandro(df_nph['raw_isosbestic'].values, fs=fs)
+
+
+
+smooth_win = 1
+smooth_reference = smooth_signal1(df_nph.raw_isosbestic, smooth_win)
+smooth_signal = smooth_signal1(df_nph.raw_calcium, smooth_win)
+
+
+
+lambd = 5e4 # Adjust lambda to get the best fit
+porder = 1
+itermax = 50
+r_base=airPLS(smooth_reference.T,lambda_=lambd,porder=porder,itermax=itermax)
+s_base=airPLS(smooth_signal,lambda_=lambd,porder=porder,itermax=itermax)
+     
+
+fig = plt.figure(figsize=(16, 10))
+ax1 = fig.add_subplot(211)
+ax1.plot(smooth_signal,'blue',linewidth=1)
+ax1.plot(s_base,'black',linewidth=1)
+ax2 = fig.add_subplot(212)
+ax2.plot(smooth_reference,'purple',linewidth=1)
+ax2.plot(r_base,'black',linewidth=1)
+
+
+
+
+reference = (smooth_reference - r_base)
+signal = (smooth_signal - s_base)  
+     
+
+fig = plt.figure(figsize=(16, 10))
+ax1 = fig.add_subplot(211)
+ax1.plot(signal,'blue',linewidth=1)
+ax2 = fig.add_subplot(212)
+ax2.plot(reference,'purple',linewidth=1)
+     
+
+df_nph["calcium_test"] = signal 
+df_nph["isosbestic_test"] = reference 
+
+
+
+
+
+
+# %%
+
+baseline_values = []
+normalized_values = []
+
+# Loop through each trial in df_trials
+for idx in range(1,len(df_trials.intervals_0)):  # Loop through trials 
+
+    # Get the start and end of the baseline window (next trial start and this trial end)
+    baseline_start = df_trials['intervals_1'].iloc[idx-1]  # end of previous trial
+    baseline_end = df_trials['intervals_0'].iloc[idx]  # start of current trial
+
+    # Get the start and end of the trial window (this trial's start and end)
+    trial_start = df_trials['intervals_0'].iloc[idx]  # start of current trial
+    trial_end = df_trials['intervals_1'].iloc[idx]    # end of current trial
+
+    # Select df_nph rows within the baseline window
+    baseline_mask = (df_nph['times'] >= baseline_start) & (df_nph['times'] <= baseline_end)
+    baseline_data = df_nph[baseline_mask]['calcium_test']
+    
+    # # Select df_nph rows within the trial window
+    # trial_mask = (df_nph['times'] >= trial_start) & (df_nph['times'] <= trial_end)
+    trial_data = df_nph['calcium_test']
+    
+    # Compute the average baseline for this trial
+    avg_baseline = baseline_data.mean()
+    baseline_values.append(avg_baseline)  # Store baseline values for each trial
+    
+    # Normalize the trial data by subtracting the baseline
+    normalized_trial = trial_data - avg_baseline
+    normalized_values.append(normalized_trial)  
+    plt.plot()
+
+
+
+plt.plot(normalized_trial) 
+plt.show()
+
+# %%
+    # Filter the dataset based on xlim
+    preprocessingmethod = "calcium_test"
+    xlim_min=1105
+    xlim_max=1250
+    mask = (df_nph['times'] >= xlim_min) & (df_nph['times'] <= xlim_max)
+    filtered_data = df_nph[mask]
+    y_min = filtered_data[preprocessingmethod].min()
+    y_max = filtered_data[preprocessingmethod].max()
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.plot(df_nph.times, df_nph[preprocessingmethod], linewidth=0.5, alpha=0.75, color='#177e89', label=preprocessingmethod)
+    for feedback_time in df_trials['feedback_times']:
+        ax.axvline(x=feedback_time, color='gray', linewidth=1, linestyle='-', alpha=0.6) 
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Signal')
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+    plt.title(preprocessingmethod)
+    # Add zoomed-in inset
+    axins = inset_axes(ax, width="50%", height="50%", loc="upper right")
+    axins.plot(df_nph.times, df_nph[preprocessingmethod], linewidth=0.75, alpha=0.75, color='#177e89')
+    axins.set_xlim(xlim_min, xlim_max)
+    axins.set_ylim(y_min, y_max)
+    # Plot the feedback times in the zoomed-in inset
+    for feedback_time in df_trials['feedback_times']:
+        if xlim_min <= feedback_time <= xlim_max:  # Only show feedback lines within the zoomed range
+            axins.axvline(x=feedback_time, color='gray', linewidth=1.05, linestyle='-', alpha=1)
+    # Add rectangle around zoomed-in area in the main plot
+    ax.indicate_inset_zoom(axins, edgecolor="black",)
+    plt.tight_layout()
+    plt.show() 
+
+# %%
+PERIEVENT_WINDOW = [-1,2]
+SAMPLING_RATE = int(1/np.mean(np.diff(df_nph.times))) 
+
+array_timestamps = np.array(df_nph.times) #pick the nph timestamps transformed to bpod clock 
+event_test = np.array(df_trials.intervals_0) #pick the intervals_0 timestamps 
+idx_event = np.searchsorted(array_timestamps, event_test) #check idx where they would be included, in a sorted way 
+""" create a column with the trial number in the nph df """
+df_nph["trial_number"] = 0 #create a new column for the trial_number 
+df_nph.loc[idx_event,"trial_number"]=1
+df_nph["trial_number"] = df_nph.trial_number.cumsum() #sum the [i-1] to i in order to get the trial number 
+
+sample_window = np.arange(PERIEVENT_WINDOW[0] * SAMPLING_RATE, PERIEVENT_WINDOW[1] * SAMPLING_RATE + 1)
+n_trials = df_trials.shape[0]
+
+psth_idx = np.tile(sample_window[:,np.newaxis], (1, n_trials)) 
+
+event_times = np.array(df_trials[EVENT]) #pick the feedback timestamps 
+
+event_idx = np.searchsorted(array_timestamps, event_times) #check idx where they would be included, in a sorted way 
+
+psth_idx += event_idx
+
+kcenia.plot_heatmap_psth(df_nph.calcium_mad,df_trials,psth_idx, EVENT, subject, session_date, region, eid)
+kcenia.plot_heatmap_psth(df_nph.calcium_test,df_trials,psth_idx, EVENT, subject, session_date, region, eid) 
+
+
+
+
+
+#%%
