@@ -55,7 +55,7 @@ def sliding_dFF(F: nap.Tsd, w_len: float, fs=None, weights=None):
     w_size = int(w_len * fs)
 
     def _dFF(A: np.array):
-        return A - np.average(A) / np.average(A)
+        return (A - np.average(A)) / np.average(A)
 
     if weights is not None:
         # note: passing weights makes the stride trick not possible, or only with allocating a matrix of shape (n_samples * w_size)

@@ -12,10 +12,17 @@ from one.api import ONE
 from tqdm import tqdm
 import logging
 
+from copy import copy
+
+# %%
+run_name = 'test'
+debug = False
+
+# %%
 # logging related
 logger = logging.getLogger()
 filemode = 'w'  # append 'w' is overwrite
-filename = Path('fphot_qc.log')
+filename = Path(f'fphot_qc_{run_name}.log')
 file_handler = logging.FileHandler(filename=filename, mode=filemode)
 log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 date_fmt = '%Y-%m-%d %H:%M:%S'
@@ -23,9 +30,16 @@ formatter = logging.Formatter(log_fmt, datefmt=date_fmt)
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
+# %% one related
 # one = ONE(base_url="https://alyx.internationalbrainlab.org")
 one_dir = Path('/mnt/h0/kb/data/one')
 one = ONE(cache_dir=one_dir)
+
+# %% get all eids in the correct order
+df = pd.read_csv('/home/georg/code/ibl-photometry/src/iblphotometry/website.csv')
+eids = list(df['eid'])
+if debug:
+    eids = eids[:10]
 
 # %% setup metrics
 
@@ -37,7 +51,7 @@ raw_metrics = [
     [metrics.bleaching_tau, None],
 ]
 
-# only apply after some form of processing
+# only apply after pipelines are run
 processed_metrics = [
     [metrics.signal_asymmetry, dict(pc_comp=95)],
     [metrics.percentile_dist, dict(pc=(5, 95))],
@@ -50,13 +64,26 @@ response_metrics = [
 ]
 
 sliding_kwargs = dict(w_len=10, n_wins=15)  # 10 seconds
-# %% get all eids in the correct order
-df = pd.read_csv('/home/georg/code/ibl-photometry/src/iblphotometry/website.csv')
-eids = list(df['eid'])
-# eids = eids[:10]
 
-# %%
-qc_df = pd.DataFrame(index=eids)
+# %% pipeline definition / registrations
+
+# note care has to be taken that all the output and input of consecutive pipeline funcs are compatible
+pipelines_reg = dict(
+    sliding_mad=(
+        (outlier_detection.remove_spikes_, dict(sd=5)),
+        (pipelines.bc_lp_sliding_mad, dict(signal_name='raw_calcium')),
+    ),
+    isosbestic=(
+        (outlier_detection.remove_spikes_, dict(sd=5)),
+        (pipelines.isosbestic_regression, dict(regressor='RANSAC')),
+    ),
+)
+
+
+# %% main QC loop
+qc_dfs = {}
+for pipe in pipelines_reg.keys():
+    qc_dfs[pipe] = pd.DataFrame(index=eids)
 
 for i, eid in enumerate(tqdm(eids)):
     # trials = one.load_dataset(eid, "_ibl_trials.table.pqt", collection='alf')
@@ -76,97 +103,59 @@ for i, eid in enumerate(tqdm(eids)):
         session_interval = nap.IntervalSet(t_start, t_stop)
         raw_photometry = raw_photometry.restrict(session_interval)
 
-        # metrics on processed
-        for ch in ['calcium', 'isosbestic']:
-            F = raw_photometry[f'raw_{ch}']
+        # process all pipelines
+        for pipe_name, pipe in pipelines_reg.items():
+            # run pipeline
+            try:
+                photometry = copy(raw_photometry)
+                for i, (pipe_func, pipe_args) in enumerate(pipe):
+                    photometry = pipe_func(photometry, **pipe_args)
+            except Exception as e:
+                logger.warning(
+                    f'{eid}: pipeline {pipe_name} fails with: {type(e).__name__}:{e}'
+                )
+                continue
 
-            # raw metrics
-            for metric, params in raw_metrics:
+            # raw metrics - a bit redundant but just to have everyting combined together
+            for ch in raw_photometry.columns:
+                F = raw_photometry[ch]
+
+                # raw metrics
+                for metric, params in raw_metrics:
+                    try:
+                        res = eval_metric(F, metric, params)
+                        qc_dfs[pipe_name].loc[eid, f'{metric.__name__}_{ch}'] = res[
+                            'value'
+                        ]
+                    except Exception as e:
+                        logger.warning(
+                            f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
+                        )
+
+            # metrics on the output of the pipeline
+            Fpp = photometry  # at this point, should be a nap.Tsd
+            for metric, params in processed_metrics:
                 try:
-                    res = eval_metric(F, metric, params)
-                    qc_df.loc[eid, f'{metric.__name__}_{ch}'] = res['value']
+                    res = eval_metric(Fpp, metric, params, sliding_kwargs)
+                    qc_dfs[pipe_name].loc[eid, f'{metric.__name__}'] = res['value']
+                    qc_dfs[pipe_name].loc[eid, f'{metric.__name__}_r'] = res['rval']
+                    qc_dfs[pipe_name].loc[eid, f'{metric.__name__}_p'] = res['pval']
                 except Exception as e:
                     logger.warning(
                         f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
                     )
 
-        # metrics on preprocessed data
-        F_ca = raw_photometry['raw_calcium']
-        F_iso = raw_photometry['raw_isosbestic']
-
-        try:  # this is essentially the pipeline
-            F_ca_sr = outlier_detection.remove_spikes(F_ca)
-            F_iso_sr = outlier_detection.remove_spikes(F_iso)
-            Fc = pipelines.isosbestic_regression(F_iso, F_ca)
-        except Exception as e:
-            logger.warning(f'{eid}: preproccessing failure: {type(e).__name__}:{e}')
-            continue
-
-        for metric, params in processed_metrics:
-            try:
-                res = eval_metric(Fc, metric, params, sliding_kwargs)
-                qc_df.loc[eid, f'{metric.__name__}'] = res['value']
-                qc_df.loc[eid, f'{metric.__name__}_r'] = res['rval']
-                qc_df.loc[eid, f'{metric.__name__}_p'] = res['pval']
-            except Exception as e:
-                logger.warning(
-                    f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
-                )
-
-        # metrics that factor in behavior
-        for metric, params in response_metrics:
-            params['trials'] = trials
-            try:
-                res = eval_metric(Fc, metric, params)
-                qc_df.loc[eid, f'{metric.__name__}'] = res['value']
-            except Exception as e:
-                logger.warning(
-                    f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
-                )
-
-        # # metrics on processed
-        # for ch in ['calcium', 'isosbestic']:
-        #     F = raw_photometry[f'raw_{ch}']
-
-        #     # raw metrics
-        #     for metric, params in raw_metrics:
-        #         try:
-        #             res = eval_metric(F, metric, params)
-        #             qc_df.loc[eid, f'{metric.__name__}_{ch}'] = res['value']
-        #         except Exception as e:
-        #             logger.warning(
-        #                 f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
-        #             )
-
-        #     # metrics on preprocessed data
-        #     try:  # this is essentially the pipeline
-        #         Fpp = outlier_detection.remove_spikes(F)
-        #         Fc = pipelines.bc_lp_sliding_mad(Fpp)
-        #     except Exception as e:
-        #         logger.warning(f'{eid}: preproccessing failure: {type(e).__name__}:{e}')
-        #         continue
-
-        #     for metric, params in processed_metrics:
-        #         try:
-        #             res = eval_metric(Fc, metric, params, sliding_kwargs)
-        #             qc_df.loc[eid, f'{metric.__name__}_{ch}'] = res['value']
-        #             qc_df.loc[eid, f'{metric.__name__}_{ch}_r'] = res['rval']
-        #             qc_df.loc[eid, f'{metric.__name__}_{ch}_p'] = res['pval']
-        #         except Exception as e:
-        #             logger.warning(
-        #                 f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
-        #             )
-
-        #     # metrics that factor in behavior
-        #     for metric, params in response_metrics:
-        #         params['trials'] = trials
-        #         try:
-        #             res = eval_metric(Fc, metric, params)
-        #             qc_df.loc[eid, f'{metric.__name__}_{ch}'] = res['value']
-        #         except Exception as e:
-        #             logger.warning(
-        #                 f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
-        #             )
-
+            # metrics that factor in behavior
+            for metric, params in response_metrics:
+                params['trials'] = trials
+                try:
+                    res = eval_metric(Fpp, metric, params)
+                    qc_dfs[pipe_name].loc[eid, f'{metric.__name__}_{ch}'] = res['value']
+                except Exception as e:
+                    logger.warning(
+                        f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
+                    )
 # %%
-qc_df.to_csv('qc_isos.csv')
+# storing all the qc
+for pipe_name in pipelines_reg.keys():
+    qc_dfs[pipe_name].to_csv(f'qc_{pipe_name}.csv')

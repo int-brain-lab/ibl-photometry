@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 import warnings
 from tqdm import tqdm
-
 import numpy as np
+import pandas as pd
 import pynapple as nap
 from scipy.optimize import minimize, curve_fit
 from scipy.stats.distributions import norm
@@ -280,6 +280,11 @@ class IsosbesticCorrection:
         ca = F_ca.values[:, np.newaxis]
         iso = F_iso.values[:, np.newaxis]
 
+        if np.any(pd.isna(ca).flatten()) or np.any(pd.isna(iso).flatten()):
+            import pdb
+
+            pdb.set_trace()
+
         reg.fit(iso, ca)
         iso_fit = reg.predict(iso)
         return nap.Tsd(t=F_ca.times(), d=iso_fit.flatten())
@@ -314,6 +319,8 @@ class LowpassCorrection:
         F_filt = filt(F, **self.filter_params)
         if mode == 'subtract':
             d = F.values - F_filt.values
+        if mode == 'divide':
+            d = F.values / F_filt.values
         if mode == 'subtract-divide':
             d = (F.values - F_filt.values) / F_filt.values
         return nap.Tsd(t=F.times(), d=d)

@@ -25,7 +25,7 @@ from scipy.stats import ttest_ind
 
 
 def percentile_dist(A: nap.Tsd | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
-    """the distance between two percentiles in units of z
+    """the distance between two percentiles in units of z. Captures the magnitude of transients.
 
     Args:
         A (nap.Tsd | np.ndarray): the input data, np.ndarray for stride tricks sliding windows
@@ -43,7 +43,7 @@ def percentile_dist(A: nap.Tsd | np.ndarray, pc: tuple = (50, 95), axis=-1) -> f
 
 
 def signal_asymmetry(A: nap.Tsd | np.ndarray, pc_comp: int = 95, axis=-1) -> float:
-    """_summary_
+    """the ratio between the distance of two percentiles to the median. Proportional to the the signal to noise.
 
     Args:
         A (nap.Tsd | np.ndarray): _description_
@@ -53,8 +53,8 @@ def signal_asymmetry(A: nap.Tsd | np.ndarray, pc_comp: int = 95, axis=-1) -> flo
     Returns:
         float: _description_
     """
-    a = percentile_dist(A, (50, pc_comp), axis=axis)
-    b = percentile_dist(A, (100 - pc_comp, 50), axis=axis)
+    a = np.absolute(percentile_dist(A, (50, pc_comp), axis=axis))
+    b = np.absolute(percentile_dist(A, (100 - pc_comp, 50), axis=axis))
     return a / b
 
 
@@ -79,7 +79,7 @@ def n_unique_samples(A: nap.Tsd) -> int:
 
 
 def n_spikes(A: nap.Tsd, sd: int):
-    """count the number of spike artifacts in the recording
+    """count the number of spike artifacts in the recording.
 
     Args:
         A (nap.Tsd): _description_
@@ -92,7 +92,7 @@ def n_spikes(A: nap.Tsd, sd: int):
 
 
 def n_outliers(A: nap.Tsd, w_size: int = 1000, alpha: float = 0.0005) -> int:
-    """_summary_
+    """counts the number of outliers as detected by grubbs test for outliers.
 
     Args:
         A (nap.Tsd): _description_
@@ -106,7 +106,7 @@ def n_outliers(A: nap.Tsd, w_size: int = 1000, alpha: float = 0.0005) -> int:
 
 
 def bleaching_tau(A: nap.Tsd) -> float:
-    """overall tau of bleaching
+    """overall tau of bleaching.
 
     Args:
         A (nap.Tsd): _description_

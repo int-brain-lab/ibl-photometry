@@ -8,15 +8,17 @@ from ibldsp.utils import WindowGenerator
 from iblphotometry import sliding_operations
 from iblphotometry import bleach_corrections
 
+import logging
 
-# def iso_dff
+logger = logging.getLogger()
 
 
 def bc_lp_sliding_mad(
-    F: nap.Tsd,
+    F: nap.Tsd | nap.TsdFrame,
     w_len: float = 120,
     overlap: int = 90,
     butterworth_lowpass=dict(N=3, Wn=0.01, btype='lowpass'),
+    signal_name: str = 'raw_calcium',
 ):
     """_summary_
 
@@ -29,13 +31,26 @@ def bc_lp_sliding_mad(
     Returns:
         _type_: _description_
     """
+
+    if isinstance(
+        F, nap.TsdFrame
+    ):  # if F is as TsdFrame, then use signal name to get the correct column - this is needed for the pipeline functionality in run_qc
+        if signal_name is None:
+            logger.critical('no signal name is provided for the pipeline')
+        F = F[signal_name]
+
     bc = bleach_corrections.LowpassCorrection()
     F_bc = bc.bleach_correct(F)
     F_res = sliding_operations.sliding_mad(F_bc, w_len=w_len, overlap=overlap)
     return F_res
 
 
-def jove2019(raw_calcium: nap.Tsd, raw_isosbestic: nap.Tsd, **params):
+def jove2019(
+    F: nap.TsdFrame,
+    ca_signal_name: str = 'raw_calcium',
+    isosbestic_signal_name: str = 'raw_isosbestic',
+    **params,
+):
     """
     Martianova, Ekaterina, Sage Aronson, and Christophe D. Proulx. "Multi-fiber photometry to record neural activity in freely-moving animals." JoVE (Journal of Visualized Experiments) 152 (2019): e60278.
     :param raw_calcium:
@@ -43,8 +58,11 @@ def jove2019(raw_calcium: nap.Tsd, raw_isosbestic: nap.Tsd, **params):
     :param params:
     :return:
     """
-    # DOCME more
-    # the first step is to remove the photobleaching w
+    raw_calcium = F[ca_signal_name]
+    raw_isosbestic = F[isosbestic_signal_name]
+
+    # replace this with a low pass corrector
+    # remove photobleaching
     calcium_lp = filt(
         raw_calcium,
         **params.get('butterworth_lowpass', {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}),
@@ -68,13 +86,22 @@ def jove2019(raw_calcium: nap.Tsd, raw_isosbestic: nap.Tsd, **params):
 
 
 def isosbestic_regression(
-    raw_isosbestic: nap.Tsd, raw_calcium: nap.Tsd, fs: float = None, **params
+    F: nap.TsdFrame,
+    ca_signal_name: str = 'raw_calcium',
+    isosbestic_signal_name: str = 'raw_isosbestic',
+    fs: float = None,
+    regressor: str = 'RANSAC',
+    correction: str = 'subtract-divide',
+    **params,
 ):
-    t = raw_isosbestic.times()
+    raw_calcium = F[ca_signal_name]
+    raw_isosbestic = F[isosbestic_signal_name]
+
+    t = F.times()
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
 
     isosbestic_correction = bleach_corrections.IsosbesticCorrection(
-        regressor='RANSAC', correction='subtract-divide'
+        regressor=regressor, correction=correction
     )
     F_corr = isosbestic_correction.correct(
         raw_calcium,
@@ -89,94 +116,3 @@ def isosbestic_regression(
 
     F_corr = filt(F_corr, **butterworth_signal)
     return F_corr
-
-
-## the originals
-
-# def preprocess_sliding_mad(
-#     raw_calcium: nap.Tsd, fs=None, wlen=120, overlap=90, returns_gain=False, **params
-# ):
-#     """
-#     Applies one pass of fiber photobleaching
-#     :param raw_calcium:
-#     :param times:
-#     :param fs:
-#     :param wlen:
-#     :param overlap:
-#     :param params:
-#     :return:
-#     """
-#     times = raw_calcium.times()
-#     fs = 1 / np.median(np.diff(times)) if fs is None else fs
-
-#     calcium = photobleaching_lowpass(raw_calcium, fs, **params).values
-
-#     wg = ibldsp.utils.WindowGenerator(
-#         ns=calcium.size, nswin=int(wlen * fs), overlap=overlap
-#     )
-#     trms = np.array([first for first, last in wg.firstlast]) / fs + times[0]
-#     rmswin, _ = psth(calcium, times, t_events=trms, fs=fs, peri_event_window=[0, wlen])
-#     gain = np.nanmedian(np.abs(calcium)) / np.nanmedian(np.abs(rmswin), axis=0)
-#     gain = np.interp(times, trms, gain)
-#     if returns_gain:
-#         return nap.Tsd(t=times, d=calcium * gain), gain
-#     else:
-#         return nap.Tsd(t=times, d=calcium * gain)
-
-# something like this would be nice
-# pipeline = dict(
-#     name="pipeline_name",
-#     parts = [func, params]
-
-#         )
-
-
-# def isosbestic_regression(
-#     raw_isosbestic: nap.Tsd, raw_calcium: nap.Tsd, fs: float, **params
-# ):
-#     """
-#     Prototype of baseline correction for photometry data.
-#     Fits a low pass version of the isosbestic signal to the calcium signal. The baseline signal is
-#     the low pass isosbestic signal multiplied by the fit slope and added to the fit intercept.
-#     The corrected signal is the calcium signal minus the baseline signal divided by the baseline signal.
-#     We apply the same procedure to the full-band isosbestic signal to check for remaining correlations.
-#     :param raw_isosbestic:
-#     :param raw_calcium:
-#     :param params: dictionary with parameters
-#         butterworth_regression: dictionary with parameters for the butterworth filter applied to both isosbestic and
-#         calcium band for the sole purpose of regression {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}
-#         butterworth_signal: dictionary with parameters for the butterworth filter {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}
-#         applied to the outputs. Set to None to disable filtering
-#     :return:
-#     iso (np.array): the corrected isosbestic signal to be used as control
-#     ph (np.array): the corrected calcium signal
-#     """
-#     params = {} if params is None else params
-#     times = raw_isosbestic.times()
-
-#     # sos = scipy.signal.butter(
-#     #     **params.get(
-#     #         "butterworth_regression", {"N": 3, "Wn": 0.1, "btype": "lowpass", "fs": fs}
-#     #     ),
-#     #     output="sos",
-#     # )
-#     butterworth_regression = params.get(
-#         "butterworth_regression", {"N": 3, "Wn": 0.1, "btype": "lowpass", "fs": fs}
-#     )
-#     calcium_lp = utils.filt(raw_calcium, **butterworth_regression)
-#     # calcium_lp = scipy.signal.sosfiltfilt(sos, raw_calcium)
-#     # isosbestic_lp = scipy.signal.sosfiltfilt(sos, raw_isosbestic)
-#     isosbestic_lp = utils.filt(raw_isosbestic, **butterworth_regression)
-#     m = np.polyfit(isosbestic_lp, calcium_lp, 1)
-
-#     ref = isosbestic_lp * m[0] + m[1]
-#     ph = nap.Tsd(t=times, d=(raw_calcium - ref) / ref)
-
-#     butterworth_signal = params.get(
-#         "butterworth_signal", {"N": 3, "Wn": 10, "btype": "lowpass", "fs": fs}
-#     )
-#     ph = utils.filt(ph, **butterworth_signal)
-#     # if butterworth_signal is not None:
-#     # sosbp = scipy.signal.butter(**butterworth_signal, output="sos")
-#     # ph = scipy.signal.sosfiltfilt(sosbp, ph)
-#     return ph

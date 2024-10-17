@@ -8,15 +8,15 @@ from scipy.stats import gaussian_kde as kde
 import warnings
 
 
-def grubbs_single(y, alpha=0.005, mode="median"):
+def grubbs_single(y, alpha=0.005, mode='median'):
     # to apply a single pass of grubbs outlier detection
     # see https://en.wikipedia.org/wiki/Grubbs%27s_test
 
     N = y.shape[0]
-    if mode == "classic":
+    if mode == 'classic':
         # this is the formulation as from wikipedia
         G = np.max(np.absolute(y - np.average(y))) / np.std(y)
-    if mode == "median":
+    if mode == 'median':
         # this is more robust against outliers
         G = np.max(np.absolute(y - np.median(y))) / np.std(y)
     tsq = t.ppf(1 - alpha / (2 * N), df=N - 2) ** 2
@@ -28,14 +28,14 @@ def grubbs_single(y, alpha=0.005, mode="median"):
         return False
 
 
-def grubbs_it(y, alpha=0.05, mode="median"):
+def grubbs_it(y, alpha=0.05, mode='median'):
     # apply grubbs test iteratively until no more outliers are found
     outliers = []
     while grubbs_single(y, alpha=alpha):
         # get the outlier index
-        if mode == "classic":
+        if mode == 'classic':
             ix = np.argmax(np.absolute(y - np.average(y)))
-        if mode == "median":
+        if mode == 'median':
             ix = np.argmax(np.absolute(y - np.median(y)))
         outliers.append(ix)
         y[ix] = np.median(y)
@@ -60,14 +60,14 @@ def grubbs_sliding(y: np.array, w_size: int, alpha: float):
         grubbs_it(y[np.prod(B.shape) :], alpha=alpha) + B.shape[0] * w_size
     )
 
-    outlier_ix = np.concatenate(outlier_ix).astype("int64")
+    outlier_ix = np.concatenate(outlier_ix).astype('int64')
     return np.unique(outlier_ix)
 
 
 def remove_nans(y: np.array):
     y = y[~pd.isna(y)]  # nanfilter
     if y.shape[0] == 0:
-        warnings.warn("y was all NaN and is now empty")
+        warnings.warn('y was all NaN and is now empty')
     return y
 
 
@@ -113,6 +113,19 @@ def remove_spikes(F: nap.Tsd, sd: int = 5, w: int = 25):
     try:
         y = fillnan_kde(y, w=w)
     except np.linalg.LinAlgError:
-        y[outliers] = np.median(y)
-        warnings.warn("KDE fillnan failed, using global median")
+        if np.all(pd.isna(y[outliers])):  # all are NaN!
+            y[:] = 0
+            warnings.warn('all values NaN, setting to zeros')  # TODO logger
+        else:
+            y[outliers] = np.nanmedian(y)
+            warnings.warn('KDE fillnan failed, using global median')  # TODO logger
+
     return nap.Tsd(t=t, d=y)
+
+
+def remove_spikes_(fp_frame: nap.TsdFrame, sd: int = 5, w: int = 25):
+    # FIXME REFACTOR very ugly multichannel version
+    f = np.zeros_like(fp_frame.values)
+    for i, col in enumerate(fp_frame.columns):
+        f[:, i] = remove_spikes(fp_frame[col], sd=sd, w=w).values
+    return nap.TsdFrame(t=fp_frame.times(), d=f, columns=fp_frame.columns)
