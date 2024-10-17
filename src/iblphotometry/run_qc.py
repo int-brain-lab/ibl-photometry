@@ -13,10 +13,13 @@ from tqdm import tqdm
 import logging
 
 from copy import copy
+import gc
 
 # %%
 run_name = 'test'
 debug = False
+output_folder = Path('/home/georg/code/ibl-photometry/qc_results')
+output_folder.mkdir(parents=True, exist_ok=True)
 
 # %%
 # logging related
@@ -77,8 +80,8 @@ pipelines_reg = dict(
         (outlier_detection.remove_spikes_, dict(sd=5)),
         (pipelines.isosbestic_regression, dict(regressor='RANSAC')),
     ),
+    jove2019=(pipelines.jove2019, dict()),
 )
-
 
 # %% main QC loop
 qc_dfs = {}
@@ -155,7 +158,9 @@ for i, eid in enumerate(tqdm(eids)):
                     logger.warning(
                         f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
                     )
+    gc.collect()
+
 # %%
 # storing all the qc
 for pipe_name in pipelines_reg.keys():
-    qc_dfs[pipe_name].to_csv(f'qc_{pipe_name}.csv')
+    qc_dfs[pipe_name].to_csv(output_folder / f'qc_{pipe_name}.csv')

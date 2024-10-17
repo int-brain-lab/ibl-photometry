@@ -63,22 +63,24 @@ def jove2019(
 
     # replace this with a low pass corrector
     # remove photobleaching
-    calcium_lp = filt(
+    lowpass_correction = bleach_corrections.LowpassCorrection()
+    calcium = lowpass_correction.bleach_correct(
         raw_calcium,
-        **params.get('butterworth_lowpass', {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}),
-    )
-    calcium = raw_calcium.values - calcium_lp.values
-
-    isosbestic_lp = filt(
+        filter_params=dict(N=3, Wn=0.01, btype='lowpass'),
+        mode='subtract',
+    ).values
+    isosbestic = lowpass_correction.bleach_correct(
         raw_isosbestic,
-        **params.get('butterworth_lowpass', {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}),
-    )
-    isosbestic = raw_isosbestic.values - isosbestic_lp.values
+        filter_params=dict(N=3, Wn=0.01, btype='lowpass'),
+        mode='subtract',
+    ).values
 
     # zscoring using median instead of mean
     # this is not the same as the modified zscore
-    calcium = (calcium - np.median(calcium)) / np.std(calcium)
-    isosbestic = (isosbestic - np.median(isosbestic)) / np.std(isosbestic)
+    # calcium = (calcium - np.median(calcium)) / np.std(calcium)
+    calcium = z(calcium, mode='median')
+    # isosbestic = (isosbestic - np.median(isosbestic)) / np.std(isosbestic)
+    isosbestic = z(isosbestic, mode='median')
     m = np.polyfit(isosbestic, calcium, 1)
     ref = isosbestic * m[0] + m[1]
     ph = (calcium - ref) / 100
