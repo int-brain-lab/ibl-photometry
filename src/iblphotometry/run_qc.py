@@ -25,7 +25,7 @@ output_folder.mkdir(parents=True, exist_ok=True)
 # logging related
 logger = logging.getLogger()
 filemode = 'w'  # append 'w' is overwrite
-filename = Path(f'fphot_qc_{run_name}.log')
+filename = output_folder / f'fphot_qc_{run_name}.log'
 file_handler = logging.FileHandler(filename=filename, mode=filemode)
 log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 date_fmt = '%Y-%m-%d %H:%M:%S'
@@ -80,7 +80,7 @@ pipelines_reg = dict(
         (outlier_detection.remove_spikes_, dict(sd=5)),
         (pipelines.isosbestic_regression, dict(regressor='RANSAC')),
     ),
-    jove2019=(pipelines.jove2019, dict()),
+    jove2019=((pipelines.jove2019, dict()),),
 )
 
 # %% main QC loop

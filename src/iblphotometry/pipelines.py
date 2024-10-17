@@ -63,15 +63,15 @@ def jove2019(
 
     # replace this with a low pass corrector
     # remove photobleaching
-    lowpass_correction = bleach_corrections.LowpassCorrection()
+    lowpass_correction = bleach_corrections.LowpassCorrection(
+        filter_params=dict(N=3, Wn=0.01, btype='lowpass'),
+    )
     calcium = lowpass_correction.bleach_correct(
         raw_calcium,
-        filter_params=dict(N=3, Wn=0.01, btype='lowpass'),
         mode='subtract',
     ).values
     isosbestic = lowpass_correction.bleach_correct(
         raw_isosbestic,
-        filter_params=dict(N=3, Wn=0.01, btype='lowpass'),
         mode='subtract',
     ).values
 
@@ -113,7 +113,7 @@ def isosbestic_regression(
 
     butterworth_signal = params.get(
         'butterworth_signal',
-        {'N': 3, 'Wn': 7, 'btype': 'lowpass', 'fs': fs},  # changed from 10
+        {'N': 3, 'Wn': 7, 'btype': 'lowpass', 'fs': fs},  # changed from 10 to 7
     )
 
     F_corr = filt(F_corr, **butterworth_signal)
