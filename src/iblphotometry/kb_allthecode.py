@@ -1075,4 +1075,484 @@ for interval in wheel_moves['intervals']:
 plt.legend()
 plt.xlim(1050, 1150)
 plt.show()
+
+
+
+
+# %% 
+""" BEHAVIOR - PSYCHOMETRIC CURVE FOR 1 SESSION """ 
+
+trials = one.load_object(eid, 'trials', collection='alf')
+mouse=subject
+date=session_date
+from brainbox.behavior.training import compute_performance
+performance, contrasts, n_contrasts = compute_performance(trials)
+# performance, contrasts, n_contrasts = compute_performance(trials, prob_right=True)
+# performance, contrasts, n_contrasts = compute_performance(trials, block=0.8)
+from brainbox.behavior.training import plot_psychometric
+def compute_performance(trials, signed_contrast=None, block=None, prob_right=False):
+    """
+    Compute performance on all trials at each contrast level from trials object
+
+    :param trials: trials object that must contain contrastLeft, contrastRight and feedbackType
+    keys
+    :type trials: dict
+    returns: float containing performance on easy contrast trials
+    """
+    if signed_contrast is None:
+        signed_contrast = get_signed_contrast(trials)
+
+    if block is None:
+        block_idx = np.full(trials.probabilityLeft.shape, True, dtype=bool)
+    else:
+        block_idx = trials.probabilityLeft == block
+
+    if not np.any(block_idx):
+        return np.nan * np.zeros(3)
+
+    contrasts, n_contrasts = np.unique(signed_contrast[block_idx], return_counts=True)
+
+    if not prob_right:
+        correct = trials.feedbackType == 1
+        performance = np.vectorize(lambda x: np.mean(correct[(x == signed_contrast) & block_idx]))(contrasts)
+    else:
+        rightward = trials.choice == -1
+        # Calculate the proportion rightward for each contrast type
+        performance = np.vectorize(lambda x: np.mean(rightward[(x == signed_contrast) & block_idx]))(contrasts)
+
+    return performance, contrasts, n_contrasts
+
+
+def compute_n_trials(trials):
+    """
+    Compute number of trials in trials object
+
+    :param trials: trials object
+    :type trials: dict
+    returns: int containing number of trials in session
+    """
+    return trials['choice'].shape[0]
+
+import psychofit as psy
+def compute_psychometric(trials, signed_contrast=None, block=None, plotting=False):
+    """
+    Compute psychometric fit parameters for trials object
+
+    :param trials: trials object that must contain contrastLeft, contrastRight and probabilityLeft
+    :type trials: dict
+    :param signed_contrast: array of signed contrasts in percent, where -ve values are on the left
+    :type signed_contrast: np.array
+    :param block: biased block can be either 0.2 or 0.8
+    :type block: float
+    :return: array of psychometric fit parameters - bias, threshold, lapse high, lapse low
+    """
+
+    if signed_contrast is None:
+        signed_contrast = get_signed_contrast(trials)
+
+    if block is None:
+        block_idx = np.full(trials.probabilityLeft.shape, True, dtype=bool)
+    else:
+    
+        block_idx = trials.probabilityLeft == block
+
+    if not np.any(block_idx):
+        return np.nan * np.zeros(4)
+
+    prob_choose_right, contrasts, n_contrasts = compute_performance(trials, signed_contrast=signed_contrast, block=block,
+                                                                    prob_right=True)
+
+    if plotting:
+        psych, _ = psy.mle_fit_psycho(
+            np.vstack([contrasts, n_contrasts, prob_choose_right]),
+            P_model='erf_psycho_2gammas',
+            parstart=np.array([0., 40., 0.1, 0.1]),
+            parmin=np.array([-50., 10., 0., 0.]),
+            parmax=np.array([50., 50., 0.2, 0.2]),
+            nfits=10)
+    else:
+
+        psych, _ = psy.mle_fit_psycho(
+            np.vstack([contrasts, n_contrasts, prob_choose_right]),
+            P_model='erf_psycho_2gammas',
+            parstart=np.array([np.mean(contrasts), 20., 0.05, 0.05]),
+            parmin=np.array([np.min(contrasts), 0., 0., 0.]),
+            parmax=np.array([np.max(contrasts), 100., 1, 1]))
+
+    return psych
+def get_signed_contrast(trials): 
+    """
+    Compute signed contrast from trials object
+
+    :param trials: trials object that must contain contrastLeft and contrastRight keys
+    :type trials: dict
+    returns: array of signed contrasts in percent, where -ve values are on the left
+    """
+    # Replace NaNs with zeros, stack and take the difference
+    contrast = np.nan_to_num(np.c_[trials['contrastLeft'], trials['contrastRight']])
+    return np.diff(contrast).flatten() * 100
+
+contrasts_2 = [-100. , -25. , 0. , 25. , 100. ]
+
+"""
+Psychometric plot
+"""
+def plot_psychometric(trials, ax=None, title=None, suptitle=None, **kwargs):
+    """
+    Function to plot pyschometric curve plots a la datajoint webpage
+    :param trials:
+    :return:
+    """
+    plt.rcParams['figure.figsize'] = [5, 5]
+    plt.rcParams["figure.dpi"] = 300
+
+    signed_contrast = get_signed_contrast(trials)
+    contrasts_fit = np.arange(-100, 100)
+
+    prob_right_50, contrasts_50, _ = compute_performance(trials, signed_contrast=signed_contrast, block=0.5, prob_right=True)
+    pars_50 = compute_psychometric(trials, signed_contrast=signed_contrast, block=0.5, plotting=True)
+    prob_right_fit_50 = psy.erf_psycho_2gammas(pars_50, contrasts_fit)
+
+    prob_right_20, contrasts_20, _ = compute_performance(trials, signed_contrast=signed_contrast, block=0.2, prob_right=True)
+    pars_20 = compute_psychometric(trials, signed_contrast=signed_contrast, block=0.2, plotting=True)
+    prob_right_fit_20 = psy.erf_psycho_2gammas(pars_20, contrasts_fit)
+
+    prob_right_80, contrasts_80, _ = compute_performance(trials, signed_contrast=signed_contrast, block=0.8, prob_right=True)
+    pars_80 = compute_psychometric(trials, signed_contrast=signed_contrast, block=0.8, plotting=True)
+    prob_right_fit_80 = psy.erf_psycho_2gammas(pars_80, contrasts_fit)
+
+    cmap = ["#E07C12","#320F42","#008F7C"]
+
+    if not ax:
+        fig, ax = plt.subplots(**kwargs)
+    else:
+        fig = plt.gcf()
+
+    # TODO error bars
+
+    fit_50 = ax.plot(contrasts_fit, prob_right_fit_50, color=cmap[1])
+    data_50 = ax.scatter(contrasts_50, prob_right_50, color=cmap[1], alpha=0.5)
+    fit_20 = ax.plot(contrasts_fit, prob_right_fit_20, color=cmap[0])
+    data_20 = ax.scatter(contrasts_20, prob_right_20, color=cmap[0], alpha=0.5)
+    fit_80 = ax.plot(contrasts_fit, prob_right_fit_80, color=cmap[2])
+    data_80 = ax.scatter(contrasts_80, prob_right_80, color=cmap[2], alpha=0.5)
+    ax.legend([fit_50[0], data_50, fit_20[0], data_20, fit_80[0], data_80],
+            ['p_left=0.5 fit', 'p_left=0.5 data', 'p_left=0.2 fit', 'p_left=0.2 data', 'p_left=0.8 fit', 'p_left=0.8 data'],
+            loc='lower right',
+            fontsize=8)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_ylabel('Probability choosing right')
+    ax.set_xlabel('Contrasts') 
+    plt.xticks(contrasts_2)
+    plt.axhline(y=0.5,color = 'gray', linestyle = '--',linewidth=0.25) 
+    plt.axvline(x=0.5,color = 'gray', linestyle = '--',linewidth=0.25) 
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    if title:
+        ax.set_title(title, fontsize=9)
+    if suptitle:
+        plt.suptitle(suptitle, y=1, fontsize=8)
+
+    return fig, ax
+fig, ax = plot_psychometric(trials, title=f"{mouse}_{date}_{eid}", suptitle=f"{performance}")
+# fig.savefig(f'/mnt/h0/kb/psyc/{mouse}_{date}_{eid}_psychometricplot.png') 
+plt.show()
 # %%
+""" PSYCHOMETRIC CURVE FOR ALL THE BLOCKS """
+import numpy as np
+import matplotlib.pyplot as plt
+import psychofit as psy
+
+# Function to compute performance across all trials
+def compute_performance_all_blocks(trials, signed_contrast=None):
+    if signed_contrast is None:
+        signed_contrast = get_signed_contrast(trials)
+    
+    contrasts, n_contrasts = np.unique(signed_contrast, return_counts=True)
+    rightward = trials.choice == -1  # Choice -1 corresponds to choosing rightward
+
+    # Calculate the proportion of rightward choices for each contrast
+    prob_choose_right = np.vectorize(lambda x: np.mean(rightward[signed_contrast == x]))(contrasts)
+    
+    return prob_choose_right, contrasts, n_contrasts
+
+# Function to compute psychometric curve across all trials
+def compute_psychometric_all_blocks(trials, signed_contrast=None):
+    if signed_contrast is None:
+        signed_contrast = get_signed_contrast(trials)
+
+    # Compute performance (proportion of rightward choices)
+    prob_choose_right, contrasts, n_contrasts = compute_performance_all_blocks(trials, signed_contrast)
+
+    # Fit the psychometric curve using the combined data from all blocks
+    psych, _ = psy.mle_fit_psycho(
+        np.vstack([contrasts, n_contrasts, prob_choose_right]),
+        P_model='erf_psycho_2gammas',
+        parstart=np.array([0., 40., 0.1, 0.1]),
+        parmin=np.array([-50., 10., 0., 0.]),
+        parmax=np.array([50., 50., 0.2, 0.2])
+    )
+
+    return psych, contrasts, prob_choose_right
+
+# Function to plot the unified psychometric curve
+def plot_psychometric_all_blocks(trials, ax=None, title=None, suptitle=None, **kwargs):
+    plt.rcParams['figure.figsize'] = [5, 5]
+    plt.rcParams["figure.dpi"] = 300
+
+    signed_contrast = get_signed_contrast(trials)
+    contrasts_fit = np.arange(-100, 100)
+
+    # Compute psychometric parameters for all blocks combined
+    psych_all, contrasts_all, prob_choose_right_all = compute_psychometric_all_blocks(trials, signed_contrast=signed_contrast)
+    prob_right_fit_all = psy.erf_psycho_2gammas(psych_all, contrasts_fit)
+
+    if not ax:
+        fig, ax = plt.subplots(**kwargs)
+    else:
+        fig = plt.gcf()
+
+    # Plot the fit curve and data points for the combined data
+    ax.plot(contrasts_fit, prob_right_fit_all, color="black", label='All blocks fit')
+    ax.scatter(contrasts_all, prob_choose_right_all, color="gray", alpha=0.5, label='All blocks data')
+
+    ax.legend(loc='lower right', fontsize=8)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_ylabel('Probability choosing right')
+    ax.set_xlabel('Contrasts')
+    plt.xticks(contrasts_2)
+    plt.axhline(y=0.5, color='gray', linestyle='--', linewidth=0.25)
+    plt.axvline(x=0.5, color='gray', linestyle='--', linewidth=0.25)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+
+    if title:
+        ax.set_title(title, fontsize=9)
+    if suptitle:
+        plt.suptitle(suptitle, y=1, fontsize=8)
+
+    return fig, ax
+
+# Call the plotting function with all blocks combined
+fig, ax = plot_psychometric_all_blocks(trials, title=f"{mouse}_{date}_{eid}", suptitle=f"{performance}")
+plt.show()
+
+# %%
+""" PSYCHOMETRIC CURVE FOR MULTIPLE SESSIONS, BY ANIMAL """ 
+import numpy as np
+import matplotlib.pyplot as plt
+import psychofit as psy
+
+# Function to compute performance across all trials
+def compute_performance_all_blocks(trials, signed_contrast=None):
+    if signed_contrast is None:
+        signed_contrast = get_signed_contrast(trials)
+
+    contrasts, n_contrasts = np.unique(signed_contrast, return_counts=True)
+    rightward = trials.choice == -1  # Choice -1 corresponds to choosing rightward
+
+    # Calculate the proportion of rightward choices for each contrast
+    prob_choose_right = np.vectorize(lambda x: np.mean(rightward[signed_contrast == x]))(contrasts)
+    
+    return prob_choose_right, contrasts, n_contrasts
+
+# Function to compute psychometric curve across all trials
+def compute_psychometric_all_blocks(trials, signed_contrast=None):
+    if signed_contrast is None:
+        signed_contrast = get_signed_contrast(trials)
+
+    # Compute performance (proportion of rightward choices)
+    prob_choose_right, contrasts, n_contrasts = compute_performance_all_blocks(trials, signed_contrast)
+
+    # Fit the psychometric curve using the combined data from all blocks
+    psych, _ = psy.mle_fit_psycho(
+        np.vstack([contrasts, n_contrasts, prob_choose_right]),
+        P_model='erf_psycho_2gammas',
+        parstart=np.array([0., 40., 0.1, 0.1]),
+        parmin=np.array([-50., 10., 0., 0.]),
+        parmax=np.array([50., 50., 0.2, 0.2])
+    )
+
+    return psych, contrasts, prob_choose_right
+
+# Function to plot psychometric curves for multiple eids and the average
+def plot_psychometric_multiple_eids(trials_list, eids, ax=None, title=None, **kwargs):
+    plt.rcParams['figure.figsize'] = [10, 10]  # Adjust the size for better clarity with many eids
+    plt.rcParams["figure.dpi"] = 300
+    cmap = plt.get_cmap("tab20")  # Use a color map that can handle up to 20 different colors
+
+    contrasts_fit = np.arange(-100, 100)
+    all_psych_params = []
+
+    if not ax:
+        fig, ax = plt.subplots(**kwargs)
+    else:
+        fig = plt.gcf()
+
+    # Loop over the trials and eids to plot individual psychometric curves
+    for i, (trials, eid) in enumerate(zip(trials_list, eids)): 
+        # Compute psychometric parameters for each eid
+        psych_all, contrasts_all, prob_choose_right_all = compute_psychometric_all_blocks(trials)
+        all_psych_params.append(psych_all)  # Store the psychometric parameters
+
+        # Fit curve
+        prob_right_fit = psy.erf_psycho_2gammas(psych_all, contrasts_fit)
+
+        # Use the color map to assign colors dynamically 
+        color = cmap(i % cmap.N)
+        # color = 'gray' 
+        # color = "#d00000"
+        # color = "#a480f2" #5HT
+        # color = '#00a6fb' #NE
+        # color = '#2ba84a' #ACh 
+
+        # Plot the psychometric fit and data points for the current eid
+        ax.plot(contrasts_fit, prob_right_fit, color=color, alpha=0.5)
+        ax.scatter(contrasts_all, prob_choose_right_all, color=color, alpha=0.2)
+
+    # Calculate the average psychometric parameters across all sessions
+    avg_psych = np.mean(all_psych_params, axis=0)
+    prob_right_fit_avg = psy.erf_psycho_2gammas(avg_psych, contrasts_fit)
+
+    # Plot the average psychometric curve
+    ax.plot(contrasts_fit, prob_right_fit_avg, color="black", linestyle='-', label='Average fit', linewidth=5)
+
+    # Formatting the plot
+    ax.legend(loc='lower right', fontsize=8)  # Adjust the legend to show multiple eids properly
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_ylabel('Probability choosing right')
+    ax.set_xlabel('Contrasts')
+    plt.axhline(y=0.5, color='gray', linestyle='--', linewidth=0.25)
+    plt.axvline(x=0.5, color='gray', linestyle='--', linewidth=0.25)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+
+    if title:
+        ax.set_title(title, fontsize=12)
+
+    return fig, ax
+
+# from Google sheets I get the list of eids 
+eids = ["daa91541-4c62-4bf6-a7e9-3d517bb06e23",
+"1c1dba79-f127-4bd6-9ae9-209a264363b5",
+"36eb2866-d6a5-4fd8-aebd-e2fb5edee40a",
+"bdfbe299-0709-4b0c-8dd6-6ab6ecf348a2",
+"31fa06cf-c93e-44e6-9b9f-4aefb75374ad",
+"f689a6d1-d23f-43bc-8b82-9b6d76c88a8b",
+"4a185c31-14b8-43f5-9873-e58d12875fb9",
+"9ff3c614-d27c-4226-ad5d-4e5cdced8fba",
+"107d700c-9be2-4e0f-a436-6a77bade563a",
+"0d238843-c420-4b3a-9852-f91beee79d8d",
+"5190d2b3-fd63-4609-82f3-6b1d30f969c1",
+"e42f7261-aef4-45e9-8e73-030f26e39ceb",
+"47fdea29-9505-4a41-892e-d1c15973c684",
+"4bd1973d-8d44-4843-85dd-d672ed2a3329",
+"24f07e1c-d027-4275-8ce5-c8a21800fcf6",
+"91ffdde6-b175-4ae0-ad18-0f6ec19405e5",
+"5a4cd1ef-d734-4f27-a23b-61229e8f3593",
+"8af59882-3b50-4f1b-873c-46040587775b",
+"d2c9b9c1-28e1-47db-a165-54f822ba6c30",
+"cbe64a6f-c7d7-486f-940f-7d7494a09621",
+"5d4e5359-bb38-45ce-90d7-629141255e4f",
+"84e93650-3efb-43cf-bf48-25d5009a21c4",
+"de9c676c-04b2-40ba-8bf8-75946f45d165",
+"0deade5f-dad7-4137-8934-ca266cf61da4",
+"ddb41f5e-299d-4239-8523-fe4beebfc845",
+"99a68192-3997-4291-92ae-f2353ccac951",
+"74d044a1-6aba-4f3d-bacd-46afa7369feb",
+"230a9de6-54dd-46b3-a5c6-0b4cb1e4e841",
+"ee16e42d-6e5f-4613-b703-3b2766c2d00e",
+"c17222b4-e336-4145-b81d-b0bdc4f27392",
+"c98d3ed2-16ae-4635-ba92-b3e7fa204321",
+"0fde8600-ba70-49fb-81ca-38d7bfaf1dd7",
+"db4d23cd-1acc-46b4-aca1-80a113b37acd",
+"b7ccd1d1-e7e3-438e-ad21-3297d8d9aade",
+"e55117bd-6afe-4cf5-997b-23783eba9a2d",
+"4eb95afe-fada-4408-8b4d-57ca2b2c6d6e",
+"73e3e099-9eca-4e17-b2a1-c0787e940cb9",
+"2e11fd99-c739-47e0-b9d4-eb70d92aaf49",
+"dae01e10-cb17-4e8a-b65e-410ce11d2fe6",
+"8e1450dd-747c-4ce9-a81b-0f1d7b111606",
+"9d8b3e6e-94da-4333-87f6-d3ded7128d88",
+"9feef25e-8964-4f3e-8f94-ad6352d9313c"
+]
+ref = one.eid2ref(eids[0])
+mouse = ref.subject 
+# Load trials for all eids dynamically
+trials_list = [one.load_object(eid, 'trials') for eid in eids]
+
+# Plot the psychometric curves for all eids and the average
+fig, ax = plot_psychometric_multiple_eids(trials_list, eids, title=f"Psychometric Curves for {len(eids)} EIDs from mouse {mouse}")
+fig.savefig(f'/mnt/h0/kb/psyc/psychometricplot_allsessions_{mouse}.png') 
+# fig, ax = plot_psychometric_multiple_eids(trials_list, eids, title=f"Psychometric Curves for {len(eids)} EIDs for DA")
+# fig.savefig(f'/mnt/h0/kb/psyc/psychometricplot_allsessions_DA_red.png') 
+plt.show()
+# %%
+""" get the avg of performance in the good trials by mouse """
+
+df_good_sessions = pd.read_csv('/home/ibladmin/Downloads/performance_all_photometry_sessions - Sheet1.csv')
+
+
+
+
+
+
+
+# %% 
+""" STATS ON CONTRAST """
+import pandas as pd
+import numpy as np
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Sample data (use your actual DataFrame)
+# avg_performance_by_subject = pd.read_csv('your_file.csv') # Uncomment to load your data
+
+# Melt the DataFrame to long format for easier ANOVA
+melted_df = avg_performance_by_subject.melt(id_vars=['subject', 'NM'], 
+                                             value_vars=['c00', 'c06', 'c12', 'c25', 'c50', 'c100'],
+                                             var_name='contrast', 
+                                             value_name='performance') 
+
+                                             # Perform ANOVA for each contrast
+anova_results = {}
+
+for contrast in ['c00', 'c06', 'c12', 'c25', 'c50', 'c100']:
+    model = ols(f'performance ~ NM', data=melted_df[melted_df['contrast'] == contrast]).fit()
+    anova_table = sm.stats.anova_lm(model, typ=2)
+    anova_results[contrast] = anova_table
+
+    # Check for significance
+    print(f"ANOVA results for {contrast}:")
+    print(anova_table)
+
+    if anova_table['PR(>F)'][0] < 0.05:  # If p-value < 0.05
+        print(f"Significant differences found for {contrast}. Performing post-hoc test...")
+        
+        # Post-hoc test using Tukey's HSD
+        tukey_results = pairwise_tukeyhsd(melted_df[melted_df['contrast'] == contrast]['performance'], 
+                                            melted_df[melted_df['contrast'] == contrast]['NM'])
+        print(tukey_results)
+
+# Set up the seaborn style
+sns.set(style="whitegrid")
+
+# Create boxplots for each contrast
+for contrast in ['c00', 'c06', 'c12', 'c25', 'c50', 'c100']:
+    plt.figure(figsize=(10, 6))
+    sns.boxplot(x='NM', y='performance', data=melted_df[melted_df['contrast'] == contrast])
+    plt.title(f'Performance by NM for {contrast}')
+    plt.xlabel('NM')
+    plt.ylabel('Performance')
+    plt.ylim(0, 1)  # Adjust as necessary
+    plt.axhline(y=0.8, color='r', linestyle='--')  # Example threshold line
+    plt.show()
