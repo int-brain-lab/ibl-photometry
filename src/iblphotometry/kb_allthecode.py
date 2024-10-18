@@ -607,3 +607,472 @@ kcenia.plot_heatmap_psth(df_nph.calcium_test,df_trials,psth_idx, EVENT, subject,
 
 
 #%%
+""" CC CE EC EE """ 
+photometry_feedback = df_nph.calcium_jove2019.values[psth_idx] 
+
+photometry_feedback_avg = np.mean(photometry_feedback, axis=1)
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Function to compute avg and sem
+def avg_sem(data):
+    avg = data.mean(axis=1)
+    sem = data.std(axis=1) / np.sqrt(data.shape[1])
+    return avg, sem
+
+prev_feedback = df_trials['feedbackType'].shift(-1)
+prev_feedback2 = df_trials['feedbackType'].shift(-2)
+
+# Define the trial types for three consecutive feedback types
+df_trials_ccc = df_trials[(prev_feedback2 == 1) & (prev_feedback == 1) & (df_trials['feedbackType'] == 1)]
+df_trials_cce = df_trials[(prev_feedback2 == 1) & (prev_feedback == 1) & (df_trials['feedbackType'] == -1)]
+df_trials_cec = df_trials[(prev_feedback2 == 1) & (prev_feedback == -1) & (df_trials['feedbackType'] == 1)]
+df_trials_cee = df_trials[(prev_feedback2 == 1) & (prev_feedback == -1) & (df_trials['feedbackType'] == -1)]
+df_trials_ecc = df_trials[(prev_feedback2 == -1) & (prev_feedback == 1) & (df_trials['feedbackType'] == 1)]
+df_trials_ece = df_trials[(prev_feedback2 == -1) & (prev_feedback == 1) & (df_trials['feedbackType'] == -1)]
+df_trials_eec = df_trials[(prev_feedback2 == -1) & (prev_feedback == -1) & (df_trials['feedbackType'] == 1)]
+df_trials_eee = df_trials[(prev_feedback2 == -1) & (prev_feedback == -1) & (df_trials['feedbackType'] == -1)]
+
+# PSTH for each trial type
+psth_ccc = photometry_feedback[:, ((prev_feedback2 == 1) & (prev_feedback == 1) & (df_trials['feedbackType'] == 1))]
+psth_cce = photometry_feedback[:, ((prev_feedback2 == 1) & (prev_feedback == 1) & (df_trials['feedbackType'] == -1))]
+psth_cec = photometry_feedback[:, ((prev_feedback2 == 1) & (prev_feedback == -1) & (df_trials['feedbackType'] == 1))]
+psth_cee = photometry_feedback[:, ((prev_feedback2 == 1) & (prev_feedback == -1) & (df_trials['feedbackType'] == -1))]
+psth_ecc = photometry_feedback[:, ((prev_feedback2 == -1) & (prev_feedback == 1) & (df_trials['feedbackType'] == 1))]
+psth_ece = photometry_feedback[:, ((prev_feedback2 == -1) & (prev_feedback == 1) & (df_trials['feedbackType'] == -1))]
+psth_eec = photometry_feedback[:, ((prev_feedback2 == -1) & (prev_feedback == -1) & (df_trials['feedbackType'] == 1))]
+psth_eee = photometry_feedback[:, ((prev_feedback2 == -1) & (prev_feedback == -1) & (df_trials['feedbackType'] == -1))]
+
+# Compute avg and sem for each trial type
+avg_ccc, sem_ccc = avg_sem(psth_ccc)
+avg_cce, sem_cce = avg_sem(psth_cce)
+avg_cec, sem_cec = avg_sem(psth_cec)
+avg_cee, sem_cee = avg_sem(psth_cee)
+avg_ecc, sem_ecc = avg_sem(psth_ecc)
+avg_ece, sem_ece = avg_sem(psth_ece)
+avg_eec, sem_eec = avg_sem(psth_eec)
+avg_eee, sem_eee = avg_sem(psth_eee)
+
+# Create the figure and gridspec
+fig = plt.figure(figsize=(12, 12))
+gs = fig.add_gridspec(2, 2, height_ratios=[3, 3])
+
+# Plot for "ccc" (cold color)
+color = "#218380"  # greenish blue
+plt.plot(avg_ccc, color=color, linewidth=2, label='ccc trials')
+plt.fill_between(range(len(avg_ccc)), avg_ccc - sem_ccc, avg_ccc + sem_ccc, color=color, alpha=0.18)
+
+# Plot for "cce" (warm color)
+color = "#ff7f0e"  # orange
+plt.plot(avg_cce, color=color, linewidth=2, label="cce trials")
+plt.fill_between(range(len(avg_cce)), avg_cce - sem_cce, avg_cce + sem_cce, color=color, alpha=0.18)
+
+# Plot for "cec" (cold color)
+color = "#17becf"  # blueish green
+plt.plot(avg_cec, color=color, linewidth=2, label="cec trials")
+plt.fill_between(range(len(avg_cec)), avg_cec - sem_cec, avg_cec + sem_cec, color=color, alpha=0.18)
+
+# Plot for "cee" (warm color)
+color = "#d62728"  # red
+plt.plot(avg_cee, color=color, linewidth=2, label="cee trials")
+plt.fill_between(range(len(avg_cee)), avg_cee - sem_cee, avg_cee + sem_cee, color=color, alpha=0.18)
+
+# Plot for "ecc" (cold color)
+color = "#1f77b4"  # blue
+plt.plot(avg_ecc, color=color, linewidth=2, label="ecc trials")
+plt.fill_between(range(len(avg_ecc)), avg_ecc - sem_ecc, avg_ecc + sem_ecc, color=color, alpha=0.18)
+
+# Plot for "ece" (warm color)
+color = "#bcbd22"  # yellow-green
+plt.plot(avg_ece, color=color, linewidth=2, label="ece trials")
+plt.fill_between(range(len(avg_ece)), avg_ece - sem_ece, avg_ece + sem_ece, color=color, alpha=0.18)
+
+# Plot for "eec" (cold color)
+color = "#2ca02c"  # green
+plt.plot(avg_eec, color=color, linewidth=2, label="eec trials")
+plt.fill_between(range(len(avg_eec)), avg_eec - sem_eec, avg_eec + sem_eec, color=color, alpha=0.18)
+
+# Plot for "eee" (warm color)
+color = "#ff9896"  # light red
+plt.plot(avg_eee, color=color, linewidth=2, label="eee trials")
+plt.fill_between(range(len(avg_eee)), avg_eee - sem_eee, avg_eee + sem_eee, color=color, alpha=0.18)
+
+# Adding a vertical line, labels, title, and legend
+plt.axvline(x=30, color="black", alpha=0.9, linewidth=3, linestyle="dashed")
+plt.ylabel('Average Value')
+plt.xlabel('Time')
+title = f"psth aligned to {EVENT} "
+plt.title(title + ' ' + subject + ' ' + session_date + ' ' + region, fontsize=16)
+
+# Adding legend outside the plots
+plt.legend(fontsize=14)
+fig.suptitle('Neuromodulator activity for different trial types in 1 mouse', y=1.02, fontsize=18)
+plt.tight_layout()
+
+# Show the plot
+plt.show()
+
+
+
+#%%
+""" CCCC, CCCE, ..., EEEE """
+# Shift feedbackType column to get the previous three feedback types
+
+photometry_feedback = df_nph.calcium_jove2019.values[psth_idx] 
+
+photometry_feedback_avg = np.mean(photometry_feedback, axis=1)
+# plt.plot(photometry_feedback_avg) 
+
+
+prev_feedback = df_trials['feedbackType'].shift(-1)
+prev_feedback2 = df_trials['feedbackType'].shift(-2)
+prev_feedback3 = df_trials['feedbackType'].shift(-3)
+
+# Define the trial types for four consecutive feedback types
+df_trials_cccc = df_trials[(prev_feedback3 == 1) & (prev_feedback2 == 1) & (prev_feedback == 1) & (df_trials['feedbackType'] == 1)]
+df_trials_ccce = df_trials[(prev_feedback3 == 1) & (prev_feedback2 == 1) & (prev_feedback == 1) & (df_trials['feedbackType'] == -1)]
+df_trials_eeec = df_trials[(prev_feedback3 == -1) & (prev_feedback2 == -1) & (prev_feedback == -1) & (df_trials['feedbackType'] == 1)]
+df_trials_eeee = df_trials[(prev_feedback3 == -1) & (prev_feedback2 == -1) & (prev_feedback == -1) & (df_trials['feedbackType'] == -1)]
+
+# PSTH for each trial type
+psth_cccc = photometry_feedback[:, ((prev_feedback3 == 1) & (prev_feedback2 == 1) & (prev_feedback == 1) & (df_trials['feedbackType'] == 1))]
+psth_ccce = photometry_feedback[:, ((prev_feedback3 == 1) & (prev_feedback2 == 1) & (prev_feedback == 1) & (df_trials['feedbackType'] == -1))]
+psth_eeec = photometry_feedback[:, ((prev_feedback3 == -1) & (prev_feedback2 == -1) & (prev_feedback == -1) & (df_trials['feedbackType'] == 1))]
+psth_eeee = photometry_feedback[:, ((prev_feedback3 == -1) & (prev_feedback2 == -1) & (prev_feedback == -1) & (df_trials['feedbackType'] == -1))]
+
+# Compute avg and sem for each trial type
+avg_cccc, sem_cccc = avg_sem(psth_cccc)
+avg_ccce, sem_ccce = avg_sem(psth_ccce)
+avg_eeec, sem_eeec = avg_sem(psth_eeec)
+avg_eeee, sem_eeee = avg_sem(psth_eeee)
+
+# Create the figure and gridspec
+fig = plt.figure(figsize=(12, 12))
+gs = fig.add_gridspec(2, 2, height_ratios=[3, 3])
+
+# Plot for "cccc" (cold color)
+color = "#1f77b4"  # blue
+plt.plot(avg_cccc, color=color, linewidth=2, label='cccc trials')
+plt.fill_between(range(len(avg_cccc)), avg_cccc - sem_cccc, avg_cccc + sem_cccc, color=color, alpha=0.18)
+
+# Plot for "ccce" (warm color)
+color = "#ff7f0e"  # orange
+plt.plot(avg_ccce, color=color, linewidth=2, label="ccce trials")
+plt.fill_between(range(len(avg_ccce)), avg_ccce - sem_ccce, avg_ccce + sem_ccce, color=color, alpha=0.18)
+
+# Plot for "eeec" (cold color)
+color = "#2ca02c"  # green
+plt.plot(avg_eeec, color=color, linewidth=2, label="eeec trials")
+plt.fill_between(range(len(avg_eeec)), avg_eeec - sem_eeec, avg_eeec + sem_eeec, color=color, alpha=0.18)
+
+# Plot for "eeee" (warm color)
+color = "#d62728"  # red
+plt.plot(avg_eeee, color=color, linewidth=2, label="eeee trials")
+plt.fill_between(range(len(avg_eeee)), avg_eeee - sem_eeee, avg_eeee + sem_eeee, color=color, alpha=0.18)
+
+# Adding a vertical line, labels, title, and legend
+plt.axvline(x=30, color="black", alpha=0.9, linewidth=3, linestyle="dashed")
+plt.ylabel('Average Value')
+plt.xlabel('Time')
+title = f"psth aligned to {EVENT} "
+plt.title(title + ' ' + subject + ' ' + session_date + ' ' + region, fontsize=16)
+
+# Adding legend outside the plots
+plt.legend(fontsize=14)
+fig.suptitle('Neuromodulator activity for different trial types in 1 mouse', y=1.02, fontsize=18)
+plt.tight_layout()
+
+# Show the plot
+plt.show()
+
+
+
+# %%
+""" BLOCK SWITCHES """ 
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Assuming df_trials is already defined and populated
+
+# Extract relevant data from df_trials
+probabilities = df_trials['probabilityLeft'].values
+feedback_types = df_trials['feedbackType'].values
+
+# Identify indices for bl and br conditions
+bl_indices = (np.roll(probabilities, -1) == 0.5) | (np.roll(probabilities, -1) == 0.2)  # Previous was 0.5 or 0.2
+br_indices = (np.roll(probabilities, -1) == 0.5) | (np.roll(probabilities, -1) == 0.8)  # Previous was 0.5 or 0.8
+bl_indices = bl_indices & (probabilities == 0.8)  # Current is 0.8
+br_indices = br_indices & (probabilities == 0.2)  # Current is 0.2
+
+# Get the feedback types for correct (1) and incorrect (-1) responses
+correct_bl = bl_indices & (feedback_types == 1)
+incorrect_bl = bl_indices & (feedback_types == -1)
+correct_br = br_indices & (feedback_types == 1)
+incorrect_br = br_indices & (feedback_types == -1)
+
+# PSTH for each condition
+psth_bl_correct = photometry_feedback[:, correct_bl]
+psth_bl_incorrect = photometry_feedback[:, incorrect_bl]
+psth_br_correct = photometry_feedback[:, correct_br]
+psth_br_incorrect = photometry_feedback[:, incorrect_br]
+
+# Function to compute average and SEM
+def avg_sem(data):
+    avg = data.mean(axis=1)
+    sem = data.std(axis=1) / np.sqrt(data.shape[1])
+    return avg, sem
+
+# Compute average and SEM for each condition
+avg_bl_correct, sem_bl_correct = avg_sem(psth_bl_correct)
+avg_bl_incorrect, sem_bl_incorrect = avg_sem(psth_bl_incorrect)
+avg_br_correct, sem_br_correct = avg_sem(psth_br_correct)
+avg_br_incorrect, sem_br_incorrect = avg_sem(psth_br_incorrect)
+
+# Create the figure
+plt.figure(figsize=(12, 12))
+
+# Plot for bl correct trials
+color = "#1f77b4"  # Blue
+plt.plot(avg_bl_correct, color=color, linewidth=2, label='bl Correct')
+plt.fill_between(range(len(avg_bl_correct)), avg_bl_correct - sem_bl_correct, avg_bl_correct + sem_bl_correct, color=color, alpha=0.18)
+
+# Plot for bl incorrect trials
+color = "#ff7f0e"  # Orange
+plt.plot(avg_bl_incorrect, color=color, linewidth=2, label='bl Incorrect')
+plt.fill_between(range(len(avg_bl_incorrect)), avg_bl_incorrect - sem_bl_incorrect, avg_bl_incorrect + sem_bl_incorrect, color=color, alpha=0.18)
+
+# Plot for br correct trials
+color = "#2ca02c"  # Green
+plt.plot(avg_br_correct, color=color, linewidth=2, label='br Correct')
+plt.fill_between(range(len(avg_br_correct)), avg_br_correct - sem_br_correct, avg_br_correct + sem_br_correct, color=color, alpha=0.18)
+
+# Plot for br incorrect trials
+color = "#d62728"  # Red
+plt.plot(avg_br_incorrect, color=color, linewidth=2, label='br Incorrect')
+plt.fill_between(range(len(avg_br_incorrect)), avg_br_incorrect - sem_br_incorrect, avg_br_incorrect + sem_br_incorrect, color=color, alpha=0.18)
+
+# Adding a vertical line, labels, title, and legend
+plt.axvline(x=30, color="black", alpha=0.9, linewidth=3, linestyle="dashed")
+plt.ylabel('Average Value')
+plt.xlabel('Time')
+plt.title(f'PSTH Aligned to {EVENT}', fontsize=16)
+
+# Adding legend outside the plots
+plt.legend(fontsize=14)
+plt.tight_layout()
+
+# Show the plot
+plt.show()
+
+# %%
+""" CHOICES and CORRECT ERROR""" 
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Function to compute avg and sem
+def avg_sem(data):
+    avg = data.mean(axis=1)
+    sem = data.std(axis=1) / np.sqrt(data.shape[1])
+    return avg, sem
+
+# Separate the trials based on choice
+df_trials_cl = df_trials[df_trials['choice'] == 1]  # cl: choice = 1
+df_trials_cr = df_trials[df_trials['choice'] == -1]  # cr: choice = -1
+df_trials_cn = df_trials[df_trials['choice'] == 0]   # cn: choice = 0
+
+# Filter by feedbackType (correct and incorrect)
+# For cl
+cl_indices_correct = df_trials_cl.index[df_trials_cl['feedbackType'] == 1].tolist()
+cl_indices_incorrect = df_trials_cl.index[df_trials_cl['feedbackType'] == -1].tolist()
+
+# For cr
+cr_indices_correct = df_trials_cr.index[df_trials_cr['feedbackType'] == 1].tolist()
+cr_indices_incorrect = df_trials_cr.index[df_trials_cr['feedbackType'] == -1].tolist()
+
+# For cn
+cn_indices_correct = df_trials_cn.index[df_trials_cn['feedbackType'] == 1].tolist()
+cn_indices_incorrect = df_trials_cn.index[df_trials_cn['feedbackType'] == -1].tolist()
+
+# PSTH for each trial type using the original indices
+psth_cl_correct = photometry_feedback[:, cl_indices_correct]
+psth_cl_incorrect = photometry_feedback[:, cl_indices_incorrect]
+
+psth_cr_correct = photometry_feedback[:, cr_indices_correct]
+psth_cr_incorrect = photometry_feedback[:, cr_indices_incorrect]
+
+psth_cn_correct = photometry_feedback[:, cn_indices_correct]
+psth_cn_incorrect = photometry_feedback[:, cn_indices_incorrect]
+
+# Compute avg and sem for each trial type
+avg_cl_correct, sem_cl_correct = avg_sem(psth_cl_correct)
+avg_cl_incorrect, sem_cl_incorrect = avg_sem(psth_cl_incorrect)
+
+avg_cr_correct, sem_cr_correct = avg_sem(psth_cr_correct)
+avg_cr_incorrect, sem_cr_incorrect = avg_sem(psth_cr_incorrect)
+
+avg_cn_correct, sem_cn_correct = avg_sem(psth_cn_correct)
+avg_cn_incorrect, sem_cn_incorrect = avg_sem(psth_cn_incorrect)
+
+# Create the figure
+plt.figure(figsize=(12, 12))
+
+# Plot for "cl" correct trials
+color = "#1f77b4"  # Blue
+plt.plot(avg_cl_correct, color=color, linewidth=2, label='cl Correct')
+plt.fill_between(range(len(avg_cl_correct)), avg_cl_correct - sem_cl_correct, avg_cl_correct + sem_cl_correct, color=color, alpha=0.18)
+
+# Plot for "cl" incorrect trials
+color = "#ff7f0e"  # Orange
+plt.plot(avg_cl_incorrect, color=color, linewidth=2, label='cl Incorrect')
+plt.fill_between(range(len(avg_cl_incorrect)), avg_cl_incorrect - sem_cl_incorrect, avg_cl_incorrect + sem_cl_incorrect, color=color, alpha=0.18)
+
+# Plot for "cr" correct trials
+color = "#2ca02c"  # Green
+plt.plot(avg_cr_correct, color=color, linewidth=2, label='cr Correct')
+plt.fill_between(range(len(avg_cr_correct)), avg_cr_correct - sem_cr_correct, avg_cr_correct + sem_cr_correct, color=color, alpha=0.18)
+
+# Plot for "cr" incorrect trials
+color = "#d62728"  # Red
+plt.plot(avg_cr_incorrect, color=color, linewidth=2, label='cr Incorrect')
+plt.fill_between(range(len(avg_cr_incorrect)), avg_cr_incorrect - sem_cr_incorrect, avg_cr_incorrect + sem_cr_incorrect, color=color, alpha=0.18)
+
+# Plot for "cn" correct trials
+color = "#bcbd22"  # Yellow-green
+plt.plot(avg_cn_correct, color=color, linewidth=2, label='cn Correct')
+plt.fill_between(range(len(avg_cn_correct)), avg_cn_correct - sem_cn_correct, avg_cn_correct + sem_cn_correct, color=color, alpha=0.18)
+
+# Plot for "cn" incorrect trials
+color = "#ff9896"  # Light red
+plt.plot(avg_cn_incorrect, color=color, linewidth=2, label='cn Incorrect')
+plt.fill_between(range(len(avg_cn_incorrect)), avg_cn_incorrect - sem_cn_incorrect, avg_cn_incorrect + sem_cn_incorrect, color=color, alpha=0.18)
+
+# Adding a vertical line, labels, title, and legend
+plt.axvline(x=30, color="black", alpha=0.9, linewidth=3, linestyle="dashed")
+plt.ylabel('Average Value')
+plt.xlabel('Time')
+plt.suptitle(f'PSTH Aligned to {EVENT}', fontsize=16) 
+plt.title(title + ' ' + subject + ' ' + session_date + ' ' + region, fontsize=16)
+
+# Adding legend outside the plots
+plt.legend(fontsize=14)
+plt.tight_layout()
+
+# Show the plot
+plt.show()
+
+#%% 
+""" VIDEO """
+test = one.load_object(eid, 'leftCamera', attribute=['lightningPose', 'times'])
+video_data = pd.DataFrame(test['lightningPose']) 
+video_data["times"] = test.times 
+#%%
+""" 1. try to recalculate the diameter and correlate it with 5-HT """ 
+video_data["v0_diameter"] = video_data["pupil_top_r_y"] - video_data["pupil_bottom_r_y"] 
+video_data["v1_diameter"] = ((video_data.pupil_top_r_y - video_data.pupil_bottom_r_y) + (video_data.pupil_left_r_y - video_data.pupil_right_r_y))/2
+
+""" 2. Nose Tip """ 
+video_data["nose_s"] = (video_data.nose_tip_x + video_data.nose_tip_y) 
+video_data["nose_m"] = (video_data.nose_tip_x * video_data.nose_tip_y) 
+
+""" 3. Paws """
+video_data["paw_l_s"] = (video_data.paw_l_x + video_data.paw_l_y) 
+video_data["paw_l_m"] = (video_data.paw_l_x * video_data.paw_l_y) 
+video_data["paw_r_s"] = (video_data.paw_r_x + video_data.paw_r_y) 
+video_data["paw_r_m"] = (video_data.paw_r_x * video_data.paw_r_y) 
+video_data["paw_lr_s"] = ((video_data.paw_l_x + video_data.paw_l_y) + (video_data.paw_r_x + video_data.paw_r_y)) 
+video_data["paw_lr_m"] = ((video_data.paw_l_x * video_data.paw_l_y) + (video_data.paw_r_x * video_data.paw_r_y)) 
+video_data["paw_lr_y_s"] = (video_data.paw_l_y + video_data.paw_r_y) 
+video_data["paw_lr_y_m"] = (video_data.paw_l_y * video_data.paw_r_y)
+
+
+
+
+# %%
+""" CORRELATIONS BETWEEN VIDEO DATA AND PREPROCESSING METHODS""" 
+# Define window size for rolling mean
+window_size = 10
+
+# List of video column names
+video_column_names = video_data.columns
+
+# Function to plot correlations for a given calcium variable
+def plot_correlations(calcium_variable_name, calcium_variable):
+    # Initialize a DataFrame to hold correlation data
+    correlation_results = {}
+
+    # Loop through video variable columns to calculate correlations
+    for video_variable in video_column_names:
+        # Create smoothed data
+        df_nph_smoothed = df_nph[calcium_variable].rolling(window=window_size).mean()
+        video_data_smoothed = video_data[video_variable].rolling(window=window_size).mean()
+
+        # Combine into a DataFrame and drop NaN values
+        combined_data = pd.DataFrame({
+            calcium_variable_name: df_nph_smoothed,
+            video_variable: video_data_smoothed
+        }).dropna()
+
+        # Calculate correlation and store the results
+        correlation = combined_data.corr().iloc[0, 1]  # Get correlation between calcium and video variable
+        correlation_results[video_variable] = correlation
+
+    # Convert results to DataFrame for plotting
+    correlation_df = pd.DataFrame.from_dict(correlation_results, orient='index', columns=['Correlation'])
+    correlation_df = correlation_df.reset_index().rename(columns={'index': 'Video Variable'})
+
+    # Plotting the correlation results
+    plt.figure(figsize=(12, 6))
+    sns.barplot(x='Correlation', y='Video Variable', data=correlation_df, palette='coolwarm')
+    plt.axvline(0, color='black', linestyle='--', linewidth=1)
+    plt.title(f'Correlation of {calcium_variable_name} with Video Variables')
+    plt.xlabel('Correlation Coefficient')
+    plt.ylabel('Video Variable')
+    plt.xlim(-0.05, 0.05)
+    plt.grid(True)
+    plt.show()
+
+# Plot correlations for both calcium variables
+plot_correlations('Calcium (mad)', 'calcium_mad')
+plot_correlations('Calcium (jove 2019)', 'calcium_jove2019') 
+
+
+
+
+#%%
+""" WHEEL DATA """ 
+
+""" WHEEL MOVEMENT - shadow areas are wheel movement """ 
+wheel = one.load_object(eid, 'wheel', collection='alf')
+try:
+    # Warning: Some older sessions may not have a wheelMoves dataset
+    wheel_moves = one.load_object(eid, 'wheelMoves', collection='alf')
+except AssertionError:
+    wheel_moves = extract_wheel_moves(wheel.timestamps, wheel.position) 
+
+fig, ax1 = plt.subplots(figsize=(12, 3))
+window_size = 10
+video_data_smoothed = video_data["v1_diameter"].rolling(window=window_size).mean()
+ax1.plot(video_data.times, video_data_smoothed, linewidth=2, color='brown', label='pupil') 
+plt.legend()
+
+nph_smoothed = df_nph["calcium_jove2019"].rolling(window=window_size).mean()
+ax2 = ax1.twinx()
+ax2.plot(df_nph.times, nph_smoothed, linewidth=2, color='teal', label='NM')
+
+# Add vertical lines for feedback times
+for xc, xv in zip(df_trials.feedback_times, df_trials.feedbackType):
+    if xv == 1: 
+        ax2.axvline(x=xc, color='blue', linewidth=1)
+    elif xv == -1: 
+        ax2.axvline(x=xc, color='red', linewidth=1)
+
+# Add shaded areas for wheel movements
+for interval in wheel_moves['intervals']:
+    ax1.axvspan(interval[0], interval[1], color='gray', alpha=0.5)
+
+# ax2.set_ylim(-0.002, 0.002)
+plt.legend()
+plt.xlim(1050, 1150)
+plt.show()
+# %%
