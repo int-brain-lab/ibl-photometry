@@ -4,81 +4,79 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 import pynapple as nap
-from scipy.optimize import minimize, curve_fit
+from scipy.optimize import minimize
 from scipy.stats.distributions import norm
 from scipy.stats import gaussian_kde
-from sklearn.linear_model import RANSACRegressor, LinearRegression, TheilSenRegressor
+from scipy.special import pseudo_huber
 
 from iblphotometry.utils import filt
+from inspect import signature
 
 
-class AbstractBleachingModel(ABC):
-    p0 = None
-    popt = None
-    perr = None
+def correct(signal: nap.Tsd, reference: nap.Tsd, mode: str = 'subtract') -> nap.Tsd:
+    if mode == 'subtract':
+        signal_corrected = signal.values - reference.values
+    if mode == 'divide':
+        signal_corrected = signal.values / reference.values
+    if mode == 'subtract-divide':
+        signal_corrected = (signal.values - reference.values) / reference.values
+    return nap.Tsd(t=signal.times(), d=signal_corrected)
 
-    def __init__(self, method='L-BFGS-B', **method_kwargs):
-        self.method = method
-        self.method_kwargs = method_kwargs
+
+def mse_loss(p, x, y, fun):
+    # mean squared error
+    y_hat = fun(x, *p)
+    return np.sum((y - y_hat) ** 2) / y.shape[0]
+
+
+def mae_loss(p, x, y, fun):
+    # mean absolute error
+    y_hat = fun(x, *p)
+    return np.sum(np.absolute(y - y_hat)) / y.shape[0]
+
+
+def huber_loss(p, x, y, fun, d):
+    # huber loss function
+    y_hat = fun(x, *p)
+    r = y - y_hat
+    return np.sum(pseudo_huber(d, r)) / y.shape[0]
+
+
+def irls_loss(p, x, y, fun, d=1e-7):
+    # iteratively reweighted least squares - loss function
+    y_hat = fun(x, *p)
+    a = y - y_hat
+    # irls weight
+    f = np.max(np.stack([np.abs(a), np.ones(a.shape[0]) * d]), axis=0)
+    w = 1 / f
+    return np.sum(w * np.abs(a) ** 2) / y.shape[0]
+
+
+class AbstractModel(ABC):
+    @abstractmethod
+    def eq():
+        # the model equation
+        ...
 
     @abstractmethod
-    def model(self, t: np.ndarray, *args): ...
+    def est_p0():
+        # given data, estimate model parameters
+        ...
 
-    @abstractmethod
-    def estimate_p0(self, y: np.array, t: np.array) -> tuple: ...
-
-    def _obj_fun(self, p, t, y):
-        y_hat = self.model(t, *p)
-        return np.sum((y - y_hat) ** 2)
-
-    def _fit(self, y: np.array, t: np.array, calc_err: bool = True):
-        if self.p0 is None:
-            self.p0 = self.estimate_p0(y, t)
-
-        self.minimize_result = minimize(
-            self._obj_fun,
-            self.p0,
-            args=(t, y),
-            bounds=self.bounds,
-            method=self.method,
-        )
-
-        if not self.minimize_result.success:
-            raise Exception(f'Fitting failed. {self.minimize_result.message}')
-
-        self.popt = self.minimize_result.x
-
-        if calc_err:
-            self.perr = self._calc_perr(y, t)
-
-    def _predict(self, t: np.array):
-        return self.model(t, *self.popt)
-
-    def _calc_perr(self, y: np.array, t: np.array):
-        bounds = np.array(self.bounds)
-        pcov = curve_fit(
-            self.model, t, y, p0=self.popt, bounds=(bounds[:, 0], bounds[:, 1])
-        )[1]
-        return np.sqrt(np.diag(pcov))
-
-    def _calc_r_squared(self, F):
-        y, t = F.values, F.times()
-        y_hat = self._predict(t)
+    def _calc_r_squared(self, y, y_hat):
         r = 1 - np.sum((y - y_hat) ** 2) / np.sum((y - np.average(y)) ** 2)
         return r
 
-    def _calc_likelihood(self, F, n_samples=-1, use_kde=False):
-        y, t = F.values, F.times()
-        y_hat = self._predict(t)
+    def _calc_likelihood(self, y, y_hat, n_samples=-1, use_kde=False):
         rs = y - y_hat
         if n_samples > 0:
-            inds = np.random.randint(0, t.shape[0], size=n_samples)
+            inds = np.random.randint(0, y.shape[0], size=n_samples)
             rs = rs[inds]
         if use_kde is True:
             # explicit estimation of the distribution of residuals
             if n_samples == -1:
                 warnings.warn(
-                    f'calculating KDE on {F.values.shape[0]} samples. This might be slow'
+                    f'calculating KDE on {y.values.shape[0]} samples. This might be slow'
                 )
             dist = gaussian_kde(rs)
         else:
@@ -88,77 +86,73 @@ class AbstractBleachingModel(ABC):
         ll = np.sum(np.log(dist.pdf(rs)))
         return ll
 
-    def _calc_aic(self, ll):
-        aic = 2 * self.popt.shape[0] - 2 * ll  # np.log(ll)
+    def _calc_aic(self, k, ll):
+        aic = 2 * k - 2 * ll  # np.log(ll)
         return aic
 
-    def calc_model_stats(self, F: nap.Tsd, n_samples: int = -1, use_kde: bool = False):
-        if self.popt is None:
-            raise ValueError('model has not yet been fitted.')
-        r_sq = self._calc_r_squared(F)
-        ll = self._calc_likelihood(F, n_samples, use_kde)
-        aic = self._calc_aic(ll)
+    def calc_model_stats(self, y, y_hat, n_samples: int = -1, use_kde: bool = False):
+        r_sq = self._calc_r_squared(y, y_hat)
+        ll = self._calc_likelihood(y, y_hat, n_samples, use_kde)
+        k = len(signature(self.eq).parameters) - 1
+        aic = self._calc_aic(ll, k)
         return dict(r_sq=r_sq, ll=ll, aic=aic)
 
-    def calc_model_conf_ints(self, t, ci=(5, 95), n_samples=100):
-        Y = np.zeros((t.shape[0], n_samples))
-        for i in tqdm(range(n_samples)):
-            p = self.popt + self.perr * np.random.randn(self.popt.shape[0])
-            Y[:, i] = self.model(t, *p)
-        self.model_ci = np.percentile(Y, ci, axis=1)
 
-    def bleach_correct(self, F: nap.Tsd, mode='subtract'):
-        y, t = F.values, F.times()
-        self._fit(y, t)
-        y_hat = self._predict(t)
-        if mode == 'divide':
-            yc = y / y_hat
-        if mode == 'subtract':
-            yc = y - y_hat
-        if mode == 'subtract-divide':
-            yc = (y - y_hat) / y_hat
-        return nap.Tsd(t=t, d=yc)
+### MODELS
+class LinearModel(AbstractModel):
+    def eq(self, x, m, b):
+        return x * m + b
+
+    def est_p0(self, x: np.array, y: np.array):
+        return tuple(np.polyfit(x, y, 1))
+        # x, y = np.sort(x), np.sort(y)
+        # dx = x[-1] - x[0]
+        # dy = y[-1] - y[0]
+        # m = dy / dx
+        # b = np.average(y - (m * x))
+        # return (m, b)
 
 
-class ExponDecayBleachingModel(AbstractBleachingModel):
+class ExponDecay(AbstractModel):
     bounds = ((0, np.Inf), (0, np.Inf), (-np.Inf, np.Inf))
 
-    def model(self, t, A, tau, b):
+    def eq(self, t, A, tau, b):
         return A * np.exp(-t / tau) + b
 
-    def estimate_p0(self, y: np.array, t: np.array):
+    def est_p0(self, t: np.array, y: np.array):
         return (y[0], t[int(t.shape[0] / 3)], y[-1])
 
-    # def bleach_correct_logspace(self, F: nap.Tsd):
-    #     # bleach correction not by regular subtraction, but rather by subtraction in logspace
-    #     # -> multiplicative / division
-    #     y, t = F.values, F.times()
-    #     self._fit(y, t)
-    #     y_hat = self._predict(t)
 
-    #     def logsp(y):
-    #         return 20 * np.log10(y)
-
-    #     def linsp(yl):
-    #         return 10 ** (yl / 20)
-
-    #     y_corr = linsp(logsp(y) - logsp(y_hat))
-
-    #     return nap.Tsd(t=t, d=y_corr)
-
-
-# bleach correction models
-class ExponDecayBleachingModelX(AbstractBleachingModel):
+class ExponDecayT(AbstractModel):
     bounds = ((0, np.Inf), (0, np.Inf), (-np.Inf, np.Inf), (-np.Inf, np.Inf))
 
-    def model(self, t, A, tau, b, t_s):
+    def eq(self, t, A, tau, b, t_s):
         return A * np.exp(-(t - t_s) / tau) + b
 
-    def estimate_p0(self, y: np.array, t: np.array):
+    def est_p0(self, t: np.array, y: np.array):
         return (y[0], t[int(t.shape[0] / 3)], y[-1], 0)
 
 
-class DoubleExponDecayBleachingModelX(AbstractBleachingModel):
+class DoubleExponDecay(AbstractModel):
+    bounds = (
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (-np.Inf, np.Inf),
+    )
+
+    def eq(self, t, A1, tau1, A2, tau2, b):
+        return A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2) + b
+
+    def est_p0(self, t: np.array, y: np.array):
+        A_est = y[0]
+        tau_est = t[int(t.shape[0] / 3)]
+        b_est = y[-1]
+        return (A_est, tau_est, A_est / 2, tau_est / 2, b_est)
+
+
+class DoubleExponDecayT(AbstractModel):
     bounds = (
         (0, np.Inf),
         (0, np.Inf),
@@ -168,17 +162,48 @@ class DoubleExponDecayBleachingModelX(AbstractBleachingModel):
         (-np.Inf, np.Inf),
     )
 
-    def model(self, t, A1, tau1, A2, tau2, b, t_s):
+    def eq(self, t, A1, tau1, A2, tau2, b, t_s):
         return A1 * np.exp(-(t - t_s) / tau1) + A2 * np.exp(-(t - t_s) / tau2) + b
 
-    def estimate_p0(self, y: np.array, t: np.array):
+    def est_p0(self, t: np.array, y: np.array):
         A_est = y[0]
         tau_est = t[int(t.shape[0] / 3)]
         b_est = y[-1]
         return (A_est, tau_est, A_est / 2, tau_est / 2, b_est, 0)
 
 
-class TripleExponDecayBleachingModelX(AbstractBleachingModel):
+class TripleExponDecay(AbstractModel):
+    bounds = (
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (0, np.Inf),
+        (-np.Inf, np.Inf),
+    )
+
+    def eq(self, t, A1, tau1, A2, tau2, A3, tau3, b):
+        return (
+            A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2) + A3 * np.exp(-t / tau3) + b
+        )
+
+    def est_p0(self, t: np.array, y: np.array):
+        A_est = y[0]
+        tau_est = t[int(t.shape[0] / 3)]
+        b_est = y[-1]
+        return (
+            A_est,
+            tau_est,
+            A_est * 0.66,
+            tau_est * 0.66,
+            A_est * 0.33,
+            tau_est * 0.33,
+            b_est,
+        )
+
+
+class TripleExponDecayT(AbstractModel):
     bounds = (
         (0, np.Inf),
         (0, np.Inf),
@@ -190,7 +215,7 @@ class TripleExponDecayBleachingModelX(AbstractBleachingModel):
         (-np.Inf, np.Inf),
     )
 
-    def model(self, t, A1, tau1, A2, tau2, A3, tau3, b, t_s):
+    def eq(self, t, A1, tau1, A2, tau2, A3, tau3, b, t_s):
         return (
             A1 * np.exp(-(t - t_s) / tau1)
             + A2 * np.exp(-(t - t_s) / tau2)
@@ -198,7 +223,7 @@ class TripleExponDecayBleachingModelX(AbstractBleachingModel):
             + b
         )
 
-    def estimate_p0(self, y: np.array, t: np.array):
+    def est_p0(self, t: np.array, y: np.array):
         A_est = y[0]
         tau_est = t[int(t.shape[0] / 3)]
         b_est = y[-1]
@@ -214,113 +239,127 @@ class TripleExponDecayBleachingModelX(AbstractBleachingModel):
         )
 
 
-class DoubleExponDecayBleachingModel(AbstractBleachingModel):
-    bounds = (
-        (0, np.Inf),
-        (0, np.Inf),
-        (0, np.Inf),
-        (0, np.Inf),
-        (-np.Inf, np.Inf),
-    )
+class Regression:
+    def __init__(self, model=None, method: str = 'linear', method_params=None):
+        self.model = model
+        self.method = method
+        self.params = method_params if method_params is not None else {}
 
-    def model(self, t, A1, tau1, A2, tau2, b):
-        return A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2) + b
+    def fit(self, x: np.ndarray, y: np.ndarray, algorithm='L-BFGS-B') -> tuple:
+        p0 = self.model.est_p0(x, y)
+        bounds = self.model.bounds if hasattr(self.model, 'bounds') else None
+        if self.method == 'linear':
+            minimize_result = minimize(
+                mse_loss,
+                p0,
+                args=(x, y, self.model.eq),
+                bounds=bounds,
+                method=algorithm,
+            )
+        if self.method == 'huber':
+            d = self.params.get('d', 3)
+            minimize_result = minimize(
+                huber_loss,
+                p0,
+                args=(x, y, self.model.eq, d),
+                bounds=bounds,
+                method=algorithm,
+            )
+        if self.method == 'irls':
+            d = self.params.get('d', 1e-7)
+            minimize_result = minimize(
+                irls_loss,
+                p0,
+                args=(x, y, self.model.eq, d),
+                bounds=bounds,
+                method=algorithm,
+            )
+        if not minimize_result.success:
+            raise Exception(f'Fitting failed. {minimize_result.message}')
+        else:
+            self.popt = minimize_result.x
 
-    def estimate_p0(self, y: np.array, t: np.array):
-        A_est = y[0]
-        tau_est = t[int(t.shape[0] / 3)]
-        b_est = y[-1]
-        return (A_est, tau_est, A_est / 2, tau_est / 2, b_est)
+        # if self.method == 'sklearn-RANSAC':
+        #     self.reg = RANSACRegressor(random_state=42)
+        #     xr = x.reshape(-1, 1)
+        #     self.reg.fit(xr, y)
+        #     self.popt = (self.reg.estimator_.coef_, self.reg.estimator_.intercept_)
+
+        # if self.method == 'sklearn-linear':
+        #     self.reg = LinearRegression()
+        #     xr = x.reshape(-1, 1)
+        #     self.reg.fit(xr, y)
+        #     self.popt = (self.reg.coef_, self.reg.intercept_)
+        #     print(self.popt)
+
+    def predict(self, x: np.ndarray, return_type='numpy'):
+        # if self.method in ['linear', 'huber', 'irls']:
+        y_hat = self.model.eq(x, *self.popt)
+        if return_type == 'numpy':
+            return y_hat
+        if return_type == 'pynapple':
+            return nap.Tsd(t=x, d=y_hat)
 
 
-class TripleExponDecayBleachingModel(AbstractBleachingModel):
-    bounds = (
-        (0, np.Inf),
-        (0, np.Inf),
-        (0, np.Inf),
-        (0, np.Inf),
-        (0, np.Inf),
-        (0, np.Inf),
-        (-np.Inf, np.Inf),
-    )
-
-    def model(self, t, A1, tau1, A2, tau2, A3, tau3, b):
-        return (
-            A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2) + A3 * np.exp(-t / tau3) + b
+class BleachCorrection:
+    def __init__(
+        self,
+        model: AbstractModel = None,
+        regression_method: str = 'linear',
+        regression_params: dict = None,
+        correction_method: str = 'subtract',
+    ):
+        self.model = model
+        self.regression = Regression(
+            model=model, method=regression_method, method_params=regression_params
         )
+        self.correction_method = correction_method
 
-    def estimate_p0(self, y: np.array, t: np.array):
-        A_est = y[0]
-        tau_est = t[int(t.shape[0] / 3)]
-        b_est = y[-1]
-        return (
-            A_est,
-            tau_est,
-            A_est * 0.66,
-            tau_est * 0.66,
-            A_est * 0.33,
-            tau_est * 0.33,
-            b_est,
-        )
+    def correct(self, F: nap.Tsd):
+        self.regression.fit(F.times(), F.values)
+        ref = self.regression.predict(F.times(), return_type='pynapple')
+        return correct(F, ref, mode=self.correction_method)
 
 
 class IsosbesticCorrection:
-    def __init__(self, regressor='RANSAC', correction='subtract-divide'):
-        self.regressor = regressor
-        self.correction = correction
-
-    def _fit(self, F_ca: nap.Tsd, F_iso: nap.Tsd):
-        # this will allow for easy drop in replacement
-        if self.regressor == 'RANSAC':
-            reg = RANSACRegressor(random_state=42)
-        if self.regressor == 'linear':
-            reg = LinearRegression()
-
-        # fit
-        ca = F_ca.values[:, np.newaxis]
-        iso = F_iso.values[:, np.newaxis]
-
-        if np.any(pd.isna(ca).flatten()) or np.any(pd.isna(iso).flatten()):
-            import pdb
-
-            pdb.set_trace()
-
-        reg.fit(iso, ca)
-        iso_fit = reg.predict(iso)
-        return nap.Tsd(t=F_ca.times(), d=iso_fit.flatten())
+    def __init__(
+        self,
+        regression_method: str = 'linear',
+        regression_params: dict = None,
+        correction_method: str = 'subtract-divide',
+        lowpass_isosbestic: dict = None,
+    ):
+        self.reg = Regression(
+            model=LinearModel(),
+            method=regression_method,
+            method_params=regression_params,
+        )
+        self.lowpass_isosbestic = lowpass_isosbestic
+        self.correction_method = correction_method
 
     def correct(
         self,
         F_ca: nap.Tsd,
         F_iso: nap.Tsd,
-        lowpass_isosbestic=dict(N=3, Wn=0.01, btype='lowpass'),
     ):
-        if lowpass_isosbestic is not None:
-            F_iso = filt(F_iso, **lowpass_isosbestic)
-            iso_fit = self._fit(F_ca, F_iso)
+        if self.lowpass_isosbestic is not None:
+            F_iso = filt(F_iso, **self.lowpass_isosbestic)
 
-        if self.correction == 'subtract-divide':
-            F_corr = (F_ca.values - iso_fit.values) / iso_fit.values
+        self.reg.fit(F_iso.values, F_ca.values)
+        F_iso_fit = self.reg.predict(F_iso.values, return_type='pynapple')
 
-        if self.correction == 'subtract':
-            F_corr = F_ca.values - iso_fit.values
-
-        if self.correction == 'divide':
-            F_corr = F_ca.values / iso_fit.values
-
-        return nap.Tsd(t=F_ca.times(), d=F_corr)
+        return correct(F_ca, F_iso_fit, mode=self.correction_method)
 
 
-class LowpassCorrection:
-    def __init__(self, filter_params=dict(N=3, Wn=0.01, btype='lowpass')):
+class LowpassBleachCorrection:
+    def __init__(
+        self,
+        filter_params=dict(N=3, Wn=0.01, btype='lowpass'),
+        correction_method='subtract-divide',
+    ):
         self.filter_params = filter_params
+        self.correction_method = correction_method
 
-    def bleach_correct(self, F: nap.Tsd, mode='subtract'):
+    def correct(self, F: nap.Tsd, mode='subtract'):
         F_filt = filt(F, **self.filter_params)
-        if mode == 'subtract':
-            d = F.values - F_filt.values
-        if mode == 'divide':
-            d = F.values / F_filt.values
-        if mode == 'subtract-divide':
-            d = (F.values - F_filt.values) / F_filt.values
-        return nap.Tsd(t=F.times(), d=d)
+        return correct(F, F_filt, mode=self.correction_method)
