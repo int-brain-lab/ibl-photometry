@@ -123,16 +123,6 @@ class ExponDecay(AbstractModel):
         return (y[0], t[int(t.shape[0] / 3)], y[-1])
 
 
-class ExponDecayT(AbstractModel):
-    bounds = ((0, np.Inf), (0, np.Inf), (-np.Inf, np.Inf), (-np.Inf, np.Inf))
-
-    def eq(self, t, A, tau, b, t_s):
-        return A * np.exp(-(t - t_s) / tau) + b
-
-    def est_p0(self, t: np.array, y: np.array):
-        return (y[0], t[int(t.shape[0] / 3)], y[-1], 0)
-
-
 class DoubleExponDecay(AbstractModel):
     bounds = (
         (0, np.Inf),
@@ -150,26 +140,6 @@ class DoubleExponDecay(AbstractModel):
         tau_est = t[int(t.shape[0] / 3)]
         b_est = y[-1]
         return (A_est, tau_est, A_est / 2, tau_est / 2, b_est)
-
-
-class DoubleExponDecayT(AbstractModel):
-    bounds = (
-        (0, np.Inf),
-        (0, np.Inf),
-        (0, np.Inf),
-        (0, np.Inf),
-        (-np.Inf, np.Inf),
-        (-np.Inf, np.Inf),
-    )
-
-    def eq(self, t, A1, tau1, A2, tau2, b, t_s):
-        return A1 * np.exp(-(t - t_s) / tau1) + A2 * np.exp(-(t - t_s) / tau2) + b
-
-    def est_p0(self, t: np.array, y: np.array):
-        A_est = y[0]
-        tau_est = t[int(t.shape[0] / 3)]
-        b_est = y[-1]
-        return (A_est, tau_est, A_est / 2, tau_est / 2, b_est, 0)
 
 
 class TripleExponDecay(AbstractModel):
@@ -203,44 +173,8 @@ class TripleExponDecay(AbstractModel):
         )
 
 
-class TripleExponDecayT(AbstractModel):
-    bounds = (
-        (0, np.Inf),
-        (0, np.Inf),
-        (0, np.Inf),
-        (0, np.Inf),
-        (0, np.Inf),
-        (0, np.Inf),
-        (-np.Inf, np.Inf),
-        (-np.Inf, np.Inf),
-    )
-
-    def eq(self, t, A1, tau1, A2, tau2, A3, tau3, b, t_s):
-        return (
-            A1 * np.exp(-(t - t_s) / tau1)
-            + A2 * np.exp(-(t - t_s) / tau2)
-            + A3 * np.exp(-(t - t_s) / tau3)
-            + b
-        )
-
-    def est_p0(self, t: np.array, y: np.array):
-        A_est = y[0]
-        tau_est = t[int(t.shape[0] / 3)]
-        b_est = y[-1]
-        return (
-            A_est,
-            tau_est,
-            A_est * 0.66,
-            tau_est * 0.66,
-            A_est * 0.33,
-            tau_est * 0.33,
-            b_est,
-            0,
-        )
-
-
 class Regression:
-    def __init__(self, model=None, method: str = 'linear', method_params=None):
+    def __init__(self, model=None, method: str = 'mse', method_params=None):
         self.model = model
         self.method = method
         self.params = method_params if method_params is not None else {}
@@ -248,9 +182,17 @@ class Regression:
     def fit(self, x: np.ndarray, y: np.ndarray, algorithm='L-BFGS-B') -> tuple:
         p0 = self.model.est_p0(x, y)
         bounds = self.model.bounds if hasattr(self.model, 'bounds') else None
-        if self.method == 'linear':
+        if self.method == 'mse':
             minimize_result = minimize(
                 mse_loss,
+                p0,
+                args=(x, y, self.model.eq),
+                bounds=bounds,
+                method=algorithm,
+            )
+        if self.method == 'mae':
+            minimize_result = minimize(
+                mae_loss,
                 p0,
                 args=(x, y, self.model.eq),
                 bounds=bounds,
@@ -293,7 +235,6 @@ class Regression:
         #     print(self.popt)
 
     def predict(self, x: np.ndarray, return_type='numpy'):
-        # if self.method in ['linear', 'huber', 'irls']:
         y_hat = self.model.eq(x, *self.popt)
         if return_type == 'numpy':
             return y_hat
@@ -305,7 +246,7 @@ class BleachCorrection:
     def __init__(
         self,
         model: AbstractModel = None,
-        regression_method: str = 'linear',
+        regression_method: str = 'mse',
         regression_params: dict = None,
         correction_method: str = 'subtract',
     ):
@@ -324,7 +265,7 @@ class BleachCorrection:
 class IsosbesticCorrection:
     def __init__(
         self,
-        regression_method: str = 'linear',
+        regression_method: str = 'mse',
         regression_params: dict = None,
         correction_method: str = 'subtract-divide',
         lowpass_isosbestic: dict = None,
