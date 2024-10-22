@@ -16,7 +16,7 @@ from copy import copy
 import gc
 
 # %%
-run_name = 'test'
+run_name = 'test_2'
 debug = False
 output_folder = Path('/home/georg/code/ibl-photometry/qc_results')
 output_folder.mkdir(parents=True, exist_ok=True)
@@ -163,4 +163,4 @@ for i, eid in enumerate(tqdm(eids)):
 # %%
 # storing all the qc
 for pipe_name in pipelines_reg.keys():
-    qc_dfs[pipe_name].to_csv(output_folder / f'qc_{pipe_name}.csv')
+    qc_dfs[pipe_name].to_csv(output_folder / f'qc_{run_name}_{pipe_name}.csv')

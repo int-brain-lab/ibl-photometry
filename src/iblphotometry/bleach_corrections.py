@@ -99,6 +99,9 @@ class AbstractModel(ABC):
 
 
 ### MODELS
+eps = np.finfo(np.float64).eps
+
+
 class LinearModel(AbstractModel):
     def eq(self, x, m, b):
         return x * m + b
@@ -114,7 +117,7 @@ class LinearModel(AbstractModel):
 
 
 class ExponDecay(AbstractModel):
-    bounds = ((0, np.Inf), (0, np.Inf), (-np.Inf, np.Inf))
+    bounds = ((0, np.Inf), (eps, np.Inf), (-np.Inf, np.Inf))
 
     def eq(self, t, A, tau, b):
         return A * np.exp(-t / tau) + b
@@ -126,9 +129,9 @@ class ExponDecay(AbstractModel):
 class DoubleExponDecay(AbstractModel):
     bounds = (
         (0, np.Inf),
+        (eps, np.Inf),
         (0, np.Inf),
-        (0, np.Inf),
-        (0, np.Inf),
+        (eps, np.Inf),
         (-np.Inf, np.Inf),
     )
 
@@ -145,11 +148,11 @@ class DoubleExponDecay(AbstractModel):
 class TripleExponDecay(AbstractModel):
     bounds = (
         (0, np.Inf),
+        (eps, np.Inf),
         (0, np.Inf),
+        (eps, np.Inf),
         (0, np.Inf),
-        (0, np.Inf),
-        (0, np.Inf),
-        (0, np.Inf),
+        (eps, np.Inf),
         (-np.Inf, np.Inf),
     )
 

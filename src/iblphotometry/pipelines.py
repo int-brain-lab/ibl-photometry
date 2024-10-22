@@ -39,8 +39,11 @@ def bc_lp_sliding_mad(
             logger.critical('no signal name is provided for the pipeline')
         F = F[signal_name]
 
-    bc = bleach_corrections.LowpassCorrection()
-    F_bc = bc.bleach_correct(F)
+    bleach_correction = bleach_corrections.LowpassBleachCorrection(
+        correction_method='subtract-divide',
+        filter_params=butterworth_lowpass,
+    )
+    F_bc = bleach_correction.correct(F)
     F_res = sliding_operations.sliding_mad(F_bc, w_len=w_len, overlap=overlap)
     return F_res
 
@@ -63,24 +66,24 @@ def jove2019(
 
     # replace this with a low pass corrector
     # remove photobleaching
-    lowpass_correction = bleach_corrections.LowpassCorrection(
+    bleach_correction = bleach_corrections.LowpassBleachCorrection(
+        correction_method='subtract-divide',
         filter_params=dict(N=3, Wn=0.01, btype='lowpass'),
     )
-    calcium = lowpass_correction.bleach_correct(
+    calcium = bleach_correction.correct(
         raw_calcium,
         mode='subtract',
     ).values
-    isosbestic = lowpass_correction.bleach_correct(
+    isosbestic = bleach_correction.correct(
         raw_isosbestic,
         mode='subtract',
     ).values
 
     # zscoring using median instead of mean
-    # this is not the same as the modified zscore
-    # calcium = (calcium - np.median(calcium)) / np.std(calcium)
     calcium = z(calcium, mode='median')
-    # isosbestic = (isosbestic - np.median(isosbestic)) / np.std(isosbestic)
     isosbestic = z(isosbestic, mode='median')
+
+    # regular regression
     m = np.polyfit(isosbestic, calcium, 1)
     ref = isosbestic * m[0] + m[1]
     ph = (calcium - ref) / 100
@@ -92,8 +95,8 @@ def isosbestic_regression(
     ca_signal_name: str = 'raw_calcium',
     isosbestic_signal_name: str = 'raw_isosbestic',
     fs: float = None,
-    regressor: str = 'RANSAC',
-    correction: str = 'subtract-divide',
+    regression_method: str = 'irls',
+    correction_method: str = 'subtract-divide',
     **params,
 ):
     raw_calcium = F[ca_signal_name]
@@ -103,17 +106,19 @@ def isosbestic_regression(
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
 
     isosbestic_correction = bleach_corrections.IsosbesticCorrection(
-        regressor=regressor, correction=correction
+        regression_method=regression_method,
+        correction_method=correction_method,
+        lowpass_isosbestic=dict(N=3, Wn=0.01, btype='lowpass'),
     )
+
     F_corr = isosbestic_correction.correct(
         raw_calcium,
         raw_isosbestic,
-        lowpass_isosbestic=dict(N=3, Wn=0.01, btype='lowpass'),
     )
 
     butterworth_signal = params.get(
         'butterworth_signal',
-        {'N': 3, 'Wn': 7, 'btype': 'lowpass', 'fs': fs},  # changed from 10 to 7
+        dict(N=3, Wn=7, btype='lowpass', fs=fs),  # changed from 10 to 7
     )
 
     F_corr = filt(F_corr, **butterworth_signal)

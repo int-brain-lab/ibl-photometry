@@ -3,7 +3,7 @@ import pandas as pd
 import pynapple as nap
 from scipy import stats
 from iblphotometry.utils import z, psth
-from iblphotometry.bleach_corrections import ExponDecayBleachingModel
+from iblphotometry.bleach_corrections import Regression, ExponDecay
 from iblphotometry.outlier_detection import detect_spikes, grubbs_sliding
 from scipy.stats import ttest_ind
 
@@ -115,9 +115,9 @@ def bleaching_tau(A: nap.Tsd) -> float:
         float: _description_
     """
     y, t = A.values, A.times()
-    bleaching_model = ExponDecayBleachingModel()
-    bleaching_model._fit(y, t)
-    return bleaching_model.popt[1]
+    reg = Regression(model=ExponDecay())
+    reg.fit(y, t)
+    return reg.popt[1]
 
 
 def ttest_pre_post(
