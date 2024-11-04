@@ -16,8 +16,10 @@ from copy import copy
 import gc
 
 # %%
-run_name = 'test_2'
-debug = False
+run_name = 'test_3'
+debug = True
+dataset = 'kcenia'  # or 'alejandro'
+
 output_folder = Path('/home/georg/code/ibl-photometry/qc_results')
 output_folder.mkdir(parents=True, exist_ok=True)
 
@@ -33,14 +35,22 @@ formatter = logging.Formatter(log_fmt, datefmt=date_fmt)
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
-# %% one related
-# one = ONE(base_url="https://alyx.internationalbrainlab.org")
-one_dir = Path('/mnt/h0/kb/data/one')
-one = ONE(cache_dir=one_dir)
+# %%
+if dataset == 'kcenia':
+    # one related - for xcenias dataset
+    one_dir = Path('/mnt/h0/kb/data/one')
+    one = ONE(cache_dir=one_dir)
 
-# %% get all eids in the correct order
-df = pd.read_csv('/home/georg/code/ibl-photometry/src/iblphotometry/website.csv')
-eids = list(df['eid'])
+    df = pd.read_csv('/home/georg/code/ibl-photometry/src/iblphotometry/website.csv')
+    eids = list(df['eid'])
+
+if dataset == 'alejandro':
+    # one - for alejandros dataset
+    one = ONE(base_url='https://alyx.internationalbrainlab.org', mode='remote')
+    eids = one.search(dataset='photometry.signal.pqt')
+
+
+# %%
 if debug:
     eids = eids[:10]
 
@@ -62,8 +72,19 @@ processed_metrics = [
 ]
 
 # apply after providing trial information
+BEHAV_EVENTS = [
+    'stimOn_times',
+    'goCue_times',
+    'response_times',
+    'feedback_times',
+    'firstMovement_times',
+    'intervals_0',
+    'intervals_1',
+]
+
 response_metrics = [
-    [metrics.ttest_pre_post, dict(event_name='feedback_times')]  # <- to be included
+    [metrics.ttest_pre_post, dict(event_name='feedback_times')],
+    [metrics.has_responses, dict(event_names=BEHAV_EVENTS)],  # <- to be included
 ]
 
 sliding_kwargs = dict(w_len=10, n_wins=15)  # 10 seconds
@@ -71,17 +92,28 @@ sliding_kwargs = dict(w_len=10, n_wins=15)  # 10 seconds
 # %% pipeline definition / registrations
 
 # note care has to be taken that all the output and input of consecutive pipeline funcs are compatible
-pipelines_reg = dict(
-    sliding_mad=(
-        (outlier_detection.remove_spikes_, dict(sd=5)),
-        (pipelines.bc_lp_sliding_mad, dict(signal_name='raw_calcium')),
-    ),
-    isosbestic=(
-        (outlier_detection.remove_spikes_, dict(sd=5)),
-        (pipelines.isosbestic_regression, dict(regressor='RANSAC')),
-    ),
-    jove2019=((pipelines.jove2019, dict()),),
-)
+
+if dataset == 'kcenia':
+    pipelines_reg = dict(
+        sliding_mad=(
+            (outlier_detection.remove_spikes_, dict(sd=5)),
+            (pipelines.bc_lp_sliding_mad, dict(signal_name='raw_calcium')),
+        ),
+        isosbestic=(
+            (outlier_detection.remove_spikes_, dict(sd=5)),
+            (pipelines.isosbestic_regression, dict(regression_method='irls')),
+        ),
+        jove2019=((pipelines.jove2019, dict()),),
+    )
+
+if dataset == 'alejandro':
+    pipelines_reg = dict(
+        sliding_mad=(
+            (outlier_detection.remove_spikes_, dict(sd=5)),
+            (pipelines.bc_lp_sliding_mad, dict(signal_name='GCaMP')),
+        ),
+        jove2019=((pipelines.jove2019, dict()),),
+    )
 
 # %% main QC loop
 qc_dfs = {}
