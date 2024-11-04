@@ -15,10 +15,19 @@ import logging
 from copy import copy
 import gc
 
+
+# %%
+id_runner = 'gaelle'  # georg or gaelle
+
 # %%
 run_name = 'test_2'
 debug = False
-output_folder = Path('/home/georg/code/ibl-photometry/qc_results')
+match id_runner:
+    case 'gaelle':
+        output_folder = Path('/Users/gaellechapuis/Desktop/FiberPhotometry/Pipeline_GR')
+    case 'georg':
+        output_folder = Path('/home/georg/code/ibl-photometry/qc_results')
+
 output_folder.mkdir(parents=True, exist_ok=True)
 
 # %%
@@ -34,12 +43,22 @@ file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 # %% one related
-# one = ONE(base_url="https://alyx.internationalbrainlab.org")
-one_dir = Path('/mnt/h0/kb/data/one')
-one = ONE(cache_dir=one_dir)
+match id_runner:
+    case 'gaelle':
+        one = ONE(base_url="https://alyx.internationalbrainlab.org")
+    case 'georg':
+        one_dir = Path('/mnt/h0/kb/data/one')
+        one = ONE(cache_dir=one_dir)
 
 # %% get all eids in the correct order
-df = pd.read_csv('/home/georg/code/ibl-photometry/src/iblphotometry/website.csv')
+match id_runner:
+    case 'gaelle':
+        path_websitecsv = Path('/Users/gaellechapuis/Desktop/FiberPhotometry/QC_Sheets/'
+                               'website_overview - website_overview.csv')
+    case 'georg':
+        path_websitecsv = Path('/home/georg/code/ibl-photometry/src/iblphotometry/website.csv')
+
+df = pd.read_csv(path_websitecsv)
 eids = list(df['eid'])
 if debug:
     eids = eids[:10]
