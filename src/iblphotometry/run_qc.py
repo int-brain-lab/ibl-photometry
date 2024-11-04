@@ -18,15 +18,15 @@ import gc
 
 # %%
 id_runner = 'gaelle'  # georg or gaelle
-
+data_runner = 'ccu'  # ccu or alex
 # %%
 run_name = 'test_2'
 debug = False
 match id_runner:
     case 'gaelle':
-        output_folder = Path('/Users/gaellechapuis/Desktop/FiberPhotometry/Pipeline_GR')
+        output_folder = Path('/Users/gaellechapuis/Desktop/FiberPhotometry/Pipeline_GR/').joinpath(data_runner)
     case 'georg':
-        output_folder = Path('/home/georg/code/ibl-photometry/qc_results')
+        output_folder = Path('/home/georg/code/ibl-photometry/qc_results/').joinpath(data_runner)
 
 output_folder.mkdir(parents=True, exist_ok=True)
 
@@ -51,15 +51,22 @@ match id_runner:
         one = ONE(cache_dir=one_dir)
 
 # %% get all eids in the correct order
-match id_runner:
-    case 'gaelle':
-        path_websitecsv = Path('/Users/gaellechapuis/Desktop/FiberPhotometry/QC_Sheets/'
-                               'website_overview - website_overview.csv')
-    case 'georg':
-        path_websitecsv = Path('/home/georg/code/ibl-photometry/src/iblphotometry/website.csv')
+match data_runner:
+    case 'ccu':
+        # Load EIDs from website spreadsheet
+        match id_runner:
+            case 'gaelle':
+                path_websitecsv = Path('/Users/gaellechapuis/Desktop/FiberPhotometry/QC_Sheets/'
+                                       'website_overview - website_overview.csv')
+            case 'georg':
+                path_websitecsv = Path('/home/georg/code/ibl-photometry/src/iblphotometry/website.csv')
 
-df = pd.read_csv(path_websitecsv)
-eids = list(df['eid'])
+        df = pd.read_csv(path_websitecsv)
+        eids = list(df['eid'])
+
+    case 'alex':
+        # Get EIDs from Alyx
+        eids = one.search(dataset='photometry.signal.pqt')
 if debug:
     eids = eids[:10]
 
@@ -90,17 +97,28 @@ sliding_kwargs = dict(w_len=10, n_wins=15)  # 10 seconds
 # %% pipeline definition / registrations
 
 # note care has to be taken that all the output and input of consecutive pipeline funcs are compatible
-pipelines_reg = dict(
-    sliding_mad=(
-        (outlier_detection.remove_spikes_, dict(sd=5)),
-        (pipelines.bc_lp_sliding_mad, dict(signal_name='raw_calcium')),
-    ),
-    isosbestic=(
-        (outlier_detection.remove_spikes_, dict(sd=5)),
-        (pipelines.isosbestic_regression, dict(regressor='RANSAC')),
-    ),
-    jove2019=((pipelines.jove2019, dict()),),
-)
+
+match data_runner:
+    case 'ccu':
+        pipelines_reg = dict(
+            sliding_mad=(
+                (outlier_detection.remove_spikes_, dict(sd=5)),
+                (pipelines.bc_lp_sliding_mad, dict(signal_name='raw_calcium')),
+            ),
+            isosbestic=(
+                (outlier_detection.remove_spikes_, dict(sd=5)),
+                (pipelines.isosbestic_regression, dict(regressor='RANSAC')),
+            ),
+            jove2019=((pipelines.jove2019, dict()),),
+        )
+    case 'alex':  # No isosbestic signal prevents from applying certain pipelines
+        pipelines_reg = dict(
+            sliding_mad=(
+                (outlier_detection.remove_spikes_, dict(sd=5)),
+                (pipelines.bc_lp_sliding_mad, dict(signal_name='raw_calcium')),
+            )
+        )
+
 
 # %% main QC loop
 qc_dfs = {}
@@ -115,8 +133,22 @@ for i, eid in enumerate(tqdm(eids)):
 
     for i, region in enumerate(regions):
         # io related
-        pqt_path = session_path / 'alf' / region / 'raw_photometry.pqt'
-        raw_photometry = pd.read_parquet(pqt_path)
+        match data_runner:
+            case 'ccu':
+                pqt_path = session_path / 'alf' / region / 'raw_photometry.pqt'
+                raw_photometry = pd.read_parquet(pqt_path)
+
+            case 'alex':
+                # Load the photometry signal dataset
+                photometry = one.load_dataset(eid, 'photometry.signal.pqt')
+                # Take only the wavelength for the signal CA
+                # There is no ISO for Alejandro's data
+                photometry = photometry[photometry['wavelength'] == 470]
+                # Create dataframe for internal representation
+                raw_photometry = pd.DataFrame()
+                raw_photometry["raw_calcium"] = photometry[region]
+                raw_photometry["times"] = photometry['times']
+
         raw_photometry = nap.TsdFrame(raw_photometry.set_index('times'))
 
         # restricting the fluorescence data to the time within the task
