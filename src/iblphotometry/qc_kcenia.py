@@ -5,6 +5,53 @@ from iblphotometry import metrics, outlier_detection, pipelines
 from one.api import ONE
 import logging
 import qc
+import pynapple as nap
+
+
+# %%
+class kc_data_loader:
+    def __init__(self, one, eids):
+        self.i = 0
+        self.j = 0
+        self.eids = eids
+        self.one = one
+        pass
+
+    def eid2regions(self, eid):
+        session_path = self.one.eid2path(eid)
+        brain_regions = [
+            reg.name for reg in session_path.joinpath('alf').glob('Region*')
+        ]
+        return brain_regions
+
+    def get_data(self, eid, brain_region):
+        trials = self.one.load_dataset(eid, '*trials.table')
+        session_path = self.one.eid2path(eid)
+        pid = f'{eid}-{brain_region}'
+        pqt_path = session_path / 'alf' / brain_region / 'raw_photometry.pqt'
+        raw_photometry = pd.read_parquet(pqt_path)
+        raw_photometry = nap.TsdFrame(raw_photometry.set_index('times'))
+        return raw_photometry, trials, eid, pid, brain_region
+
+    def __next__(self):
+        # check if i is valid
+        # if not, end iteration
+        if self.i == len(self.eids):
+            raise StopIteration
+        eid = self.eids[self.i]
+
+        # if i is valid, get brain regions
+        brain_regions = self.eid2regions(eid)
+
+        # check if j is valid
+        if self.j < len(brain_regions):
+            brain_region = brain_regions[self.j]
+            self.j += 1
+            return self.get_data(eid, brain_region)
+        else:
+            self.j = 0
+            self.i += 1
+            self.__next__()
 
 
 # %%
@@ -69,7 +116,7 @@ BEHAV_EVENTS = [
 
 qc_metrics['response'] = [
     [metrics.ttest_pre_post, dict(event_name='feedback_times')],
-    [metrics.has_responses, dict(event_names=BEHAV_EVENTS)],  # <- to be included
+    [metrics.has_responses, dict(event_names=BEHAV_EVENTS)],
 ]
 
 qc_metrics['sliding_kwargs'] = dict(w_len=10, n_wins=15)  # 10 seconds
@@ -90,7 +137,13 @@ pipelines_reg = dict(
 )
 
 # %% run qc
-qc_dfs = qc.run_qc(eids, one, pipelines_reg, qc_metrics, local=True)
+data_loader = kc_data_loader(one, eids)
+qc_dfs = qc.run_qc(
+    data_loader,
+    pipelines_reg,
+    qc_metrics,
+    debug=True,
+)
 
 # storing all the qc
 for pipe_name in pipelines_reg.keys():

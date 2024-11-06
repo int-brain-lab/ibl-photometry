@@ -26,7 +26,7 @@ def qc_single(
     trials: pd.DataFrame,
     pipelines_reg: dict,
     qc_metrics: dict,
-    eid: str,
+    eid: str,  # <- should be pid
 ) -> dict:
     """run QC on a single experiment / photometry session.
 
@@ -107,46 +107,69 @@ def qc_single(
 # %% main QC loop
 
 
-def run_qc(eids, one, pipelines_reg, qc_metrics, local=True):
+def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False):
     qc_dfs = {}
     for pipe in pipelines_reg.keys():
         qc_dfs[pipe] = {}  # pd.DataFrame(index=eids)
 
-    # -> this part is specific to locally stored data (= kcenia)
-    for i, eid in enumerate(tqdm(eids)):
-        trials = one.load_dataset(eid, '*trials.table')
-        session_path = one.eid2path(eid)
-        if local:
-            brain_regions = [
-                reg.name for reg in session_path.joinpath('alf').glob('Region*')
-            ]
-        else:
-            rois = one.load_dataset(eid, 'photometryROI.locations.pqt')
-            brain_regions = list(rois.brain_region)
+    if debug:
+        N = 3
+    else:
+        N = len(data_loader.eids)
 
-        for i, region in enumerate(brain_regions):
-            # io related
-            if local:
-                pqt_path = session_path / 'alf' / region / 'raw_photometry.pqt'
-                raw_photometry = pd.read_parquet(pqt_path)
-                raw_photometry = nap.TsdFrame(raw_photometry.set_index('times'))
-            else:
-                photometry = one.load_dataset(eid, 'photometry.signal.pqt')
-                photometry = photometry.groupby('name').get_group(
-                    'GCaMP'
-                )  # discard empty
-                photometry = photometry.rename(columns=rois['brain_region'].to_dict())
-                raw_photometry = nap.TsdFrame(
-                    t=photometry['times'].values,
-                    d=photometry[region].values,
-                    columns=['raw_calcium'],
-                )
+    for i in range(N):
+        raw_photometry, trials, eid, pid, brain_region = next(data_loader)
 
-            qc_res = qc_single(raw_photometry, trials, pipelines_reg, qc_metrics, eid)
+        qc_res = qc_single(raw_photometry, trials, pipelines_reg, qc_metrics, eid)
 
-            for pipe in pipelines_reg.keys():
-                qc_res[pipe]['brain_region'] = region
-                qc_dfs[pipe][eid] = qc_res[pipe]
+        for pipe in pipelines_reg.keys():
+            qc_res[pipe]['brain_region'] = brain_region
+            qc_dfs[pipe][eid] = qc_res[pipe]
 
         gc.collect()
     return qc_dfs
+
+
+# def run_qc(eids, one, pipelines_reg, qc_metrics, local=True):
+#     qc_dfs = {}
+#     for pipe in pipelines_reg.keys():
+#         qc_dfs[pipe] = {}  # pd.DataFrame(index=eids)
+
+#     # -> this part is specific to locally stored data (= kcenia)
+#     for i, eid in enumerate(tqdm(eids)):
+#         trials = one.load_dataset(eid, '*trials.table')
+#         session_path = one.eid2path(eid)
+#         if local:
+#             brain_regions = [
+#                 reg.name for reg in session_path.joinpath('alf').glob('Region*')
+#             ]
+#         else:
+#             rois = one.load_dataset(eid, 'photometryROI.locations.pqt')
+#             brain_regions = list(rois.brain_region)
+
+#         for i, region in enumerate(brain_regions):
+#             # io related
+#             if local:
+#                 pqt_path = session_path / 'alf' / region / 'raw_photometry.pqt'
+#                 raw_photometry = pd.read_parquet(pqt_path)
+#                 raw_photometry = nap.TsdFrame(raw_photometry.set_index('times'))
+#             else:
+#                 photometry = one.load_dataset(eid, 'photometry.signal.pqt')
+#                 photometry = photometry.groupby('name').get_group(
+#                     'GCaMP'
+#                 )  # discard empty
+#                 photometry = photometry.rename(columns=rois['brain_region'].to_dict())
+#                 raw_photometry = nap.TsdFrame(
+#                     t=photometry['times'].values,
+#                     d=photometry[region].values,
+#                     columns=['raw_calcium'],
+#                 )
+
+#             qc_res = qc_single(raw_photometry, trials, pipelines_reg, qc_metrics, eid)
+
+#             for pipe in pipelines_reg.keys():
+#                 qc_res[pipe]['brain_region'] = region
+#                 qc_dfs[pipe][eid] = qc_res[pipe]
+
+#         gc.collect()
+#     return qc_dfs

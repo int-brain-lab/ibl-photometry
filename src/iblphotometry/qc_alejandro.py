@@ -5,6 +5,59 @@ from iblphotometry import metrics, outlier_detection, pipelines
 from one.api import ONE
 import logging
 import qc
+import pynapple as nap
+
+
+# %%
+class alex_data_loader:
+    def __init__(self, one, eids: list[str] = None):
+        self.i = 0
+        self.j = 0
+        self.eids = (
+            one.search(dataset='photometry.signal.pqt') if eids is None else eids
+        )
+        self.one = one
+        pass
+
+    def eid2regions(self, eid):
+        rois = one.load_dataset(eid, 'photometryROI.locations.pqt')
+        brain_regions = list(rois.brain_region)
+        return brain_regions
+
+    def get_data(self, eid, brain_region):
+        # self.one.eid2pid(eid)
+        photometry = one.load_dataset(eid, 'photometry.signal.pqt')
+        photometry = photometry.groupby('name').get_group('GCaMP')  # discard empty
+        trials = self.one.load_dataset(eid, '*trials.table')
+        rois = one.load_dataset(eid, 'photometryROI.locations.pqt')
+        photometry = photometry.rename(columns=rois['brain_region'].to_dict())
+        raw_photometry = nap.TsdFrame(
+            t=photometry['times'].values,
+            d=photometry[brain_region].values,
+            columns=['raw_calcium'],
+        )
+        pid = None  # FIXME
+        return raw_photometry, trials, eid, pid, brain_region
+
+    def __next__(self):
+        # check if i is valid
+        # if not, end iteration
+        if self.i == len(self.eids):
+            raise StopIteration
+        eid = self.eids[self.i]
+
+        # if i is valid, get brain regions
+        brain_regions = self.eid2regions(eid)
+
+        # check if j is valid
+        if self.j < len(brain_regions):
+            brain_region = brain_regions[self.j]
+            self.j += 1
+            return self.get_data(eid, brain_region)
+        else:
+            self.j = 0
+            self.i += 1
+            self.__next__()
 
 
 # %%
@@ -81,7 +134,14 @@ pipelines_reg = dict(
 )
 
 # %% run qc
-qc_dfs = qc.run_qc(eids, one, pipelines_reg, qc_metrics, local=False)
+data_loader = alex_data_loader(one)
+
+qc_dfs = qc.run_qc(
+    data_loader,
+    pipelines_reg,
+    qc_metrics,
+    debug=True,
+)
 
 # storing all the qc
 for pipe_name in pipelines_reg.keys():
