@@ -125,6 +125,7 @@ def remove_spikes(F: nap.Tsd, sd: int = 5, w: int = 25):
 
 def remove_spikes_(fp_frame: nap.TsdFrame, sd: int = 5, w: int = 25):
     # FIXME REFACTOR very ugly multichannel version
+    # possible solution: overloading, if Tsd, run once, if TsdFrame, operate on all columns
     f = np.zeros_like(fp_frame.values)
     for i, col in enumerate(fp_frame.columns):
         f[:, i] = remove_spikes(fp_frame[col], sd=sd, w=w).values

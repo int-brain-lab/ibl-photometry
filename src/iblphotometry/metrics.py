@@ -173,7 +173,7 @@ def has_response_to_event(
     P = psth(y, t, event_times.times(), fs=fs, peri_event_window=window)[0]
 
     # or: pynapple style
-    P = nap.compute_perievent_continuous(A, event_times, window).values
+    # P = nap.compute_perievent_continuous(A, event_times, window).values
 
     # assuming time is on dim 1
     if mode == 'mean':
@@ -183,7 +183,7 @@ def has_response_to_event(
 
     # baseline is all samples that are not part of the response
     ts = event_times.times()
-    gaps = nap.Intervalset(start=ts + window[0], end=ts + window[1])
+    gaps = nap.IntervalSet(start=ts + window[0], end=ts + window[1])
     base_samples = A.restrict(A.time_support.set_diff(gaps)).values
 
     res = ttest_ind(sig_samples, base_samples)
@@ -203,7 +203,7 @@ def has_responses(
 
     res = []
     for event_name in event_names:
-        event_times = nap.Ts(t=trials[event_name])
+        event_times = nap.Ts(t=trials[event_name].values)
         res.append(
             has_response_to_event(A, event_times, fs=fs, window=window, alpha=alpha)
         )
