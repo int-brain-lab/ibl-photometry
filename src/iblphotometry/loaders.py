@@ -16,7 +16,7 @@ class IterateSession():
         raw_photometry = nap.TsdFrame(raw_photometry.set_index('times'))
         # Get trials data
         trials = self.one.load_dataset(eid, '*trials.table')
-        return raw_photometry, trials
+        return raw_photometry, trials, eid, pname
 
     def __next__(self):
         # check if i is valid
@@ -32,11 +32,12 @@ class IterateSession():
         if self.i_probe < len(pnames):
             pname = pnames[self.i_probe]
             self.i_probe += 1
-            return self.get_data(eid, pname)
+            return self.get_all_data(eid, pname)
         else:
             self.i_probe = 0
             self.i_eid += 1
             self.__next__()
+
 
 class KceniaLoader(IterateSession):
 
