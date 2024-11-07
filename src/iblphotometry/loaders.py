@@ -19,6 +19,13 @@ class IterateSession():
         trials = self.one.load_dataset(eid, '*trials.table')
         return raw_photometry, trials, eid, pname
 
+    def get_eids_pnames(self, eids):
+        # Instantiate dict with keys as eids
+        dict_a = dict((ikey, list()) for ikey in eids)
+        for eid in eids:
+            dict_a[eid] = self.eid2pnames(eid)
+        return dict_a
+
     def __next__(self):
         # check if eid iteration is valid
         # if not, end iteration
