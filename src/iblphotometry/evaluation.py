@@ -58,8 +58,8 @@ def eval_metric(
         )
         r, p = stats.linregress(S.times(), S.values)[2:4]
     else:
-        r = np.NaN
-        p = np.NaN
+        r = np.nan
+        p = np.nan
 
     return dict(value=m, rval=r, pval=p)
 

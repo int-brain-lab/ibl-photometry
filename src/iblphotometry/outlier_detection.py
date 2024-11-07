@@ -93,7 +93,7 @@ def remove_outliers(F: nap.Tsd, w_size: int, alpha: float = 0.005, w: int = 25):
     y = copy(y)
     outliers = grubbs_sliding(y, w_size=w_size, alpha=alpha)
     while len(outliers) > 0:
-        y[outliers] = np.NaN
+        y[outliers] = np.nan
         y = fillnan_kde(y, w=w)
         outliers = grubbs_sliding(y, w_size=w_size, alpha=alpha)
     return nap.Tsd(t=t, d=y)
@@ -109,7 +109,7 @@ def remove_spikes(F: nap.Tsd, sd: int = 5, w: int = 25):
     y, t = F.values, F.times()
     y = copy(y)
     outliers = detect_spikes(y, sd=sd)
-    y[outliers] = np.NaN
+    y[outliers] = np.nan
     try:
         y = fillnan_kde(y, w=w)
     except np.linalg.LinAlgError:

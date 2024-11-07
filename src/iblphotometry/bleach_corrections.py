@@ -117,7 +117,7 @@ class LinearModel(AbstractModel):
 
 
 class ExponDecay(AbstractModel):
-    bounds = ((0, np.Inf), (eps, np.Inf), (-np.Inf, np.Inf))
+    bounds = ((0, np.inf), (eps, np.inf), (-np.inf, np.inf))
 
     def eq(self, t, A, tau, b):
         return A * np.exp(-t / tau) + b
@@ -128,11 +128,11 @@ class ExponDecay(AbstractModel):
 
 class DoubleExponDecay(AbstractModel):
     bounds = (
-        (0, np.Inf),
-        (eps, np.Inf),
-        (0, np.Inf),
-        (eps, np.Inf),
-        (-np.Inf, np.Inf),
+        (0, np.inf),
+        (eps, np.inf),
+        (0, np.inf),
+        (eps, np.inf),
+        (-np.inf, np.inf),
     )
 
     def eq(self, t, A1, tau1, A2, tau2, b):
@@ -147,13 +147,13 @@ class DoubleExponDecay(AbstractModel):
 
 class TripleExponDecay(AbstractModel):
     bounds = (
-        (0, np.Inf),
-        (eps, np.Inf),
-        (0, np.Inf),
-        (eps, np.Inf),
-        (0, np.Inf),
-        (eps, np.Inf),
-        (-np.Inf, np.Inf),
+        (0, np.inf),
+        (eps, np.inf),
+        (0, np.inf),
+        (eps, np.inf),
+        (0, np.inf),
+        (eps, np.inf),
+        (-np.inf, np.inf),
     )
 
     def eq(self, t, A1, tau1, A2, tau2, A3, tau3, b):
