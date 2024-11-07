@@ -16,7 +16,7 @@ class IterateSession():
 
     def get_all_data(self, eid, pname):
         # Get photometry data and convert to pynapple
-        raw_photometry, eid, pname = self.get_data(self, eid, pname)
+        raw_photometry, eid, pname = self.get_data(eid, pname)
         raw_photometry = nap.TsdFrame(raw_photometry.set_index('times'))
         # Get trials data
         trials = self.one.load_dataset(eid, '*trials.table')

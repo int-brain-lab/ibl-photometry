@@ -3,7 +3,7 @@ import pandas as pd
 from iblphotometry import metrics, outlier_detection, pipelines
 from one.api import ONE
 import logging
-import qc
+import iblphotometry.qc as qc
 import iblphotometry.loaders as ffld
 
 ##
