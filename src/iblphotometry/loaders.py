@@ -4,15 +4,12 @@ from pathlib import Path
 
 
 class IterateSession():
-    def __init__(self, one, eids):
+    def __init__(self, one, eids=None):
         self.i_eid = 0
         self.i_probe = 0
-        self.eids = self.set_eids(eids)
         self.one = one
+        self.eids = self.set_eids(eids)
         pass
-
-    def set_eids(self, eids):
-        return eids
 
     def get_all_data(self, eid, pname):
         # Get photometry data and convert to pynapple
@@ -29,7 +26,7 @@ class IterateSession():
             raise StopIteration
         eid = self.eids[self.i_eid]
 
-        # if i is valid, get brain regions
+        # if eid is valid, get brain regions
         pnames = self.eid2pnames(eid)
 
         # check if probe iteration is valid
@@ -45,6 +42,11 @@ class IterateSession():
 
 class KceniaLoader(IterateSession):
 
+    def set_eids(self, eids):
+        if eids is None:
+            raise ValueError('eids cannot be None for Kcenia loader')
+        return eids
+
     def eid2pnames(self, eid):
         session_path = self.one.eid2path(eid)
         pnames = [reg.name for reg in session_path.joinpath('alf').glob('Region*')]
@@ -59,7 +61,7 @@ class KceniaLoader(IterateSession):
 
 class AlexLoader(IterateSession):
 
-    def set_eid(self, eids=None):
+    def set_eids(self, eids=None):
         eids = self.one.search(dataset='photometry.signal.pqt') if eids is None else eids
         return eids
 
