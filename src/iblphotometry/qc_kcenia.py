@@ -40,13 +40,13 @@ class kc_data_loader:
         eid = self.eids[self.i]
 
         # if i is valid, get brain regions
-        brain_regions = self.eid2pnames(eid)
+        pnames = self.eid2pnames(eid)
 
         # check if j is valid
-        if self.j < len(brain_regions):
-            brain_region = brain_regions[self.j]
+        if self.j < len(pnames):
+            pname = pnames[self.j]
             self.j += 1
-            return self.get_data(eid, brain_region)
+            return self.get_data(eid, pname)
         else:
             self.j = 0
             self.i += 1

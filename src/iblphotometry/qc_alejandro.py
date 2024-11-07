@@ -28,14 +28,15 @@ class alex_data_loader:
         # self.one.eid2pid(eid)
         photometry = one.load_dataset(eid, 'photometry.signal.pqt')
         photometry = photometry.groupby('name').get_group('GCaMP')  # discard empty
+        # This is equivalent to :
+        # photometry = photometry[photometry['wavelength'] == 470]
+        raw_photometry = pd.DataFrame()
+        raw_photometry["raw_calcium"] = photometry[pname]
+        raw_photometry["times"] = photometry['times']
+        raw_photometry = nap.TsdFrame(raw_photometry.set_index('times'))
+
         trials = self.one.load_dataset(eid, '*trials.table')
-        rois = one.load_dataset(eid, 'photometryROI.locations.pqt')
-        photometry = photometry.rename(columns=rois['brain_region'].to_dict())
-        raw_photometry = nap.TsdFrame(
-            t=photometry['times'].values,
-            d=photometry[pname].values,
-            columns=['raw_calcium'],
-        )
+
         return raw_photometry, trials, eid, pname
 
     def __next__(self):
@@ -46,13 +47,13 @@ class alex_data_loader:
         eid = self.eids[self.i]
 
         # if i is valid, get brain regions
-        brain_regions = self.eid2pname(eid)
+        pnames = self.eid2pnames(eid)
 
         # check if j is valid
-        if self.j < len(brain_regions):
-            brain_region = brain_regions[self.j]
+        if self.j < len(pnames):
+            pname = pnames[self.j]
             self.j += 1
-            return self.get_data(eid, brain_region)
+            return self.get_data(eid, pname)
         else:
             self.j = 0
             self.i += 1
