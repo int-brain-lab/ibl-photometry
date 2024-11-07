@@ -5,60 +5,7 @@ from iblphotometry import metrics, outlier_detection, pipelines
 from one.api import ONE
 import logging
 import qc
-import pynapple as nap
-
-
-# %%
-class alex_data_loader:
-    def __init__(self, one, eids: list[str] = None):
-        self.i = 0
-        self.j = 0
-        self.eids = (
-            one.search(dataset='photometry.signal.pqt') if eids is None else eids
-        )
-        self.one = one
-        pass
-
-    def eid2pnames(self, eid):
-        rois = one.load_dataset(eid, 'photometryROI.locations.pqt')
-        pnames = list(rois.index)
-        return pnames
-
-    def get_data(self, eid, pname):
-        # self.one.eid2pid(eid)
-        photometry = one.load_dataset(eid, 'photometry.signal.pqt')
-        photometry = photometry.groupby('name').get_group('GCaMP')  # discard empty
-        # This is equivalent to :
-        # photometry = photometry[photometry['wavelength'] == 470]
-        raw_photometry = pd.DataFrame()
-        raw_photometry["raw_calcium"] = photometry[pname]
-        raw_photometry["times"] = photometry['times']
-        raw_photometry = nap.TsdFrame(raw_photometry.set_index('times'))
-
-        trials = self.one.load_dataset(eid, '*trials.table')
-
-        return raw_photometry, trials, eid, pname
-
-    def __next__(self):
-        # check if i is valid
-        # if not, end iteration
-        if self.i == len(self.eids):
-            raise StopIteration
-        eid = self.eids[self.i]
-
-        # if i is valid, get brain regions
-        pnames = self.eid2pnames(eid)
-
-        # check if j is valid
-        if self.j < len(pnames):
-            pname = pnames[self.j]
-            self.j += 1
-            return self.get_data(eid, pname)
-        else:
-            self.j = 0
-            self.i += 1
-            self.__next__()
-
+import iblphotometry.loaders as ffld
 
 # %%
 run_name = 'test_debug'
@@ -134,7 +81,7 @@ pipelines_reg = dict(
 )
 
 # %% run qc
-data_loader = alex_data_loader(one)
+data_loader = ffld.AlexLoader(one)
 
 qc_dfs = qc.run_qc(
     data_loader,

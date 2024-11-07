@@ -5,51 +5,7 @@ from iblphotometry import metrics, outlier_detection, pipelines
 from one.api import ONE
 import logging
 import qc
-import pynapple as nap
-
-
-# %%
-class kc_data_loader:
-    def __init__(self, one, eids):
-        self.i = 0
-        self.j = 0
-        self.eids = eids
-        self.one = one
-        pass
-
-    def eid2pnames(self, eid):
-        session_path = self.one.eid2path(eid)
-        pnames = [reg.name for reg in session_path.joinpath('alf').glob('Region*')]
-        return pnames
-
-    def get_data(self, eid, pname):
-        trials = self.one.load_dataset(eid, '*trials.table')
-        session_path = self.one.eid2path(eid)
-        pqt_path = session_path / 'alf' / pname / 'raw_photometry.pqt'
-        raw_photometry = pd.read_parquet(pqt_path)
-        raw_photometry = nap.TsdFrame(raw_photometry.set_index('times'))
-        return raw_photometry, trials, eid, pname
-
-    def __next__(self):
-        # check if i is valid
-        # if not, end iteration
-        if self.i == len(self.eids):
-            raise StopIteration
-        eid = self.eids[self.i]
-
-        # if i is valid, get brain regions
-        pnames = self.eid2pnames(eid)
-
-        # check if j is valid
-        if self.j < len(pnames):
-            pname = pnames[self.j]
-            self.j += 1
-            return self.get_data(eid, pname)
-        else:
-            self.j = 0
-            self.i += 1
-            self.__next__()
-
+import iblphotometry.loaders as ffld
 
 # %%
 run_name = 'test_debug'
@@ -134,7 +90,7 @@ pipelines_reg = dict(
 )
 
 # %% run qc
-data_loader = kc_data_loader(one, eids)
+data_loader = ffld.KceniaLoader(one, eids)
 qc_dfs = qc.run_qc(
     data_loader,
     pipelines_reg,

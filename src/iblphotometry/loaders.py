@@ -6,9 +6,12 @@ class IterateSession():
     def __init__(self, one, eids):
         self.i_eid = 0
         self.i_probe = 0
-        self.eids = eids
+        self.eids = self.set_eids(eids)
         self.one = one
         pass
+
+    def set_eids(self, eids):
+        return eids
 
     def get_all_data(self, eid, pname):
         # Get photometry data and convert to pynapple
@@ -54,6 +57,10 @@ class KceniaLoader(IterateSession):
 
 
 class AlexLoader(IterateSession):
+
+    def set_eid(self, eids=None):
+        eids = self.one.search(dataset='photometry.signal.pqt') if eids is None else eids
+        return eids
 
     def eid2pnames(self, eid):
         rois = self.one.load_dataset(eid, 'photometryROI.locations.pqt')
