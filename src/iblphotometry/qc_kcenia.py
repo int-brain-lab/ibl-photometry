@@ -1,18 +1,25 @@
 # %%
 import pandas as pd
-from pathlib import Path
 from iblphotometry import metrics, outlier_detection, pipelines
 from one.api import ONE
 import logging
 import qc
 import iblphotometry.loaders as ffld
 
-# %%
+##
+# User case specific variable
+path_user = ffld.user_config('gaelle')
+
+output_folder = path_user['dir_results']
+output_folder.mkdir(parents=True, exist_ok=True)
+
+one = ONE(cache_dir=path_user['dir_one'])
+
+path_websitecsv = path_user['file_websheet']
+
+##
 run_name = 'test_debug'
 debug = True
-
-output_folder = Path('/home/georg/code/ibl-photometry/qc_results/')
-output_folder.mkdir(parents=True, exist_ok=True)
 
 # %%
 # logging related
@@ -26,12 +33,7 @@ formatter = logging.Formatter(log_fmt, datefmt=date_fmt)
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
-# %% one related
-one_dir = Path('/mnt/h0/kb/data/one')
-one = ONE(cache_dir=one_dir)
-
 # %% get all eids in the correct order
-path_websitecsv = Path('/home/georg/code/ibl-photometry/src/iblphotometry/website.csv')
 
 df = pd.read_csv(path_websitecsv)
 eids = list(df['eid'])

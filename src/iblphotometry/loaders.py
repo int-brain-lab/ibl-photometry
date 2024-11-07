@@ -1,5 +1,6 @@
 import pynapple as nap
 import pandas as pd
+from pathlib import Path
 
 
 class IterateSession():
@@ -81,3 +82,25 @@ class AlexLoader(IterateSession):
         raw_photometry["times"] = photometry['times']
 
         return raw_photometry, eid, pname
+
+
+# TODO delete this once analysis settled
+def user_config(user):
+    path_users = dict()
+
+    match user:
+        case 'georg':
+            path_users = {
+                "dir_results": Path('/home/georg/code/ibl-photometry/qc_results/'),
+                "file_websheet": Path('/home/georg/code/ibl-photometry/src/iblphotometry/website.csv'),
+                "dir_one": Path('/mnt/h0/kb/data/one')
+            }
+        case 'gaelle':
+            path_users = {
+                "dir_results": Path('/Users/gaellechapuis/Desktop/FiberPhotometry/Pipeline_GR'),
+                "file_websheet": Path('/Users/gaellechapuis/Desktop/FiberPhotometry/QC_Sheets/'
+                                      'website_overview - website_overview.csv'),
+                "dir_one": Path('/Users/gaellechapuis/Downloads/ONE/alyx.internationalbrainlab.org/')
+            }
+
+    return path_users

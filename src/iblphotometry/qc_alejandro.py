@@ -1,6 +1,5 @@
 # %%
 import pandas as pd
-from pathlib import Path
 from iblphotometry import metrics, outlier_detection, pipelines
 from one.api import ONE
 import logging
@@ -8,11 +7,17 @@ import qc
 import iblphotometry.loaders as ffld
 
 # %%
+# User case specific variable
+path_user = ffld.user_config('gaelle')
+
+output_folder = path_user['dir_results']
+output_folder.mkdir(parents=True, exist_ok=True)
+
+one = ONE(mode='remote')
+
+##
 run_name = 'test_debug'
 debug = True
-
-output_folder = Path('/home/georg/code/ibl-photometry/qc_results_alex/')
-output_folder.mkdir(parents=True, exist_ok=True)
 
 # %%
 # logging related
@@ -25,9 +30,6 @@ date_fmt = '%Y-%m-%d %H:%M:%S'
 formatter = logging.Formatter(log_fmt, datefmt=date_fmt)
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
-
-# %% one related
-one = ONE(mode='remote')
 
 # %% get all eids in the correct order
 eids = one.search(dataset='photometry.signal.pqt')
