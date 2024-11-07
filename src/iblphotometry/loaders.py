@@ -23,7 +23,7 @@ class IterateSession():
         return raw_photometry, trials, eid, pname
 
     def __next__(self):
-        # check if i is valid
+        # check if eid iteration is valid
         # if not, end iteration
         if self.i_eid == len(self.eids):
             raise StopIteration
@@ -32,7 +32,7 @@ class IterateSession():
         # if i is valid, get brain regions
         pnames = self.eid2pnames(eid)
 
-        # check if j is valid
+        # check if probe iteration is valid
         if self.i_probe < len(pnames):
             pname = pnames[self.i_probe]
             self.i_probe += 1
@@ -41,6 +41,7 @@ class IterateSession():
             self.i_probe = 0
             self.i_eid += 1
             self.__next__()
+            return
 
 
 class KceniaLoader(IterateSession):
