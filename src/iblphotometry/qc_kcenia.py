@@ -17,21 +17,20 @@ class kc_data_loader:
         self.one = one
         pass
 
-    def eid2regions(self, eid):
+    def eid2pnames(self, eid):
         session_path = self.one.eid2path(eid)
-        brain_regions = [
+        pnames = [
             reg.name for reg in session_path.joinpath('alf').glob('Region*')
         ]
-        return brain_regions
+        return pnames
 
-    def get_data(self, eid, brain_region):
+    def get_data(self, eid, pname):
         trials = self.one.load_dataset(eid, '*trials.table')
         session_path = self.one.eid2path(eid)
-        pid = f'{eid}-{brain_region}'
-        pqt_path = session_path / 'alf' / brain_region / 'raw_photometry.pqt'
+        pqt_path = session_path / 'alf' / pname / 'raw_photometry.pqt'
         raw_photometry = pd.read_parquet(pqt_path)
         raw_photometry = nap.TsdFrame(raw_photometry.set_index('times'))
-        return raw_photometry, trials, eid, pid, brain_region
+        return raw_photometry, trials, eid, pname
 
     def __next__(self):
         # check if i is valid
@@ -41,7 +40,7 @@ class kc_data_loader:
         eid = self.eids[self.i]
 
         # if i is valid, get brain regions
-        brain_regions = self.eid2regions(eid)
+        brain_regions = self.eid2pnames(eid)
 
         # check if j is valid
         if self.j < len(brain_regions):
