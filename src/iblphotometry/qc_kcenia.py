@@ -19,9 +19,7 @@ class kc_data_loader:
 
     def eid2pnames(self, eid):
         session_path = self.one.eid2path(eid)
-        pnames = [
-            reg.name for reg in session_path.joinpath('alf').glob('Region*')
-        ]
+        pnames = [reg.name for reg in session_path.joinpath('alf').glob('Region*')]
         return pnames
 
     def get_data(self, eid, pname):
