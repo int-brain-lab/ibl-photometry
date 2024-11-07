@@ -118,12 +118,12 @@ def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False):
         N = len(data_loader.eids)
 
     for i in range(N):
-        raw_photometry, trials, eid, pid, brain_region = next(data_loader)
+        raw_photometry, trials, eid, pname = next(data_loader)
 
         qc_res = qc_single(raw_photometry, trials, pipelines_reg, qc_metrics, eid)
 
         for pipe in pipelines_reg.keys():
-            qc_res[pipe]['brain_region'] = brain_region
+            qc_res[pipe]['pname'] = pname
             qc_dfs[pipe][eid] = qc_res[pipe]
 
         gc.collect()
