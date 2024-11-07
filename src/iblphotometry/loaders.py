@@ -41,7 +41,6 @@ class IterateSession():
             self.i_probe = 0
             self.i_eid += 1
             self.__next__()
-            return
 
 
 class KceniaLoader(IterateSession):
