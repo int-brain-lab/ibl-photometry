@@ -16,8 +16,8 @@ output_folder.mkdir(parents=True, exist_ok=True)
 one = ONE(mode='remote')
 
 ##
-run_name = 'test_debug'
-debug = True
+run_name = '08112024'
+debug = False
 
 # %%
 # logging related

@@ -108,9 +108,8 @@ def qc_single(
 
 
 def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False):
-    qc_dfs = {}
-    for pipe in pipelines_reg.keys():
-        qc_dfs[pipe] = {}  # pd.DataFrame(index=eids)
+    # Creating dictionary of dictionary, with each key being the pipeline name
+    qc_dfs = dict((ikey, dict()) for ikey in pipelines_reg.keys())
 
     if debug:
         N = 3

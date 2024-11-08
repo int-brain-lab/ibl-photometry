@@ -18,8 +18,8 @@ one = ONE(cache_dir=path_user['dir_one'])
 path_websitecsv = path_user['file_websheet']
 
 ##
-run_name = 'test_debug_07112024'
-debug = True
+run_name = '08112024'
+debug = False
 
 # %%
 # logging related
