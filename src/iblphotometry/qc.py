@@ -114,7 +114,8 @@ def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False):
     if debug:
         N = 3
     else:
-        # TODO this is wrong, needs to be N PIDs ; TODO use function to get dataframe
+        # TODO this is wrong, needs to be N PIDs
+        #  TODO use function to get dataframe, put it outside the run loop for speed
         N = len(data_loader.eids)
 
     for i in range(N):
