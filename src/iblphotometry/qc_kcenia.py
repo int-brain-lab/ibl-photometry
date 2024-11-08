@@ -38,9 +38,6 @@ logger.addHandler(file_handler)
 df = pd.read_csv(path_websitecsv)
 eids = list(df['eid'])
 
-if debug:
-    eids = eids[:3]
-
 # %% setup metrics
 qc_metrics = {}
 # to be applied on the raw signal
@@ -97,7 +94,7 @@ qc_dfs = qc.run_qc(
     data_loader,
     pipelines_reg,
     qc_metrics,
-    debug=True,
+    debug=debug,
 )
 
 # storing all the qc
