@@ -163,7 +163,7 @@ def has_response_to_event(
     fs: float = None,
     window: tuple = (-1, 1),
     alpha: float = 0.005,
-    mode='mean',
+    mode='peak',
 ) -> bool:
     # checks if there is a significant response to an event
 
@@ -179,9 +179,9 @@ def has_response_to_event(
 
     # assuming time is on dim 1
     if mode == 'mean':
-        sig_samples = np.average(P, axis=1)
+        sig_samples = np.average(P, axis=0)
     if mode == 'peak':
-        sig_samples = np.max(P, axis=1) - np.std(y)
+        sig_samples = np.max(P, axis=0) - np.std(y)
 
     # baseline is all samples that are not part of the response
     ts = event_times.times()
