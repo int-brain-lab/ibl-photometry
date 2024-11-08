@@ -24,6 +24,7 @@ class IterateSession():
         dict_a = dict((ikey, list()) for ikey in eids)
         for eid in eids:
             dict_a[eid] = self.eid2pnames(eid)
+        # TODO convert to dataframe with one line per eid / pid combination
         return dict_a
 
     def __next__(self):
