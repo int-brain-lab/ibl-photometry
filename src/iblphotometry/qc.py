@@ -115,7 +115,7 @@ def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False):
         N = 3
     else:
         #  TODO use function to get dataframe, put it outside the run loop for speed
-        _, N = data_loader.get_eids_pnames()
+        _, N = data_loader.get_eids_pnames(data_loader.eids)
 
     for i in range(N):
         raw_photometry, trials, eid, pname = next(data_loader)
