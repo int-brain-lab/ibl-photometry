@@ -107,7 +107,7 @@ def qc_single(
 # %% main QC loop
 
 
-def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False):
+def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False, verbose=True):
     # Creating dictionary of dictionary, with each key being the pipeline name
     qc_dfs = dict((ikey, dict()) for ikey in pipelines_reg.keys())
 
@@ -126,7 +126,11 @@ def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False):
             qc_res[pipe]['pname'] = pname
             qc_dfs[pipe][eid] = qc_res[pipe]
 
-        gc.collect()
+        if verbose:
+            print(f'{i} / {N} PIDs processed')
+
+        # This function does nothing for now, commented out
+        # gc.collect()
     return qc_dfs
 
 
