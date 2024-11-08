@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import ibllib.plots
-from utils import filt
+from iblphotometry.helpers import filt
 import pynapple as nap
 
 

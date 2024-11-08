@@ -9,7 +9,7 @@ from scipy.stats.distributions import norm
 from scipy.stats import gaussian_kde
 from scipy.special import pseudo_huber
 
-from iblphotometry.utils import filt
+from iblphotometry.helpers import filt
 from inspect import signature
 
 

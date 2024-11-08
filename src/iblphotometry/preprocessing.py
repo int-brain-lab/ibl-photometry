@@ -10,7 +10,7 @@ import numpy as np
 import ibldsp.utils
 from iblutil.numerical import rcoeff
 
-import iblphotometry.utils as utils
+import iblphotometry.helpers as helpers
 import pynapple as nap
 
 

@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 import pynapple as nap
-from iblphotometry.utils import z, psth, filt
+from iblphotometry.helpers import z, psth, filt
 from ibldsp.utils import WindowGenerator
 from iblphotometry import sliding_operations
 from iblphotometry import bleach_corrections

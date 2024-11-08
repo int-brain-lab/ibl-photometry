@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pynapple as nap
 from scipy import stats
-from iblphotometry.utils import z, psth
+from iblphotometry.helpers import z, psth
 from iblphotometry.bleach_corrections import Regression, ExponDecay
 from iblphotometry.outlier_detection import detect_spikes, grubbs_sliding
 from scipy.stats import ttest_ind
@@ -173,6 +173,8 @@ def has_response_to_event(
     P = psth(y, t, event_times.times(), fs=fs, peri_event_window=window)[0]
 
     # or: pynapple style
+    # in the long run, this will be the preferred way as this will 
+    # respect the .time_support of the pynapple object. # TODO verify this
     # P = nap.compute_perievent_continuous(A, event_times, window).values
 
     # assuming time is on dim 1

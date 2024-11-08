@@ -1,9 +1,9 @@
 import pynapple as nap
 import pandas as pd
 from pathlib import Path
+from abc import ABC, abstractmethod
 
-
-class IterateSession():
+class BaseLoader(ABC):
     def __init__(self, one, eids=None):
         self.i_eid = 0
         self.i_probe = 0
@@ -11,20 +11,24 @@ class IterateSession():
         self.eids = self.set_eids(eids)
         pass
 
-    def get_all_data(self, eid, pname):
+    @abstractmethod
+    def get_photometry_data() -> nap.TsdFrame:
+        ...
+
+    def get_data(self, eid, pname):
         # Get photometry data and convert to pynapple
-        raw_photometry, eid, pname = self.get_data(eid, pname)
-        raw_photometry = nap.TsdFrame(raw_photometry.set_index('times'))
+        raw_photometry = self.get_photometry_data(eid, pname)
+        
         # Get trials data
         trials = self.one.load_dataset(eid, '*trials.table')
         return raw_photometry, trials, eid, pname
 
-    def get_eids_pnames(self, eids):
-        # Instantiate dict with keys as eids
-        dict_a = dict((ikey, list()) for ikey in eids)
-        for eid in eids:
-            dict_a[eid] = self.eid2pnames(eid)
-        return dict_a
+    # def get_eids_pnames(self, eids):
+    #     # Instantiate dict with keys as eids
+    #     dict_a = dict((ikey, list()) for ikey in eids)
+    #     for eid in eids:
+    #         dict_a[eid] = self.eid2pnames(eid)
+    #     return dict_a
 
     def __next__(self):
         # check if eid iteration is valid
@@ -40,14 +44,14 @@ class IterateSession():
         if self.i_probe < len(pnames):
             pname = pnames[self.i_probe]
             self.i_probe += 1
-            return self.get_all_data(eid, pname)
+            return self.get_data(eid, pname)
         else:
             self.i_probe = 0
             self.i_eid += 1
             return self.__next__()
 
 
-class KceniaLoader(IterateSession):
+class KceniaLoader(BaseLoader):
 
     def set_eids(self, eids):
         if eids is None:
@@ -59,14 +63,14 @@ class KceniaLoader(IterateSession):
         pnames = [reg.name for reg in session_path.joinpath('alf').glob('Region*')]
         return pnames
 
-    def get_data(self, eid, pname):
+    def get_photometry_data(self, eid, pname):
         session_path = self.one.eid2path(eid)
         pqt_path = session_path / 'alf' / pname / 'raw_photometry.pqt'
         raw_photometry = pd.read_parquet(pqt_path)
-        return raw_photometry, eid, pname
+        return nap.TsdFrame(raw_photometry.set_index('times'))
 
 
-class AlexLoader(IterateSession):
+class AlexLoader(BaseLoader):
 
     def set_eids(self, eids=None):
         eids = self.one.search(dataset='photometry.signal.pqt') if eids is None else eids
@@ -77,20 +81,15 @@ class AlexLoader(IterateSession):
         pnames = list(rois.index)
         return pnames
 
-    def get_data(self, eid, pname):
-        photometry = self.one.load_dataset(eid, 'photometry.signal.pqt')
-
-        # Restrict the dataframe to only the GCamp signal
-        photometry = photometry.groupby('name').get_group('GCaMP')
-        # This should be equivalent to :
-        # photometry = photometry[photometry['wavelength'] == 470]
-
-        # Create a new dataframe restricted to pname as calcium signal
-        raw_photometry = pd.DataFrame()
-        raw_photometry["raw_calcium"] = photometry[pname]
-        raw_photometry["times"] = photometry['times']
-
-        return raw_photometry, eid, pname
+    def get_photometry_data(self, eid, pname):
+        raw_photometry = self.one.load_dataset(eid, 'photometry.signal.pqt')
+        raw_photometry = raw_photometry.groupby('name').get_group('GCaMP')
+        raw_photometry = nap.TsdFrame(
+            t=raw_photometry['times'].values,
+            d=raw_photometry[pname].values,
+            columns=['raw_calcium'],
+        )
+        return raw_photometry
 
 
 # TODO delete this once analysis settled
