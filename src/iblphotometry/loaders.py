@@ -23,24 +23,15 @@ class BaseLoader(ABC):
         trials = self.one.load_dataset(eid, '*trials.table')
         return raw_photometry, trials, eid, pname
 
-<<<<<<< HEAD
     # def get_eids_pnames(self, eids):
     #     # Instantiate dict with keys as eids
     #     dict_a = dict((ikey, list()) for ikey in eids)
     #     for eid in eids:
     #         dict_a[eid] = self.eid2pnames(eid)
     #     return dict_a
-=======
-    def get_eids_pnames(self, eids):
-        # Instantiate dict with keys as eids
-        dict_a = dict((ikey, list()) for ikey in eids)
-        n_pid = 0
-        for eid in eids:
-            dict_a[eid] = self.eid2pnames(eid)
-            n_pid = n_pid + len(dict_a[eid])
-        # TODO convert to dataframe with one line per eid / pid combination
-        return dict_a
->>>>>>> 86eaa15208b836d0433923c02f372cc755f2d832
+
+    def __iter__(self):
+        return self
 
     def __next__(self):
         # check if eid iteration is valid
@@ -112,7 +103,7 @@ def user_config(user):
         case 'georg':
             path_users = {
                 "dir_results": Path('/home/georg/code/ibl-photometry/qc_results/'),
-                "file_websheet": Path('/home/georg/code/ibl-photometry/src/iblphotometry/website.csv'),
+                "file_websheet": Path('/home/georg/code/ibl-photometry/src/local/website.csv'),
                 "dir_one": Path('/mnt/h0/kb/data/one')
             }
         case 'gaelle':

@@ -8,7 +8,7 @@ import iblphotometry.loaders as ffld
 
 ##
 # User case specific variable
-path_user = ffld.user_config('gaelle')
+path_user = ffld.user_config('georg')
 
 output_folder = path_user['dir_results'].joinpath('Kcenia')
 output_folder.mkdir(parents=True, exist_ok=True)
@@ -18,8 +18,8 @@ one = ONE(cache_dir=path_user['dir_one'])
 path_websitecsv = path_user['file_websheet']
 
 ##
-run_name = '08112024'
-debug = False
+run_name = 'test_post_merge'
+debug = True
 
 # %%
 # logging related
