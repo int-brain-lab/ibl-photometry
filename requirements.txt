@@ -3,3 +3,5 @@ numpy
 matplotlib
 pytest
 scipy
+pynapple
+utils
