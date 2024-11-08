@@ -34,8 +34,10 @@ class BaseLoader(ABC):
     def get_eids_pnames(self, eids):
         # Instantiate dict with keys as eids
         dict_a = dict((ikey, list()) for ikey in eids)
+        n_pid = 0
         for eid in eids:
             dict_a[eid] = self.eid2pnames(eid)
+            n_pid = n_pid + len(dict_a[eid])
         # TODO convert to dataframe with one line per eid / pid combination
         return dict_a
 >>>>>>> 86eaa15208b836d0433923c02f372cc755f2d832

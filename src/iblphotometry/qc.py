@@ -107,16 +107,15 @@ def qc_single(
 # %% main QC loop
 
 
-def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False):
+def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False, verbose=True):
     # Creating dictionary of dictionary, with each key being the pipeline name
     qc_dfs = dict((ikey, dict()) for ikey in pipelines_reg.keys())
 
     if debug:
         N = 3
     else:
-        # TODO this is wrong, needs to be N PIDs
         #  TODO use function to get dataframe, put it outside the run loop for speed
-        N = len(data_loader.eids)
+        _, N = data_loader.get_eids_pnames(data_loader.eids)
 
     for i in range(N):
         raw_photometry, trials, eid, pname = next(data_loader)
@@ -127,7 +126,11 @@ def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False):
             qc_res[pipe]['pname'] = pname
             qc_dfs[pipe][eid] = qc_res[pipe]
 
-        gc.collect()
+        if verbose:
+            print(f'{i} / {N} PIDs processed')
+
+        # This function does nothing for now, commented out
+        # gc.collect()
     return qc_dfs
 
 
