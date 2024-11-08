@@ -10,14 +10,14 @@ import iblphotometry.loaders as ffld
 # User case specific variable
 path_user = ffld.user_config('gaelle')
 
-output_folder = path_user['dir_results']
+output_folder = path_user['dir_results'].joinpath('Alejandro')
 output_folder.mkdir(parents=True, exist_ok=True)
 
 one = ONE(mode='remote')
 
 ##
-run_name = 'test_debug'
-debug = True
+run_name = '08112024'
+debug = False
 
 # %%
 # logging related
