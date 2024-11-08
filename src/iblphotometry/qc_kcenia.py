@@ -10,7 +10,7 @@ import iblphotometry.loaders as ffld
 # User case specific variable
 path_user = ffld.user_config('gaelle')
 
-output_folder = path_user['dir_results']
+output_folder = path_user['dir_results'].joinpath('Kcenia')
 output_folder.mkdir(parents=True, exist_ok=True)
 
 one = ONE(cache_dir=path_user['dir_one'])
