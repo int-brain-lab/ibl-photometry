@@ -106,7 +106,7 @@ def qc_single(
 
 # %% main QC loop
 
-def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False, verbose=True):
+def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False):
     # Creating dictionary of dictionary, with each key being the pipeline name
     qc_dfs = dict((ikey, dict()) for ikey in pipelines_reg.keys())
 
@@ -122,8 +122,7 @@ def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False, verbose=True):
             if i > 10:
                 break
 
-        # This function does nothing for now, commented out
-        # gc.collect()
+        gc.collect()
     return qc_dfs
 
 
