@@ -49,15 +49,22 @@ class OneLoader(BaseLoader):
         if eids is None and pids is None:
             raise ValueError('either eids or pids must be provided')
 
+        # time for pydantic
+        for name, _list in zip(['eids', 'pids'], [eids, pids]):
+            if not isinstance(_list, list):
+                raise TypeError(f'{name} has to be a list of str')
+
         if eids is not None:
-            self.eids = list(eids)
-            self.pids = list(
-                chain.from_iterable([one.eid2pid(eid)[0] for eid in self.eids])
-            )
+            self.eids = eids
+            if pids is None:
+                self.pids = list(
+                    chain.from_iterable([one.eid2pid(eid)[0] for eid in self.eids])
+                )
 
         if pids is not None:
             self.pids = pids
-            self.eids = list(np.unique([one.pid2eid(pid)[0] for pid in pids]))
+            if eids is None:
+                self.eids = list(np.unique([one.pid2eid(pid)[0] for pid in pids]))
 
         self.size = len(self.pids)
 
@@ -87,7 +94,7 @@ class OneLoader(BaseLoader):
         eid, pname = self.pid2eid(pid)
         return dict(eid=eid, pid=pid, pname=pname)
 
-    def pid2eid(self, pid: str) -> str:
+    def pid2eid(self, pid: str) -> tuple[str, str]:
         # set up like this so it can be overridden
         return self.one.pid2eid(pid)
 
@@ -109,11 +116,16 @@ class OneLoader(BaseLoader):
 
 class KceniaLoader(OneLoader):
     def __init__(self, one, eids: list[str]):
-        pids = list(chain.from_iterable([self.eid2pnames(eid) for eid in eids]))
+        self.one = one
+        pids = []
+        for eid in eids:
+            pnames = self.eid2pnames(eid)
+            for pname in pnames:
+                pids.append(f'{eid}_{pname}')
         super().__init__(one, eids=eids, pids=pids)
 
     def pid2eid(self, pid: str):
-        return pid.split('-')
+        return pid.split('_')
 
     def eid2pnames(self, eid: str):
         session_path = self.one.eid2path(eid)
@@ -124,7 +136,8 @@ class KceniaLoader(OneLoader):
         eid, pname = self.pid2eid(pid)
         session_path = self.one.eid2path(eid)
         pqt_path = session_path / 'alf' / pname / 'raw_photometry.pqt'
-        raw_photometry = pd.read_parquet(pqt_path)
+        raw_photometry_df = pd.read_parquet(pqt_path)
+        raw_photometry = nap.TsdFrame(raw_photometry_df.set_index('times'))
         return raw_photometry
 
 
@@ -162,7 +175,7 @@ def user_config(user):
             path_users = {
                 'dir_results': Path('/home/georg/code/ibl-photometry/qc_results/'),
                 'file_websheet': Path(
-                    '/home/georg/code/ibl-photometry/src/iblphotometry/website.csv'
+                    '/home/georg/code/ibl-photometry/src/local/website.csv'
                 ),
                 'dir_one': Path('/mnt/h0/kb/data/one'),
             }

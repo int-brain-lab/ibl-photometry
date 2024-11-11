@@ -78,11 +78,11 @@ qc_metrics['sliding_kwargs'] = dict(w_len=10, n_wins=15)  # 10 seconds
 # note care has to be taken that all the output and input of consecutive pipeline funcs are compatible
 pipelines_reg = dict(
     sliding_mad=(
-        (outlier_detection.remove_spikes_, dict(sd=5)),
+        (outlier_detection.remove_spikes, dict(sd=5)),
         (pipelines.bc_lp_sliding_mad, dict(signal_name='raw_calcium')),
     ),
     isosbestic=(
-        (outlier_detection.remove_spikes_, dict(sd=5)),
+        (outlier_detection.remove_spikes, dict(sd=5)),
         (pipelines.isosbestic_regression, dict(regression_method='irls')),
     ),
     jove2019=((pipelines.jove2019, dict()),),
