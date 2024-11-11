@@ -22,7 +22,7 @@ logger = logging.getLogger()
 
 # %%
 def qc_single(
-    raw_photometry: nap.TsdFrame,
+    raw_photometry: nap.Tsd | nap.TsdFrame,
     trials: pd.DataFrame,
     pipelines_reg: dict,
     qc_metrics: dict,
@@ -50,12 +50,15 @@ def qc_single(
     session_interval = nap.IntervalSet(t_start, t_stop)
     raw_photometry = raw_photometry.restrict(session_interval)
 
-    # process all pipelines
-    for pipe_name, pipe in pipelines_reg.items():
+    # iterate over pipelines
+    for pipe_name, pipeline in pipelines_reg.items():
         # run pipeline
         try:
             photometry = copy(raw_photometry)
-            for i, (pipe_func, pipe_args) in enumerate(pipe):
+            # run the entire pipeline function by funtion
+            # for this to work, the output and input types of each
+            # pipeline function have to be compatible!
+            for i, (pipe_func, pipe_args) in enumerate(pipeline):
                 photometry = pipe_func(photometry, **pipe_args)
         except Exception as e:
             logger.warning(
@@ -64,21 +67,54 @@ def qc_single(
             continue
 
         # raw metrics - a bit redundant but just to have everyting combined together
-        for ch in raw_photometry.columns:
-            F = raw_photometry[ch]
+        # if multiple channels:
+        for metric, params in qc_metrics['raw']:
+            if isinstance(photometry, nap.TsdFrame):
+                for ch in photometry.columns:
+                    F = photometry[ch]
+                    try:
+                        res = eval_metric(F, metric, params)
+                        qc[pipe_name][f'{metric.__name__}_{ch}'] = res['value']
+                    except Exception as e:
+                        logger.warning(
+                            f'{eid}, {ch}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
+                        )
 
-            # raw metrics
-            for metric, params in qc_metrics['raw']:
+            else:  # is a nap.Tsd
                 try:
-                    res = eval_metric(F, metric, params)
-                    qc[pipe_name][f'{metric.__name__}_{ch}'] = res['value']
+                    res = eval_metric(photometry, metric, params)
+                    qc[pipe_name][f'{metric.__name__}'] = res['value']
                 except Exception as e:
                     logger.warning(
-                        f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
+                        f'{eid}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
                     )
 
+        # # raw metrics - a bit redundant but just to have everyting combined together
+        # # if multiple channels:
+        # if isinstance(photometry, nap.TsdFrame):
+        #     for ch in photometry.columns:
+        #         F = photometry[ch]
+        #         for metric, params in qc_metrics['raw']:
+        #             try:
+        #                 res = eval_metric(F, metric, params)
+        #                 qc[pipe_name][f'{metric.__name__}_{ch}'] = res['value']
+        #             except Exception as e:
+        #                 logger.warning(
+        #                     f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
+        #                 )
+        # else:  # raw_photometry is already a single channel
+        #     for metric, params in qc_metrics['raw']:
+        #         try:
+        #             res = eval_metric(photometry, metric, params)
+        #             qc[pipe_name][f'{metric.__name__}_{ch}'] = res['value']
+        #         except Exception as e:
+        #             logger.warning(
+        #                 f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
+        #             )
+
         # metrics on the output of the pipeline
-        Fpp = photometry  # at this point, should be a nap.Tsd
+        # at this point, photometry is a nap.Tsd
+        Fpp = photometry
         for metric, params in qc_metrics['processed']:
             try:
                 res = eval_metric(Fpp, metric, params, qc_metrics['sliding_kwargs'])
@@ -87,7 +123,7 @@ def qc_single(
                 qc[pipe_name][f'{metric.__name__}_p'] = res['pval']
             except Exception as e:
                 logger.warning(
-                    f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
+                    f'{eid}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
                 )
 
         # metrics that factor in behavior
@@ -95,10 +131,10 @@ def qc_single(
             params['trials'] = trials
             try:
                 res = eval_metric(Fpp, metric, params)
-                qc[pipe_name][f'{metric.__name__}_{ch}'] = res['value']
+                qc[pipe_name][f'{metric.__name__}'] = res['value']
             except Exception as e:
                 logger.warning(
-                    f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
+                    f'{eid}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
                 )
 
     return qc
@@ -106,17 +142,19 @@ def qc_single(
 
 # %% main QC loop
 
+
 def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False):
     # Creating dictionary of dictionary, with each key being the pipeline name
     qc_dfs = dict((ikey, dict()) for ikey in pipelines_reg.keys())
 
-    for i, (raw_photometry, trials, eid, pname) in enumerate(data_loader):
-
-        qc_res = qc_single(raw_photometry, trials, pipelines_reg, qc_metrics, eid)
+    for i, (raw_photometry, trials, meta) in enumerate(tqdm(data_loader)):
+        qc_res = qc_single(
+            raw_photometry, trials, pipelines_reg, qc_metrics, meta['eid']
+        )
 
         for pipe in pipelines_reg.keys():
-            qc_res[pipe]['pname'] = pname
-            qc_dfs[pipe][eid] = qc_res[pipe]
+            qc_res[pipe]['pname'] = meta['pname']
+            qc_dfs[pipe][meta['eid']] = qc_res[pipe]
 
         if debug:
             if i > 10:

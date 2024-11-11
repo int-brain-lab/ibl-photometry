@@ -12,9 +12,10 @@ only implements the iterator
 
 class BaseLoader(ABC):
     i = 0
+    size = None
 
-    def __init__(self, dataset_ids):
-        self.dataset_ids = dataset_ids  # these can be pids
+    # def __init__(self):
+    # self.size = None  # this property must be set
 
     @abstractmethod
     def get_data(self):
@@ -25,7 +26,7 @@ class BaseLoader(ABC):
         return self
 
     def __next__(self):
-        if self.i < len(self.dataset_ids):
+        if self.i < self.size:
             self.i += 1
             return self.get_data()
         else:
@@ -43,30 +44,51 @@ logically, we should iterate over pids
 class OneLoader(BaseLoader):
     """serves as a base class for ONE compatible data loaders, Kcenias data is still a special case of this"""
 
-    def __init__(self, one, eids=None, pids=None, *args):
+    def __init__(self, one, eids: list[str] = None, pids: list[str] = None, *args):
         self.one = one
         if eids is None and pids is None:
             raise ValueError('either eids or pids must be provided')
 
         if eids is not None:
-            self.eids = eids
-            self.pids = list(chain([one.eid2pid(eid)[0] for eid in self.eids]))
+            self.eids = list(eids)
+            self.pids = list(
+                chain.from_iterable([one.eid2pid(eid)[0] for eid in self.eids])
+            )
 
         if pids is not None:
             self.pids = pids
             self.eids = list(np.unique([one.pid2eid(pid)[0] for pid in pids]))
 
-    def get_trials_data(self, pid) -> pd.DataFrame:
-        eid = self.one.eid2pid(pid)
+        self.size = len(self.pids)
+
+    def get_trials_data(self, pid: str) -> pd.DataFrame:
+        # set up like this so it can be overridden in subclass
+        eid, _ = self.pid2eid(pid)
         return self.one.load_dataset(eid, '*trials.table')
 
-    def get_photometry_data(self, pid) -> nap.TsdFrame:
+    def get_photometry_data(self, pid: str, signal_name: str = None) -> nap.TsdFrame:
+        # set up like this so it can be overridden in subclass
         eid, _ = self.one.pid2eid(pid)
-        raw_photometry = self.one.load_dataset(eid, 'photometry.signal.pqt')
-        raw_photometry = nap.TsdFrame(raw_photometry.set_index('times'))
+
+        # photometry.signal.pqt comes with ROIs as column names.
+        raw_photometry_df = self.one.load_dataset(eid, 'photometry.signal.pqt')
+        if signal_name is not None:
+            raw_photometry_df = raw_photometry_df.groupby('name').get_group(signal_name)
+
+        # conversion to nap.TsdFrame: time as index, and restricting to regions
+        locations = self.one.load_dataset(eid, 'photometryROI.locations.pqt')
+        raw_photometry = nap.TsdFrame(
+            raw_photometry_df.set_index('times')[locations.index]
+        )
         return raw_photometry
 
-    def pid2eid(self, pid):
+    def get_meta_data(self, pid: str) -> dict:
+        # set up like this so it can be overridden in subclass
+        eid, pname = self.pid2eid(pid)
+        return dict(eid=eid, pid=pid, pname=pname)
+
+    def pid2eid(self, pid: str) -> str:
+        # set up like this so it can be overridden
         return self.one.pid2eid(pid)
 
     def get_data(self):
@@ -80,26 +102,25 @@ class OneLoader(BaseLoader):
         trials = self.get_trials_data(pid)
 
         # meta
-        eid, pname = self.pid2eid(pid)
-        meta = dict(eid=eid, pid=pid, pname=pname)
+        meta = self.get_meta_data(pid)
 
         return raw_photometry, trials, meta
 
 
 class KceniaLoader(OneLoader):
-    def __init__(self, one, eids):
-        pids = list(chain([self.eid2pnames(eid) for eid in eids]))
+    def __init__(self, one, eids: list[str]):
+        pids = list(chain.from_iterable([self.eid2pnames(eid) for eid in eids]))
         super().__init__(one, eids=eids, pids=pids)
 
-    def pid2eid(self, pid):
+    def pid2eid(self, pid: str):
         return pid.split('-')
 
-    def eid2pnames(self, eid):
+    def eid2pnames(self, eid: str):
         session_path = self.one.eid2path(eid)
         pnames = [reg.name for reg in session_path.joinpath('alf').glob('Region*')]
         return pnames
 
-    def get_photometry_data(self, pid):
+    def get_photometry_data(self, pid: str):
         eid, pname = self.pid2eid(pid)
         session_path = self.one.eid2path(eid)
         pqt_path = session_path / 'alf' / pname / 'raw_photometry.pqt'
@@ -108,26 +129,28 @@ class KceniaLoader(OneLoader):
 
 
 class AlexLoader(OneLoader):
-    def __init__(self, one, eids=None):
+    def __init__(self, one, eids: list[str] = None):
         eids = (
-            self.one.search(dataset='photometry.signal.pqt') if eids is None else eids
+            list(one.search(dataset='photometry.signal.pqt')) if eids is None else eids
         )
         super().__init__(one, eids=eids)
 
-    def get_photometry_data(self, pid):
-        _, pname = self.one.pid2eid(pid)
-        raw_photometry = super().get_photometry_data(pid)
-        raw_photometry = raw_photometry.groupby('name').get_group('GCaMP')
-        return raw_photometry[pname]
+    def get_photometry_data(self, pid: str):
+        eid, pname = self.one.pid2eid(pid)
 
-    def get_data(pid):
-        raw_photometry, trials, meta = super().get_data(pid)
+        # mapping pname to roi
+        locations = self.one.load_dataset(eid, 'photometryROI.locations.pqt')
+        roi = dict(zip(locations['fiber'], locations.index))[pname]
 
-        # add TODO here brain region to meta
-        # rois = self.one.load_dataset(eid, 'photometryROI.locations.pqt')
-        # brain_region = None
+        # signal_name is the part that is specific to alejaandro
+        raw_photometry = super().get_photometry_data(pid, signal_name='GCaMP')
+        # this returns a TsdFrame with one column of the ROI name
+        # problematic
+        # return nap.TsdFrame(
+        #     t=raw_photometry.times(), d=raw_photometry[roi].values, columns=[roi]
 
-        return raw_photometry, trials, meta
+        # this reutrns a Tsd. Should be all good?
+        return raw_photometry[roi]
 
 
 # TODO delete this once analysis settled
