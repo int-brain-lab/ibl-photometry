@@ -6,9 +6,10 @@ import logging
 import iblphotometry.qc as qc
 import iblphotometry.loaders as ffld
 
+
 # %%
 # User case specific variable
-path_user = ffld.user_config('gaelle')
+path_user = ffld.user_config('georg')
 
 output_folder = path_user['dir_results'].joinpath('Alejandro')
 output_folder.mkdir(parents=True, exist_ok=True)
@@ -16,8 +17,8 @@ output_folder.mkdir(parents=True, exist_ok=True)
 one = ONE(mode='remote')
 
 ##
-run_name = '08112024'
-debug = False
+run_name = 'debug'
+debug = True
 
 # %%
 # logging related
@@ -32,7 +33,7 @@ file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
 # %% get all eids in the correct order
-eids = one.search(dataset='photometry.signal.pqt')
+eids = list(one.search(dataset='photometry.signal.pqt'))
 
 # %% setup metrics
 qc_metrics = {}
@@ -74,13 +75,13 @@ qc_metrics['sliding_kwargs'] = dict(w_len=10, n_wins=15)  # 10 seconds
 # note care has to be taken that all the output and input of consecutive pipeline funcs are compatible
 pipelines_reg = dict(
     sliding_mad=(
-        (outlier_detection.remove_spikes_, dict(sd=5)),
-        (pipelines.bc_lp_sliding_mad, dict(signal_name='raw_calcium')),
+        (outlier_detection.remove_spikes, dict(sd=5)),
+        (pipelines.bc_lp_sliding_mad, dict()),
     )
 )
 
 # %% run qc
-data_loader = ffld.AlexLoader(one)
+data_loader = ffld.AlexLoader(one, eids=eids)
 
 qc_dfs = qc.run_qc(
     data_loader,

@@ -105,7 +105,7 @@ def detect_spikes(t: np.array, sd: int = 5):
     return np.where(bad_inds)[0]
 
 
-def remove_spikes(F: nap.Tsd, sd: int = 5, w: int = 25):
+def _remove_spikes(F: nap.Tsd, sd: int = 5, w: int = 25):
     y, t = F.values, F.times()
     y = copy(y)
     outliers = detect_spikes(y, sd=sd)
@@ -123,10 +123,11 @@ def remove_spikes(F: nap.Tsd, sd: int = 5, w: int = 25):
     return nap.Tsd(t=t, d=y)
 
 
-def remove_spikes_(fp_frame: nap.TsdFrame, sd: int = 5, w: int = 25):
-    # FIXME REFACTOR very ugly multichannel version
-    # possible solution: overloading, if Tsd, run once, if TsdFrame, operate on all columns
-    f = np.zeros_like(fp_frame.values)
-    for i, col in enumerate(fp_frame.columns):
-        f[:, i] = remove_spikes(fp_frame[col], sd=sd, w=w).values
-    return nap.TsdFrame(t=fp_frame.times(), d=f, columns=fp_frame.columns)
+def remove_spikes(F: nap.Tsd | nap.TsdFrame, sd: int = 5, w: int = 25):
+    if isinstance(F, nap.TsdFrame):
+        f = np.zeros_like(F.values)
+        for i, col in enumerate(F.columns):
+            f[:, i] = _remove_spikes(F[col], sd=sd, w=w).values
+        return nap.TsdFrame(t=F.times(), d=f, columns=F.columns)
+    if isinstance(F, nap.Tsd):
+        return _remove_spikes(F, sd=sd, w=w)
