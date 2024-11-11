@@ -1,23 +1,78 @@
 # %%
+import numpy as np
+from scipy.stats import linregress
 import pandas as pd
-from pathlib import Path
 import pynapple as nap
-
-from iblphotometry import metrics, outlier_detection, pipelines
-from iblphotometry.evaluation import eval_metric
-
-from one.api import ONE
 
 from tqdm import tqdm
 import logging
-from pprint import pprint
 
 from copy import copy
 import gc
 
+from iblphotometry.sliding_operations import make_sliding_window
+
 import warnings
 
 logger = logging.getLogger()
+
+
+# %%
+def sliding_metric(
+    F: nap.Tsd,
+    w_len: float,
+    fs: float = None,
+    metric: callable = None,
+    n_wins: int = -1,
+    metric_kwargs: dict = None,
+):
+    """applies a metric along time.
+
+    Args:
+        F (nap.Tsd): _description_
+        w_size (int): _description_
+        metric (callable, optional): _description_. Defaults to None.
+        n_wins (int, optional): _description_. Defaults to -1.
+
+    Returns:
+        _type_: _description_
+    """
+    y, t = F.values, F.times()
+    fs = 1 / np.median(np.diff(t)) if fs is None else fs
+    w_size = int(w_len * fs)
+
+    yw = make_sliding_window(y, w_size)
+    if n_wins > 0:
+        n_samples = y.shape[0]
+        inds = np.linspace(0, n_samples - w_size, n_wins, dtype='int64')
+        yw = yw[inds, :]
+    else:
+        inds = np.arange(yw.shape[0], dtype='int64')
+
+    m = metric(yw, **metric_kwargs) if metric_kwargs is not None else metric(yw)
+
+    return nap.Tsd(t=t[inds + int(w_size / 2)], d=m)
+
+
+# eval pipleline will be here
+def eval_metric(
+    F: nap.Tsd,
+    metric: callable = None,
+    metric_kwargs: dict = None,
+    sliding_kwargs: dict = None,
+):
+    m = metric(F, **metric_kwargs) if metric_kwargs is not None else metric(F)
+
+    if sliding_kwargs is not None:
+        S = sliding_metric(
+            F, metric=metric, **sliding_kwargs, metric_kwargs=metric_kwargs
+        )
+        r, p = linregress(S.times(), S.values)[2:4]
+    else:
+        r = np.nan
+        p = np.nan
+
+    return dict(value=m, rval=r, pval=p)
 
 
 # %%
@@ -89,29 +144,6 @@ def qc_single(
                         f'{eid}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
                     )
 
-        # # raw metrics - a bit redundant but just to have everyting combined together
-        # # if multiple channels:
-        # if isinstance(photometry, nap.TsdFrame):
-        #     for ch in photometry.columns:
-        #         F = photometry[ch]
-        #         for metric, params in qc_metrics['raw']:
-        #             try:
-        #                 res = eval_metric(F, metric, params)
-        #                 qc[pipe_name][f'{metric.__name__}_{ch}'] = res['value']
-        #             except Exception as e:
-        #                 logger.warning(
-        #                     f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
-        #                 )
-        # else:  # raw_photometry is already a single channel
-        #     for metric, params in qc_metrics['raw']:
-        #         try:
-        #             res = eval_metric(photometry, metric, params)
-        #             qc[pipe_name][f'{metric.__name__}_{ch}'] = res['value']
-        #         except Exception as e:
-        #             logger.warning(
-        #                 f'{eid}: {metric.__name__} failure: {type(e).__name__}:{e}'
-        #             )
-
         # metrics on the output of the pipeline
         # at this point, photometry is a nap.Tsd
         Fpp = photometry
@@ -162,48 +194,3 @@ def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False):
 
         gc.collect()
     return qc_dfs
-
-
-# def run_qc(eids, one, pipelines_reg, qc_metrics, local=True):
-#     qc_dfs = {}
-#     for pipe in pipelines_reg.keys():
-#         qc_dfs[pipe] = {}  # pd.DataFrame(index=eids)
-
-#     # -> this part is specific to locally stored data (= kcenia)
-#     for i, eid in enumerate(tqdm(eids)):
-#         trials = one.load_dataset(eid, '*trials.table')
-#         session_path = one.eid2path(eid)
-#         if local:
-#             brain_regions = [
-#                 reg.name for reg in session_path.joinpath('alf').glob('Region*')
-#             ]
-#         else:
-#             rois = one.load_dataset(eid, 'photometryROI.locations.pqt')
-#             brain_regions = list(rois.brain_region)
-
-#         for i, region in enumerate(brain_regions):
-#             # io related
-#             if local:
-#                 pqt_path = session_path / 'alf' / region / 'raw_photometry.pqt'
-#                 raw_photometry = pd.read_parquet(pqt_path)
-#                 raw_photometry = nap.TsdFrame(raw_photometry.set_index('times'))
-#             else:
-#                 photometry = one.load_dataset(eid, 'photometry.signal.pqt')
-#                 photometry = photometry.groupby('name').get_group(
-#                     'GCaMP'
-#                 )  # discard empty
-#                 photometry = photometry.rename(columns=rois['brain_region'].to_dict())
-#                 raw_photometry = nap.TsdFrame(
-#                     t=photometry['times'].values,
-#                     d=photometry[region].values,
-#                     columns=['raw_calcium'],
-#                 )
-
-#             qc_res = qc_single(raw_photometry, trials, pipelines_reg, qc_metrics, eid)
-
-#             for pipe in pipelines_reg.keys():
-#                 qc_res[pipe]['brain_region'] = region
-#                 qc_dfs[pipe][eid] = qc_res[pipe]
-
-#         gc.collect()
-#     return qc_dfs
