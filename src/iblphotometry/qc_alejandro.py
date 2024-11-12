@@ -4,21 +4,26 @@ from iblphotometry import metrics, outlier_detection, pipelines
 from one.api import ONE
 import logging
 import iblphotometry.qc as qc
-import iblphotometry.loaders as ffld
+import iblphotometry.loaders as loaders
+from itertools import chain
 
+# %% config
 
-# %%
 # User case specific variable
-path_user = ffld.user_config('georg')
-
+path_user = loaders.user_config('georg')
 output_folder = path_user['dir_results'].joinpath('Alejandro')
 output_folder.mkdir(parents=True, exist_ok=True)
 
-one = ONE(mode='remote')
-
-##
+## params
 run_name = 'debug'
 debug = True
+
+# %% ONE related
+one = ONE(mode='remote')
+eids = list(one.search(dataset='photometry.signal.pqt'))[:5]  # <- debug here
+pids = list(chain.from_iterable([one.eid2pid(eid)[0] for eid in eids]))
+data_loader = loaders.AlexLoader(one)
+
 
 # %%
 # logging related
@@ -32,8 +37,6 @@ formatter = logging.Formatter(log_fmt, datefmt=date_fmt)
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
-# %% get all eids in the correct order
-eids = list(one.search(dataset='photometry.signal.pqt'))
 
 # %% setup metrics
 qc_metrics = {}
@@ -81,13 +84,11 @@ pipelines_reg = dict(
 )
 
 # %% run qc
-data_loader = ffld.AlexLoader(one, eids=eids)
-
 qc_dfs = qc.run_qc(
     data_loader,
+    pids,
     pipelines_reg,
     qc_metrics,
-    debug=debug,
 )
 
 # storing all the qc

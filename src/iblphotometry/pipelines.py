@@ -37,7 +37,8 @@ def bc_lp_sliding_mad(
     ):  # if F is as TsdFrame, then use signal name to get the correct column - this is needed for the pipeline functionality in run_qc
         if signal_name is None:
             logger.critical('no signal name is provided for the pipeline')
-        F = F[signal_name]
+        else:
+            F = F[signal_name]
 
     bleach_correction = bleach_corrections.LowpassBleachCorrection(
         correction_method='subtract-divide',

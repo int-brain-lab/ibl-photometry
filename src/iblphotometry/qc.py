@@ -175,22 +175,20 @@ def qc_single(
 # %% main QC loop
 
 
-def run_qc(data_loader, pipelines_reg, qc_metrics, debug=False):
+def run_qc(data_loader, pids: list[str], pipelines_reg, qc_metrics):
     # Creating dictionary of dictionary, with each key being the pipeline name
     qc_dfs = dict((ikey, dict()) for ikey in pipelines_reg.keys())
 
-    for i, (raw_photometry, trials, meta) in enumerate(tqdm(data_loader)):
-        qc_res = qc_single(
-            raw_photometry, trials, pipelines_reg, qc_metrics, meta['eid']
-        )
+    for pid in tqdm(pids):
+        raw_photometry = data_loader.load_photometry_data(pid=pid)
+        eid, pname = data_loader.pid2eid(pid)
+        trials = data_loader.load_trials_table(eid)
+
+        qc_res = qc_single(raw_photometry, trials, pipelines_reg, qc_metrics, pid)
 
         for pipe in pipelines_reg.keys():
-            qc_res[pipe]['pname'] = meta['pname']
-            qc_dfs[pipe][meta['eid']] = qc_res[pipe]
-
-        if debug:
-            if i > 10:
-                break
+            qc_res[pipe]['pname'] = pname
+            qc_dfs[pipe][eid] = qc_res[pipe]
 
         gc.collect()
     return qc_dfs
