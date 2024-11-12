@@ -25,48 +25,151 @@ def plot_raw_data_df(df_photometry, **kwargs):
 
 def plot_raw_data_tf(tf_photometry, **kwargs):
     sns.set_style('whitegrid')
-    raw_isosbestic = tf_photometry['raw_isosbestic'] if 'raw_isosbestic' in tf_photometry.columns else None
-    return plot_photometry_traces(times=tf_photometry.times(), calcium=tf_photometry['raw_calcium'], isosbestic=raw_isosbestic, **kwargs)
+    raw_isosbestic = (
+        tf_photometry['raw_isosbestic']
+        if 'raw_isosbestic' in tf_photometry.columns
+        else None
+    )
+    return plot_photometry_traces(
+        times=tf_photometry.times(),
+        calcium=tf_photometry['raw_calcium'],
+        isosbestic=raw_isosbestic,
+        **kwargs,
+    )
+
+
+def plot_Tsd(signal: nap.Tsd, axes=None, **line_kwargs):
+    if axes is None:
+        _, axes = plt.subplots()
+
+    line_kwargs.setdefault('linewidth', 0.5)
+    axes.plot(signal, **line_kwargs)
+    axes.set_xlabel('time (s)')
+    axes.set_ylabel('signal (au)')
+
+    return axes
+
+
+def plot_TsdFrame(signal: nap.TsdFrame, axes=None):
+    if axes is None:
+        _, axes = plt.subplots()
+
+    for col in signal.columns:
+        plot_Tsd(signal[col], axes=axes, label=col)
+
+    return axes
+
+
+def plot_psd_Tsd(signal: nap.Tsd, fs=None, axes=None, **line_kwargs):
+    if axes is None:
+        _, axes = plt.subplots()
+
+    if fs is None:
+        fs = 1 / np.median(np.diff(signal.t))
+
+    line_kwargs.setdefault('linewidth', 2)
+    axes.psd(signal.values, **line_kwargs)
+
+    return axes
+    # color = ('#279F95',)
+
+
+def plot_isosbestic_overview(
+    calcium: nap.Tsd,
+    isosbestic: nap.Tsd,
+    low_pass_cross_plot=0.01,
+    suptitle=None,
+    output_file=None,
+):
+    fig, axd = plt.subplot_mosaic(
+        [['top', 'top'], ['left', 'right']], constrained_layout=True, figsize=(14, 8)
+    )
+    # traces
+    plot_Tsd(calcium, axes=axd['top'], color='#279F95', label='calcium')
+    plot_Tsd(isosbestic, axes=axd['top'], color='#803896', label='isosbestic')
+
+    axd['top'].set(
+        xlabel='time (s)', ylabel='photometry trace', title='photometry signal'
+    )
+    axd['top'].legend()
+
+    # PSDs
+    plot_psd_Tsd(calcium, axes=axd['left'], color='#279F95', label='calcium')
+    plot_psd_Tsd(isosbestic, axes=axd['left'], color='#803896', label='isosbestic')
+    axd['left'].legend()
+
+    # scatter
+    if low_pass_cross_plot:
+        filter_params = dict(N=3, Wn=low_pass_cross_plot, btype='lowpass')
+        calcium_lp = filt(calcium, **filter_params)
+        isosbestic_lp = filt(isosbestic, **filter_params)
+
+    # lower right plot is the cross plot of the two signals to see if a regression makes sense
+    scatter = axd['right'].scatter(
+        isosbestic_lp.values,
+        calcium_lp.values,
+        s=1,
+        c=calcium_lp.times(),
+        cmap='magma',
+        alpha=0.8,
+    )
+    axd['right'].set(
+        xlabel='isosbestic signal',
+        ylabel='calcium dependent signal',
+        title='Cross-plot',
+    )
+    fig.colorbar(scatter, ax=axd['right'], label='time (s)')
+
+    if suptitle is not None:
+        fig.suptitle(suptitle, fontsize=16)
+    if output_file is not None:
+        fig.savefig(output_file)
+    # plt.show()
+    return fig, axd
 
 
 def plot_photometry_traces(
-    times,
-    calcium,
-    isosbestic = None,
+    times: np.ndarray,
+    signal: np.ndarray,
+    reference_signal=None,
     event_times=None,
     suptitle=None,
     output_file=None,
     low_pass_cross_plot=0.01,
 ):
-    isosbestic = calcium * np.nan if isosbestic is None else isosbestic
+    reference_signal = signal * np.nan if reference_signal is None else reference_signal
     if low_pass_cross_plot:
         filter_params = dict(N=3, Wn=0.01, btype='lowpass')
-        calcium_lp = filt(calcium, **filter_params)
-        isosbestic_lp = filt(isosbestic, **filter_params)
+        calcium_lp = filt(signal, **filter_params)
+        isosbestic_lp = filt(reference_signal, **filter_params)
     else:
-        calcium_lp, isosbestic_lp = (calcium, isosbestic)
+        calcium_lp, isosbestic_lp = (signal, reference_signal)
     # start the plotting functions, first the raw signals in time domain
     fig, axd = plt.subplot_mosaic(
         [['top', 'top'], ['left', 'right']], constrained_layout=True, figsize=(14, 8)
     )
     axd['top'].plot(
-        times, isosbestic, color='#803896', linewidth=0.5, label='isosbestic'
+        times,
+        reference_signal,
+        color='#803896',
+        linewidth=0.5,
+        label='reference_signal',
     )
     axd['top'].plot(
-        times, calcium, color='#279F95', linewidth=0.5, label='calcium dependent'
+        times, signal, color='#279F95', linewidth=0.5, label='calcium dependent'
     )
-    if np.min(isosbestic) < np.min(calcium):
-        minimum_event = np.min(isosbestic)
+    if np.min(reference_signal) < np.min(signal):
+        minimum_event = np.min(reference_signal)
     else:
-        minimum_event = np.min(calcium)
-    if np.max(isosbestic) < np.min(calcium):
-        maximum_event = np.max(calcium)
+        minimum_event = np.min(signal)
+    if np.max(reference_signal) < np.min(signal):
+        maximum_event = np.max(signal)
     else:
-        maximum_event = np.max(isosbestic)
+        maximum_event = np.max(reference_signal)
     # TO DO REFRACTOR WITH NP.MINIMUM
     if event_times is not None:
         ibllib.plots.vertical_lines(
-            # event_times, ymin=np.min(isosbestic), ymax=np.max(calcium), ax=axd['top'], alpha=.1, color='red')
+            # event_times, ymin=np.min(reference_signal), ymax=np.max(signal), ax=axd['top'], alpha=.1, color='red')
             event_times,
             ymin=minimum_event,
             ymax=maximum_event,
@@ -80,26 +183,24 @@ def plot_photometry_traces(
     axd['top'].legend()
     # lower left plot is the PSD of the two signals
     axd['left'].psd(
-        calcium,
+        signal,
         Fs=1 / np.median(np.diff(times)),
         color='#279F95',
         linewidth=2,
-        label='calcium dependent',
+        label='signal',
     )
     axd['left'].psd(
-        isosbestic,
+        reference_signal,
         Fs=1 / np.median(np.diff(times)),
         color='#803896',
         linewidth=2,
-        label='isosbestic',
+        label='reference_signal',
     )
     # lower right plot is the cross plot of the two signals to see if a regression makes sense
     scatter = axd['right'].scatter(
         isosbestic_lp, calcium_lp, s=1, c=times, cmap='magma', alpha=0.8
     )
-    axd['right'].set(
-        xlabel='isosbestic F', ylabel='calcium dependent F', title='Cross-plot'
-    )
+    axd['right'].set(xlabel='reference signal', ylabel='signal', title='Cross-plot')
     fig.colorbar(scatter, ax=axd['right'], label='time (s)')
     if suptitle is not None:
         fig.suptitle(suptitle, fontsize=16)

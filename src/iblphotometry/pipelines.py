@@ -9,8 +9,33 @@ from iblphotometry import sliding_operations
 from iblphotometry import bleach_corrections
 
 import logging
+from copy import copy
 
 logger = logging.getLogger()
+
+
+def _run_pipeline(F: nap.Tsd, pipeline):
+    # run pipeline
+    Fc = copy(F)
+    for i, (pipe_func, pipe_args) in enumerate(pipeline):
+        Fc = pipe_func(Fc, **pipe_args)
+    return Fc
+
+
+def run_pipeline(F: nap.Tsd | nap.TsdFrame, pipeline):
+    if isinstance(F, nap.Tsd):
+        return _run_pipeline(F, pipeline)
+    if isinstance(F, nap.TsdFrame):
+        Fc = copy(F)
+        d_ = np.zeros_like(Fc.d)
+        for i, col in enumerate(Fc.columns):
+            d_[:, i] = run_pipeline(Fc[col], pipeline).values
+        return nap.TsdFrame(t=Fc.t, d=d_, columns=Fc.columns)
+
+
+def lowpass_bleachcorrect(F: nap.Tsd, filter_params, correction_method):
+    bc = bleach_corrections.LowpassBleachCorrection(filter_params, correction_method)
+    return bc.correct(F)
 
 
 def bc_lp_sliding_mad(

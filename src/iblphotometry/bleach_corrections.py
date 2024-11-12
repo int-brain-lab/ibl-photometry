@@ -305,6 +305,12 @@ class LowpassBleachCorrection:
         self.filter_params = filter_params
         self.correction_method = correction_method
 
-    def correct(self, F: nap.Tsd, mode='subtract'):
+    def correct(self, F: nap.Tsd):
         F_filt = filt(F, **self.filter_params)
         return correct(F, F_filt, mode=self.correction_method)
+
+
+# convenience functions for pipelines
+def lowpass_bleachcorrect(F: nap.Tsd, filter_params, correction_method):
+    bc = LowpassBleachCorrection(filter_params, correction_method)
+    return bc.correct(F)
