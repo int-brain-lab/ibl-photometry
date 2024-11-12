@@ -11,10 +11,15 @@ class BaseLoader(ABC):
 
     @property
     @abstractmethod
-    def size(self) -> int: ...
+    def size(self) -> int:
+        ...
+        # has to be set to the number of datasets
 
     @abstractmethod
-    def get_photometry_data(self) -> nap.TsdFrame: ...
+    def get_data(self) -> tuple[nap.TsdFrame, pd.DataFrame, dict]:
+        ...
+        # should return the photometry data, the behavioral data (a trials table)
+        # and a dict with the metadata
 
     def __iter__(self):
         return self
@@ -145,12 +150,6 @@ class AlexLoader(OneLoader):
 
         # signal_name is the part that is specific to alejaandro
         raw_photometry = super().get_photometry_data(pid, signal_name='GCaMP')
-        # this returns a TsdFrame with one column of the ROI name
-        # problematic
-        # return nap.TsdFrame(
-        #     t=raw_photometry.times(), d=raw_photometry[roi].values, columns=[roi]
-
-        # this reutrns a Tsd. Should be all good?
         return raw_photometry[roi]
 
 
