@@ -8,14 +8,13 @@ from itertools import chain
 
 class BaseLoader(ABC):
     i = 0
-    size = None
 
-    # def __init__(self):
-    # self.size = None  # this property must be set
+    @property
+    @abstractmethod
+    def size(self) -> int: ...
 
     @abstractmethod
-    def get_photometry_data(self) -> nap.TsdFrame:
-        ...
+    def get_photometry_data(self) -> nap.TsdFrame: ...
 
     def __iter__(self):
         return self
@@ -28,16 +27,10 @@ class BaseLoader(ABC):
             raise StopIteration
 
 
-"""
-the problem is, that both iterating over pids and eids is possible
-if iteration is over eids, then a pname is required to get the data
-but for two different pids, the same dataframe is fetched
-logically, we should iterate over pids
-"""
-
-
 class OneLoader(BaseLoader):
     """serves as a base class for ONE compatible data loaders, Kcenias data is still a special case of this"""
+
+    size = None
 
     def __init__(self, one, eids: list[str] = None, pids: list[str] = None, *args):
         self.one = one
