@@ -1,10 +1,14 @@
-import scipy.signal
 import numpy as np
+import pandas as pd
+import pynapple as nap
 import matplotlib.pyplot as plt
 import seaborn as sns
+
 import ibllib.plots
 from iblphotometry.helpers import filt
-import pynapple as nap
+
+# TODO decorators for saving figures
+# TODO decorators for generating axes or getting axes passed as a kw
 
 
 def plot_raw_data_df(df_photometry, **kwargs):
@@ -208,3 +212,50 @@ def plot_photometry_traces(
         fig.savefig(output_file)
     plt.show()
     return fig, axd
+
+
+# plot psths
+from iblphotometry.helpers import psth
+
+# event = 'feedback_times'
+# split_by = 'feedbackType'
+# split_by = 'choice'
+# region = 'Region0G'
+
+
+def plot_psth(
+    F: nap.Tsd, trials: pd.DataFrame, event: str = None, split_by: str = None
+):
+    splits = {}
+    for i, times in trials.groupby(split_by)[event]:
+        splits[i] = times
+
+    n_per_split = [v.shape[0] for _, v in splits.items()]
+    vmin, vmax = np.percentile(F, (1, 99))
+    w_start, w_stop = -2, 2
+    fig, axes = plt.subplots(
+        nrows=len(splits), gridspec_kw=dict(height_ratios=n_per_split)
+    )
+    for i, (label, times) in enumerate(splits.items()):
+        p, ix = psth(
+            F.values,
+            F.times(),
+            times,
+            peri_event_window=(w_start, w_stop),
+        )
+        axes[i].matshow(
+            p.T,
+            origin='lower',
+            extent=(w_start, w_stop, 0, p.shape[1]),
+            vmin=vmin,
+            vmax=vmax,
+        )
+        axes[i].set_aspect('auto')
+        axes[i].axvline(0, lw=1, color='w')
+        axes[i].set_ylabel(f'{split_by}={label}')
+        axes[i].xaxis.set_ticks_position('bottom')
+        if i < len(splits) - 1:
+            axes[i].set_xticklabels('')
+    axes[-1].set_xlabel('time (s)')
+    fig.subplots_adjust(hspace=0.1)
+    return axes
