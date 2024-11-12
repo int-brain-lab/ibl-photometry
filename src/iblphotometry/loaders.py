@@ -12,7 +12,7 @@ class PhotometryLoader:
         # TODO design choice: should loading data with a pid return a nap.Tsd? I think it should
         # TODO design choice: what should be the column names? Right now they are Region0X, I think they should be brain_regions
         if eid is not None and pid is not None:
-            if pid not in self.one.eid2pid(eid)[0]:
+            if pid not in self.eid2pid(eid)[0]:
                 raise ValueError(
                     'both pid and eid are provided, however, the pid does not belong to the eid'
                 )
@@ -62,14 +62,46 @@ class PhotometryLoader:
     def pid2eid(self, pid: str) -> tuple[str, str]:
         return self.one.pid2eid(pid)
 
+    def eid2pid(self, eid: str):
+        return self.one.eid2pid(eid)
+
 
 class AlexLoader(PhotometryLoader):
     def load_photometry_data(self, eid=None, pid=None):
         return super().load_photometry_data(eid=eid, pid=pid, signal='GCaMP')
 
 
-# class KceniaLoader(PhotometryLoader):
-#     def load_photometry_data()
+class KceniaLoader(PhotometryLoader):
+    def _load_data_from_pid(self, pid: str, signal=None):
+        eid, pname = self.pid2eid(pid)
+        session_path = self.one.eid2path(eid)
+        pqt_path = session_path / 'alf' / pname / 'raw_photometry.pqt'
+        raw_photometry_df = pd.read_parquet(pqt_path)
+        raw_photometry = nap.TsdFrame(raw_photometry_df.set_index('times'))
+        return raw_photometry
+
+    def _load_data_from_eid(self, eid, signal=None):
+        raise NotImplementedError
+
+    def get_mappable(self, eid):
+        raise NotImplementedError
+
+    def get_mapping(self, eid, key=None, value=None):
+        raise NotImplementedError
+
+    def pid2eid(self, pid: str) -> tuple[str, str]:
+        return pid.split('_')
+
+    def eid2pid(self, eid):
+        pnames = self._eid2pnames(eid)
+        pids = [f'{eid}_{pname}' for pname in pnames]
+        return (pids, pnames)
+
+    def _eid2pnames(self, eid: str):
+        session_path = self.one.eid2path(eid)
+        pnames = [reg.name for reg in session_path.joinpath('alf').glob('Region*')]
+        return pnames
+
 
 # class BaseLoader(ABC):
 #     i = 0

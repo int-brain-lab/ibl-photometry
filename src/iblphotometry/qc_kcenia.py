@@ -4,11 +4,16 @@ from iblphotometry import metrics, outlier_detection, pipelines
 from one.api import ONE
 import logging
 import iblphotometry.qc as qc
-import iblphotometry.loaders as ffld
+import iblphotometry.loaders as loaders
+from itertools import chain
 
 ##
 # User case specific variable
-path_user = ffld.user_config('georg')
+path_user = loaders.user_config('georg')
+
+##
+run_name = 'test_post_merge'
+debug = True
 
 output_folder = path_user['dir_results'].joinpath('Kcenia')
 output_folder.mkdir(parents=True, exist_ok=True)
@@ -17,9 +22,15 @@ one = ONE(cache_dir=path_user['dir_one'])
 
 path_websitecsv = path_user['file_websheet']
 
-##
-run_name = 'test_post_merge'
-debug = True
+
+# %% get all eids in the correct order
+
+data_loader = loaders.KceniaLoader(one)
+df = pd.read_csv(path_websitecsv)
+eids = list(df['eid'])[:5]  # <- debug
+
+pids = list(chain.from_iterable([data_loader.eid2pid(eid)[0] for eid in eids]))
+
 
 # %%
 # logging related
@@ -33,10 +44,6 @@ formatter = logging.Formatter(log_fmt, datefmt=date_fmt)
 file_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 
-# %% get all eids in the correct order
-
-df = pd.read_csv(path_websitecsv)
-eids = list(df['eid'])
 
 # %% setup metrics
 qc_metrics = {}
@@ -89,12 +96,12 @@ pipelines_reg = dict(
 )
 
 # %% run qc
-data_loader = ffld.KceniaLoader(one, eids)
+
 qc_dfs = qc.run_qc(
     data_loader,
+    pids,
     pipelines_reg,
     qc_metrics,
-    debug=debug,
 )
 
 # storing all the qc
