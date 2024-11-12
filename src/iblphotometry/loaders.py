@@ -5,10 +5,6 @@ from pathlib import Path
 from abc import ABC, abstractmethod
 from itertools import chain
 
-""" 
-only implements the iterator
-"""
-
 
 class BaseLoader(ABC):
     i = 0
@@ -18,8 +14,7 @@ class BaseLoader(ABC):
     # self.size = None  # this property must be set
 
     @abstractmethod
-    def get_data(self):
-        # uses the current index (self.i) to return the i-th dataset
+    def get_photometry_data(self) -> nap.TsdFrame:
         ...
 
     def __iter__(self):

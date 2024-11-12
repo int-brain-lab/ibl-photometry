@@ -17,31 +17,32 @@ def plot_raw_data_df(df_photometry, **kwargs):
     :param output_file:
     :return:
     """
+    # todo deprecate, this is not in line with the current data model
     sns.set_style('whitegrid')
-    photometry = nap.TsdFrame(
-        df_photometry,
-    )
-    # times = df_photometry["times"].values
-    # calcium = df_photometry["raw_calcium"].values
-    # isosbestic = df_photometry["raw_isosbestic"].values
-    return plot_photometry_traces(photometry, **kwargs)
+    tf_photometry = nap.TsdFrame(df_photometry).set_index('times')
+    return plot_raw_data_tf(tf_photometry, **kwargs)
+
+
+def plot_raw_data_tf(tf_photometry, **kwargs):
+    sns.set_style('whitegrid')
+    raw_isosbestic = tf_photometry['raw_isosbestic'] if 'raw_isosbestic' in tf_photometry.columns else None
+    return plot_photometry_traces(times=tf_photometry.times(), calcium=tf_photometry['raw_calcium'], isosbestic=raw_isosbestic, **kwargs)
 
 
 def plot_photometry_traces(
-    photometry,
+    times,
+    calcium,
+    isosbestic = None,
     event_times=None,
     suptitle=None,
     output_file=None,
     low_pass_cross_plot=0.01,
 ):
-    times = photometry.times()
-    calcium = photometry['raw_calcium'].values
-    isosbestic = photometry['raw_isosbestic'].values
-
+    isosbestic = calcium * np.nan if isosbestic is None else isosbestic
     if low_pass_cross_plot:
         filter_params = dict(N=3, Wn=0.01, btype='lowpass')
-        calcium_lp = filt(photometry['raw_calcium'], **filter_params)
-        isosbestic_lp = filt(photometry['raw_isosbestic'], **filter_params)
+        calcium_lp = filt(calcium, **filter_params)
+        isosbestic_lp = filt(isosbestic, **filter_params)
     else:
         calcium_lp, isosbestic_lp = (calcium, isosbestic)
     # start the plotting functions, first the raw signals in time domain
