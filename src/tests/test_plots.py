@@ -3,6 +3,8 @@ from pathlib import Path
 from one.api import ONE
 # from iblphotometry.preprocessing import jove2019
 import numpy as np
+from iblphotometry.behavior import psth
+import iblphotometry.plots as plots
 
 # Set the seed
 np.random.seed(seed=0)
@@ -40,5 +42,13 @@ def get_test_data(eid, nph_path, event, one=None):
 
 
 def test_plot_psth():
-    signal, times, t_events, fs = get_test_data(eid)
+    event = 'feedback_times'
+    peri_event_window = [-1.5, 2.75]
+    eid = '77a6741c-81cc-475f-9454-a9b997be02a4'  # Good response to feedback times
+    pname = 'Region3G'
+    one = ONE()
+    nph_path = DATA_PATH.joinpath(Path(f'{eid}/{pname}'))
+    signal, times, t_events, fs = get_test_data(eid, nph_path, event, one)
     psth_mat = psth(signal, times, t_events, fs=fs, peri_event_window=peri_event_window)
+    plots.plot_psth(psth_mat)
+    # TODO Close window

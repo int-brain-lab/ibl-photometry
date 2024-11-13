@@ -3,9 +3,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from iblphotometry.behavior import psth
 
-def compute_psth(signal, times, t_events, fs, peri_event_window):
-    psth_mat = psth(signal, times, t_events, fs=fs, peri_event_window=peri_event_window)[0]
-    return psth_mat
 
 def plot_psth(psth_mat, fs, axs=None, vmin=-0.01, vmax=0.01, cmap='PuOr'):
     time = np.arange(0, psth_mat.shape[0]) / fs
