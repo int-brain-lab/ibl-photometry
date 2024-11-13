@@ -5,19 +5,33 @@ from one.api import ONE
 import numpy as np
 from iblphotometry.behavior import psth
 import iblphotometry.plots as plots
+from iblphotometry.synthetic import synthetic101
+import matplotlib.pyplot as plt
 
 # Set the seed
 np.random.seed(seed=0)
 one = ONE()
 DATA_PATH = Path(__file__).parent / 'data'
 
-def get_test_data(eid, nph_path, event, one=None):
+
+def get_synthetic_data():
+    fs = 50
+    df_nph, t_events = synthetic101(fs=50)
+    # Get event
+    signal = df_nph['raw_calcium'].values  # TODO replace with processed signal once module is working again
+    times = df_nph['times'].values
+    return signal, times, t_events, fs
+
+def get_test_data():
     '''
     This is a throw-away loader function to help testing the plotting functions
     '''
-    # Get data
-    if one is None:
-        one = ONE()
+    # --- Use real data for test ---
+    event = 'feedback_times'
+    eid = '77a6741c-81cc-475f-9454-a9b997be02a4'  # Good response to feedback times
+    pname = 'Region3G'
+    nph_path = DATA_PATH.joinpath(Path(f'{eid}/{pname}'))
+    one = ONE()
 
     # Load NP file locally
     df_nph = pd.read_parquet(nph_path.joinpath(f'raw_photometry.pqt'))
@@ -42,13 +56,17 @@ def get_test_data(eid, nph_path, event, one=None):
 
 
 def test_plot_psth():
-    event = 'feedback_times'
     peri_event_window = [-1.5, 2.75]
-    eid = '77a6741c-81cc-475f-9454-a9b997be02a4'  # Good response to feedback times
-    pname = 'Region3G'
-    one = ONE()
-    nph_path = DATA_PATH.joinpath(Path(f'{eid}/{pname}'))
-    signal, times, t_events, fs = get_test_data(eid, nph_path, event, one)
-    psth_mat = psth(signal, times, t_events, fs=fs, peri_event_window=peri_event_window)
-    plots.plot_psth(psth_mat)
-    # TODO Close window
+
+    # --- Use real data for test ---
+    # signal, times, t_events, fs = get_test_data()
+
+    # --- Use synthetic data for test ---
+    signal, times, t_events, fs = get_synthetic_data()
+
+    # Compute PSTH
+    psth_mat, _ = psth(signal, times, t_events, fs=fs, peri_event_window=peri_event_window)
+    # Plot PSTH
+    plots.plot_psth(psth_mat, fs)
+    plt.show()
+    plt.close()
