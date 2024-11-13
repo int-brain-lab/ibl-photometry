@@ -29,11 +29,9 @@ def _preprocessing(raw_signal, fs):
 def get_synthetic_data():
     fs = 50
     df_nph, t_events = synthetic101(fs=50)
-    # Get event
-    signal = df_nph['raw_calcium'].values  # TODO replace with processed signal once module is working again
-    signal_processed = _preprocessing(signal, fs=fs)
-    times = df_nph['times'].values
-    return signal_processed, times, t_events, fs
+    # Get signal and process it
+    df_nph['signal_processed'] = _preprocessing(df_nph['raw_calcium'].values, fs=fs)
+    return df_nph, t_events, fs
 
 def get_test_data():
     '''
@@ -52,21 +50,17 @@ def get_test_data():
     # Load trial from ONE
     a = one.load_object(eid, 'trials')
     df_trials = a.to_df()
+    # Get event
+    t_events = df_trials[event]
 
     # Ugly way to get sampling frequency
     time_diffs = df_nph["times"].diff().dropna()
     fs = 1 / time_diffs.median()
 
-    # Process signal
-    # df_nph['calcium_jove2019'] = jove2019(df_nph["raw_calcium"], df_nph["raw_isosbestic"], fs=fs)
+    # Get signal and process it
+    df_nph['signal_processed'] = _preprocessing(df_nph['raw_calcium'].values, fs=fs)
 
-    # Get event
-    signal = df_nph['raw_calcium'].values  # TODO replace with processed signal once module is working again
-    signal_processed = _preprocessing(signal, fs=fs)
-    times = df_nph['times'].values
-    t_events = df_trials[event]
-
-    return signal_processed, times, t_events, fs
+    return df_nph, t_events, fs
 
 
 def test_plot_psth():
@@ -77,14 +71,37 @@ def test_plot_psth():
         match test_case:
             case 'synt':
                 # --- Use real data for test ---
-                signal, times, t_events, fs = get_test_data()
+                df_nph, t_events, fs = get_test_data()
             case 'real':
                 # --- Use synthetic data for test ---
-                signal, times, t_events, fs = get_synthetic_data()
+                df_nph, t_events, fs = get_synthetic_data()
+
+        signal = df_nph['signal_processed'].values
+        times = df_nph['times'].values
 
         # Compute PSTH
         psth_mat, _ = psth(signal, times, t_events, fs=fs, peri_event_window=peri_event_window)
         # Plot PSTH
         plots.plot_psth(psth_mat, fs)
+        plt.show()
+        plt.close()
+
+
+def test_plot_raw_signals():
+    for test_case in ['synt', 'real']:
+
+        match test_case:
+            case 'synt':
+                # --- Use real data for test ---
+                df_nph, _, fs = get_test_data()
+            case 'real':
+                # --- Use synthetic data for test ---
+                df_nph, _, fs = get_synthetic_data()
+
+        raw_signal = df_nph['raw_calcium'].values
+        raw_isosbestic = df_nph['raw_isosbestic'].values
+        times = df_nph['times'].values
+
+        plots.plot_raw_signals(times, raw_signal, raw_isosbestic)
         plt.show()
         plt.close()

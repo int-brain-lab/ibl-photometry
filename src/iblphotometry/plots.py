@@ -1,13 +1,37 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from iblphotometry.behavior import psth
+
+LINE_COLOURS = {
+    'raw_isosbestic': '#9d4edd', #purple
+    'raw_calcium': '#43aa8b', #teal
+    'calcium_photobleach': '#0081a7',
+    'isosbestic_photobleach': '#0081a7',
+    'calcium_jove2019': '#0081a7',
+    'calcium_mad': '#0081a7',
+    'isosbestic_mad': '#0081a7',
+    'moving_avg': '#f4a261'
+}
+
+
+
+def set_axis_style(ax, fontsize=12, **kwargs):
+    ax.spines['right'].set_visible(False)
+    ax.spines['top'].set_visible(False)
+
+    ax.set_xlabel(kwargs.get('xlabel', None), fontsize=fontsize)
+    ax.set_ylabel(kwargs.get('ylabel', None), fontsize=fontsize)
+    ax.set_title(kwargs.get('title', None), fontsize=fontsize)
+
+    return ax
 
 
 def plot_psth(psth_mat, fs, axs=None, vmin=-0.01, vmax=0.01, cmap='PuOr'):
     time = np.arange(0, psth_mat.shape[0]) / fs
     if axs is None:
-        _, axs = plt.subplots(2, 1)
+        fig, axs = plt.subplots(2, 1)
+    else:
+        fig = axs[0].get_figure()
 
     sns.heatmap(psth_mat.T, cbar=False, ax=axs[0], cmap=cmap, vmin=vmin, vmax=vmax)
 
@@ -17,8 +41,32 @@ def plot_psth(psth_mat, fs, axs=None, vmin=-0.01, vmax=0.01, cmap='PuOr'):
     axs[1].plot(time, mean_psth + std_psth, 'k--')
     axs[1].plot(time, mean_psth - std_psth, 'k--')
 
-    return axs
+    return fig, axs
 
+
+def plot_raw_signals(times, raw_signal, raw_isosbestic=None,
+                               ax=None, xlim=None, ylim=None, xlabel='Time', ylabel=None, title=None):
+
+        if ax is None:
+            fig, ax = plt.subplots(1, 1)
+        else:
+            fig = ax.get_figure()
+
+        linewidth = 0.1 if xlim is None else 1
+        # Plot signal
+        ax.plot(times, raw_signal, linewidth=linewidth, c=LINE_COLOURS['raw_calcium'])
+        # Plot isosbestic if passed in
+        if raw_isosbestic is not None:
+            ax.plot(times, raw_isosbestic, linewidth=linewidth, c=LINE_COLOURS['raw_isosbestic'])
+
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+
+        set_axis_style(ax, xlabel=xlabel, ylabel=ylabel, title=title)
+
+        ax.tick_params(axis='both', which='major')
+
+        return fig, ax
 
 ### LEGACY CODE
 # import numpy as np
