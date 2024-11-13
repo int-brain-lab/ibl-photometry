@@ -88,7 +88,7 @@ def plot_processed_signal(signal, times, ax=None, xlim=None, ylim=None,
 # from brainbox.task.trials import find_trial_ids
 # trial_idx, dividers = find_trial_ids(trials, sort='choice')
 
-def plot_event_tick(events, ax=None, labels=None, color=None):
+def plot_event_tick(events, ax=None, labels=None, color=None, ls='--'):
     if ax is None:
         fig, ax = plt.subplots(1, 1)
     else:
@@ -97,7 +97,7 @@ def plot_event_tick(events, ax=None, labels=None, color=None):
     if color is None:
         color = 'k'
 
-    ax.vlines(events, *ax.get_ylim(), color=color, ls='--', zorder=ax.get_zorder() + 1)
+    ax.vlines(events, *ax.get_ylim(), color=color, ls=ls, zorder=ax.get_zorder() + 1)
 
     # TODO this part does not work
     # if labels is not None:
@@ -125,7 +125,7 @@ def plot_iblevents_tick(ax, trials, text=True):
     labels = ['Stim On', 'First Move', 'Feedback']
 
     for e, c, l in zip(events, colors, labels):
-        plot_event_tick(ax, events=trials[e], labels=l, color=c, text=True)
+        plot_event_tick(events=trials[e], ax=ax, labels=l, color=c)
 
     return ax
 
