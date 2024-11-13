@@ -1,4 +1,7 @@
 import numpy as np
+import copy
+from iblutil.util import Bunch
+
 
 def psth(calcium, times, t_events, fs=None, peri_event_window=None):
     """
@@ -26,3 +29,18 @@ def psth(calcium, times, t_events, fs=None, peri_event_window=None):
     psth = calcium[idx_psth]  # psth is a 2d array (ntimes, nevents)
     psth[i_out_of_bounds] = np.nan  # remove events that are out of bounds
     return psth, idx_psth
+
+
+# -------------------------------------------------------------------------------------------------
+# Filtering of trials
+# -------------------------------------------------------------------------------------------------
+def _filter(obj, idx):
+    obj = Bunch(copy.deepcopy(obj))
+    for key in obj.keys():
+        obj[key] = obj[key][idx]
+
+    return obj
+
+
+def filter_trials_by_trial_idx(trials, trial_idx):
+    return _filter(trials, trial_idx)

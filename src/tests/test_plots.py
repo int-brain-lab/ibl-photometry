@@ -102,6 +102,27 @@ def test_plot_raw_signals():
         raw_isosbestic = df_nph['raw_isosbestic'].values
         times = df_nph['times'].values
 
-        plots.plot_raw_signals(times, raw_signal, raw_isosbestic)
+        plots.plot_raw_signals(raw_signal, times, raw_isosbestic)
         plt.show()
         plt.close()
+
+
+def test_plot_processed_signal():
+    # --- Use synthetic data for test ---
+    df_nph, _, fs = get_synthetic_data()
+
+    signal = df_nph['signal_processed'].values
+    times = df_nph['times'].values
+    plots.plot_processed_signal(signal, times)
+    plt.show()
+    plt.close()
+
+
+def test_plot_event_tick():
+    # --- Use synthetic data for test ---
+    df_nph, t_events, fs = get_synthetic_data()
+
+    signal = df_nph['signal_processed'].values
+    times = df_nph['times'].values
+
+    # plot_event_tick

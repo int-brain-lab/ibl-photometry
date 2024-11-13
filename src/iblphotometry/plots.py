@@ -1,16 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from iblphotometry.behavior import filter_trials_by_trial_idx
 
 LINE_COLOURS = {
     'raw_isosbestic': '#9d4edd', #purple
-    'raw_calcium': '#43aa8b', #teal
-    'calcium_photobleach': '#0081a7',
-    'isosbestic_photobleach': '#0081a7',
-    'calcium_jove2019': '#0081a7',
-    'calcium_mad': '#0081a7',
-    'isosbestic_mad': '#0081a7',
-    'moving_avg': '#f4a261'
+    'raw_signal': '#43aa8b', #teal
+    'processed_signal': '#0081a7'
+    # 'moving_avg': '#f4a261'
 }
 
 
@@ -44,8 +41,8 @@ def plot_psth(psth_mat, fs, axs=None, vmin=-0.01, vmax=0.01, cmap='PuOr'):
     return fig, axs
 
 
-def plot_raw_signals(times, raw_signal, raw_isosbestic=None,
-                               ax=None, xlim=None, ylim=None, xlabel='Time', ylabel=None, title=None):
+def plot_raw_signals(raw_signal, times, raw_isosbestic=None,
+                     ax=None, xlim=None, ylim=None, xlabel='Time', ylabel=None, title=None):
 
         if ax is None:
             fig, ax = plt.subplots(1, 1)
@@ -54,19 +51,80 @@ def plot_raw_signals(times, raw_signal, raw_isosbestic=None,
 
         linewidth = 0.1 if xlim is None else 1
         # Plot signal
-        ax.plot(times, raw_signal, linewidth=linewidth, c=LINE_COLOURS['raw_calcium'])
+        ax.plot(times, raw_signal, linewidth=linewidth, c=LINE_COLOURS['raw_signal'])
         # Plot isosbestic if passed in
         if raw_isosbestic is not None:
             ax.plot(times, raw_isosbestic, linewidth=linewidth, c=LINE_COLOURS['raw_isosbestic'])
 
         ax.set_xlim(xlim)
         ax.set_ylim(ylim)
-
         set_axis_style(ax, xlabel=xlabel, ylabel=ylabel, title=title)
-
         ax.tick_params(axis='both', which='major')
-
         return fig, ax
+
+
+
+def plot_processed_signal(signal, times, ax=None, xlim=None, ylim=None,
+                          xlabel='Time', ylabel=None, title=None):
+
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+    else:
+        fig = ax.get_figure()
+
+    linewidth = 0.1 if xlim is None else 1
+    col = LINE_COLOURS['processed_signal']
+    # Plot signal over time
+    ax.plot(times, signal, linewidth=linewidth, c=col)
+    set_axis_style(ax, xlabel=xlabel, ylabel=ylabel, title=title)
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    ax.tick_params(axis='both', which='major')
+
+    return fig, ax
+
+
+
+# from brainbox.task.trials import find_trial_ids
+# trial_idx, dividers = find_trial_ids(trials, sort='choice')
+
+def plot_event_tick(ax, events, labels=None, color=None, text=True):
+    if color is None:
+        color = 'k'
+
+    ax.vlines(events, *ax.get_ylim(), color=color, ls='--', zorder=ax.get_zorder() + 1)
+
+    if text is True:
+        if labels is None:
+            labels = np.arange(0, len(events))
+        ax.text(events, 1.01, f'{labels}', c=color, rotation=45,
+                rotation_mode='anchor', ha='left', transform=ax.get_xaxis_transform())
+
+    return ax
+
+def plot_iblevents_tick(ax, trials, text=True):
+    '''
+
+    Parameters
+    ----------
+    ax
+    trials: Bunch object in ALF format
+    text
+
+    Returns
+    -------
+
+    '''
+
+    events = ['stimOnTrigger_times', 'firstMovement_times', 'feedback_times']
+    colors = ['b', 'g', 'r']
+    labels = ['Stim On', 'First Move', 'Feedback']
+
+    for e, c, l in zip(events, colors, labels):
+        plot_event_tick(ax, events=trials[e], labels=l, color=c, text=True)
+
+    return ax
+
 
 ### LEGACY CODE
 # import numpy as np
