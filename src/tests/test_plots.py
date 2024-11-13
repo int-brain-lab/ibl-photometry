@@ -15,10 +15,12 @@ DATA_PATH = Path(__file__).parent / 'data'
 
 def _processing(raw_signal, fs):
     # This is a convenience function to get going whilst the preprocessing refactoring is being done
+    # TODO delete this function once processing can be applied
     params = {}
     sos = scipy.signal.butter(fs=fs, output='sos', **params.get('butterworth_lowpass', {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}))
     signal_lp = scipy.signal.sosfiltfilt(sos, raw_signal)
-    raw_signal = (raw_signal - signal_lp) / signal_lp
+    signal_processed = (raw_signal - signal_lp) / signal_lp
+    return signal_processed
 
 
 def get_synthetic_data():
