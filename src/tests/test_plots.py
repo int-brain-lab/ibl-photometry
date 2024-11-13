@@ -1,19 +1,22 @@
 import pandas as pd
 from pathlib import Path
 from one.api import ONE
-# from iblphotometry.preprocessing import jove2019
 import numpy as np
 from iblphotometry.behavior import psth
 import iblphotometry.plots as plots
 from iblphotometry.synthetic import synthetic101
 import matplotlib.pyplot as plt
 
+# TODO fix import once processing settled
+# from iblphotometry.preprocessing import jove2019
+import scipy.signal
+
 # Set the seed
 np.random.seed(seed=0)
 one = ONE()
 DATA_PATH = Path(__file__).parent / 'data'
 
-def _processing(raw_signal, fs):
+def _preprocessing(raw_signal, fs):
     # This is a convenience function to get going whilst the preprocessing refactoring is being done
     # TODO delete this function once processing can be applied
     params = {}
@@ -28,8 +31,9 @@ def get_synthetic_data():
     df_nph, t_events = synthetic101(fs=50)
     # Get event
     signal = df_nph['raw_calcium'].values  # TODO replace with processed signal once module is working again
+    signal_processed = _preprocessing(signal, fs=fs)
     times = df_nph['times'].values
-    return signal, times, t_events, fs
+    return signal_processed, times, t_events, fs
 
 def get_test_data():
     '''
@@ -58,24 +62,29 @@ def get_test_data():
 
     # Get event
     signal = df_nph['raw_calcium'].values  # TODO replace with processed signal once module is working again
+    signal_processed = _preprocessing(signal, fs=fs)
     times = df_nph['times'].values
     t_events = df_trials[event]
 
-    return signal, times, t_events, fs
+    return signal_processed, times, t_events, fs
 
 
 def test_plot_psth():
     peri_event_window = [-1.5, 2.75]
 
-    # --- Use real data for test ---
-    # signal, times, t_events, fs = get_test_data()
+    for test_case in ['synt', 'real']:
 
-    # --- Use synthetic data for test ---
-    signal, times, t_events, fs = get_synthetic_data()
+        match test_case:
+            case 'synt':
+                # --- Use real data for test ---
+                signal, times, t_events, fs = get_test_data()
+            case 'real':
+                # --- Use synthetic data for test ---
+                signal, times, t_events, fs = get_synthetic_data()
 
-    # Compute PSTH
-    psth_mat, _ = psth(signal, times, t_events, fs=fs, peri_event_window=peri_event_window)
-    # Plot PSTH
-    plots.plot_psth(psth_mat, fs)
-    plt.show()
-    plt.close()
+        # Compute PSTH
+        psth_mat, _ = psth(signal, times, t_events, fs=fs, peri_event_window=peri_event_window)
+        # Plot PSTH
+        plots.plot_psth(psth_mat, fs)
+        plt.show()
+        plt.close()
