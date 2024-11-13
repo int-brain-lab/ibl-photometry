@@ -22,20 +22,18 @@ def _run_pipeline(F: nap.Tsd, pipeline):
     return Fc
 
 
-def run_pipeline(F: nap.Tsd | nap.TsdFrame, pipeline):
+def run_pipeline(F: nap.Tsd | nap.TsdFrame, pipeline, on_columns=False):
     if isinstance(F, nap.Tsd):
         return _run_pipeline(F, pipeline)
     if isinstance(F, nap.TsdFrame):
-        Fc = copy(F)
-        d_ = np.zeros_like(Fc.d)
-        for i, col in enumerate(Fc.columns):
-            d_[:, i] = run_pipeline(Fc[col], pipeline).values
-        return nap.TsdFrame(t=Fc.t, d=d_, columns=Fc.columns)
-
-
-def lowpass_bleachcorrect(F: nap.Tsd, filter_params, correction_method):
-    bc = bleach_corrections.LowpassBleachCorrection(filter_params, correction_method)
-    return bc.correct(F)
+        if on_columns:
+            Fc = copy(F)
+            d_ = np.zeros_like(Fc.d)
+            for i, col in enumerate(Fc.columns):
+                d_[:, i] = run_pipeline(Fc[col], pipeline).values
+            return nap.TsdFrame(t=Fc.t, d=d_, columns=Fc.columns)
+        else:
+            return _run_pipeline(F, pipeline)
 
 
 def bc_lp_sliding_mad(

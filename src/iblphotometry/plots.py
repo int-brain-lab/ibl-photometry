@@ -3,12 +3,27 @@ import pandas as pd
 import pynapple as nap
 import matplotlib.pyplot as plt
 import seaborn as sns
+from pathlib import Path
+from matplotlib import ticker
 
 import ibllib.plots
 from iblphotometry.helpers import filt
 
 # TODO decorators for saving figures
 # TODO decorators for generating axes or getting axes passed as a kw
+
+
+# def saveable(func):
+#     def wrapper(*args, **kwargs):
+#         if 'output_file' in kwargs:
+#             axes = func(*args, **kwargs)
+#             plt.gcf().savefig(kwargs['output_file'])
+#             # plt.close(fig)
+#         else:
+#             axes = func(*args, **kwargs)
+#         return axes
+
+#     return wrapper
 
 
 def plot_raw_data_df(df_photometry, **kwargs):
@@ -42,6 +57,7 @@ def plot_raw_data_tf(tf_photometry, **kwargs):
     )
 
 
+# @saveable
 def plot_Tsd(signal: nap.Tsd, axes=None, **line_kwargs):
     if axes is None:
         _, axes = plt.subplots()
@@ -233,6 +249,7 @@ def plot_psth(
     n_per_split = [v.shape[0] for _, v in splits.items()]
     vmin, vmax = np.percentile(F, (1, 99))
     w_start, w_stop = -2, 2
+
     fig, axes = plt.subplots(
         nrows=len(splits), gridspec_kw=dict(height_ratios=n_per_split)
     )
@@ -254,6 +271,7 @@ def plot_psth(
         axes[i].axvline(0, lw=1, color='w')
         axes[i].set_ylabel(f'{split_by}={label}')
         axes[i].xaxis.set_ticks_position('bottom')
+        # axes[i].yaxis.set_major_locator(ticker.MultipleLocator(20))
         if i < len(splits) - 1:
             axes[i].set_xticklabels('')
     axes[-1].set_xlabel('time (s)')

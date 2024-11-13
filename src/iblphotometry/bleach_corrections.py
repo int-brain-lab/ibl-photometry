@@ -314,3 +314,10 @@ class LowpassBleachCorrection:
 def lowpass_bleachcorrect(F: nap.Tsd, filter_params, correction_method):
     bc = LowpassBleachCorrection(filter_params, correction_method)
     return bc.correct(F)
+
+
+def isosbestic_correct(
+    F: nap.TsdFrame, signal_name=None, reference_name=None, **kwargs
+):
+    ic = IsosbesticCorrection(**kwargs)
+    return ic.correct(F[signal_name], F[reference_name])
