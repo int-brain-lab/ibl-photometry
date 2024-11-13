@@ -88,19 +88,23 @@ def plot_processed_signal(signal, times, ax=None, xlim=None, ylim=None,
 # from brainbox.task.trials import find_trial_ids
 # trial_idx, dividers = find_trial_ids(trials, sort='choice')
 
-def plot_event_tick(ax, events, labels=None, color=None, text=True):
+def plot_event_tick(events, ax=None, labels=None, color=None):
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+    else:
+        fig = ax.get_figure()
+
     if color is None:
         color = 'k'
 
     ax.vlines(events, *ax.get_ylim(), color=color, ls='--', zorder=ax.get_zorder() + 1)
 
-    if text is True:
-        if labels is None:
-            labels = np.arange(0, len(events))
-        ax.text(events, 1.01, f'{labels}', c=color, rotation=45,
-                rotation_mode='anchor', ha='left', transform=ax.get_xaxis_transform())
+    # TODO this part does not work
+    # if labels is not None:
+    #     ax.text(events, 1.01, labels, c=color, rotation=45,
+    #             rotation_mode='anchor', ha='left', transform=ax.get_xaxis_transform())
 
-    return ax
+    return fig, ax
 
 def plot_iblevents_tick(ax, trials, text=True):
     '''

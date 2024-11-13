@@ -121,8 +121,11 @@ def test_plot_processed_signal():
 def test_plot_event_tick():
     # --- Use synthetic data for test ---
     df_nph, t_events, fs = get_synthetic_data()
+    plots.plot_event_tick(t_events)
+    plt.show()
+    plt.close()
 
-    signal = df_nph['signal_processed'].values
-    times = df_nph['times'].values
-
-    # plot_event_tick
+    # TODO Test labels
+    # plots.plot_event_tick(t_events, labels='test_label')
+    plt.show()
+    plt.close()
