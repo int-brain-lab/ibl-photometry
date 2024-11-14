@@ -146,6 +146,7 @@ def plot_psd(signal, ax=None, title=None, **line_kwargs):
         fig = ax.get_figure()
     line_kwargs.setdefault('linewidth', 2)
     ax.psd(signal, **line_kwargs)
+    # TODO the freq x-axis is currently not informative
     ax.set_title(title)
 
     return fig, ax
