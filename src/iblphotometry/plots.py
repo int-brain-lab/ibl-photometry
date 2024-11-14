@@ -103,7 +103,16 @@ class PlotSignalResponse():
         for iaxs, event in enumerate(PSTH_EVENTS.keys()):
             axs_plt = [axs[0, iaxs],
                        axs[1, iaxs]]
-            plot_psth(self.psth_dict[event], self.psth_dict['times'], axs=axs_plt)
+            plot_psth(self.psth_dict[event], self.psth_dict['times'], axs=axs_plt, title=event)
+
+            if iaxs == 0:
+                axs[0, iaxs].set_xlabel('Frames')
+                axs[0, iaxs].set_ylabel('Trials')
+                axs[1, iaxs].set_xlabel('Time (s)')
+            if iaxs > 0:
+                axs[0, iaxs].axis('off')
+                axs[1, iaxs].set_yticks([])
+        fig.tight_layout()
         return fig, axs
 """
 ------------------------------------------------
@@ -195,7 +204,7 @@ Plotting functions requiring behavioral events
 ------------------------------------------------
 """
 
-def plot_psth(psth_mat, time, axs=None, vmin=-0.01, vmax=0.01, cmap='PuOr'):
+def plot_psth(psth_mat, time, axs=None, vmin=-0.01, vmax=0.01, cmap='PuOr', title=None):
     # if time is None:
     #     time = np.arange(0, psth_mat.shape[0]) / fs
     if axs is None:
@@ -204,6 +213,7 @@ def plot_psth(psth_mat, time, axs=None, vmin=-0.01, vmax=0.01, cmap='PuOr'):
         fig = axs[0].get_figure()
 
     sns.heatmap(psth_mat.T, cbar=False, ax=axs[0], cmap=cmap, vmin=vmin, vmax=vmax)
+    axs[0].set_title(title)
 
     mean_psth = np.nanmean(psth_mat, axis=1)
     std_psth = np.nanstd(psth_mat, axis=1)
