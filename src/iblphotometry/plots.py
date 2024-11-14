@@ -106,7 +106,7 @@ def plot_event_tick(events, ax=None, labels=None, color=None, ls='--'):
 
     return fig, ax
 
-def plot_iblevents_tick(ax, trials, text=True):
+def plot_iblevents_tick(ax, trials):
     '''
 
     Parameters

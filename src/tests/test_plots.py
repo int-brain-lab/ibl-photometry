@@ -8,29 +8,19 @@ from iblphotometry.synthetic import synthetic101
 import matplotlib.pyplot as plt
 
 # TODO fix import once processing settled
-# from iblphotometry.preprocessing import jove2019
-import scipy.signal
+import iblphotometry.preprocessing as ffpr
 
 # Set the seed
 np.random.seed(seed=0)
 one = ONE()
 DATA_PATH = Path(__file__).parent / 'data'
 
-def _preprocessing(raw_signal, fs):
-    # This is a convenience function to get going whilst the preprocessing refactoring is being done
-    # TODO delete this function once processing can be applied
-    params = {}
-    sos = scipy.signal.butter(fs=fs, output='sos', **params.get('butterworth_lowpass', {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}))
-    signal_lp = scipy.signal.sosfiltfilt(sos, raw_signal)
-    signal_processed = (raw_signal - signal_lp) / signal_lp
-    return signal_processed
-
 
 def get_synthetic_data():
     fs = 50
     df_nph, t_events = synthetic101(fs=50)
     # Get signal and process it
-    df_nph['signal_processed'] = _preprocessing(df_nph['raw_calcium'].values, fs=fs)
+    df_nph['signal_processed'] = ffpr.mad_raw_signal(df_nph['raw_calcium'].values, fs=fs)
     return df_nph, t_events, fs
 
 def get_test_data():
@@ -58,7 +48,7 @@ def get_test_data():
     fs = 1 / time_diffs.median()
 
     # Get signal and process it
-    df_nph['signal_processed'] = _preprocessing(df_nph['raw_calcium'].values, fs=fs)
+    df_nph['signal_processed'] = ffpr.mad_raw_signal(df_nph['raw_calcium'].values, fs=fs)
 
     return df_nph, t_events, fs
 
