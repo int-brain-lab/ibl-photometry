@@ -2,9 +2,11 @@ import numpy as np
 import pynapple as nap
 import pandas as pd
 from pathlib import Path
+from iblphotometry import io
 
 
 class PhotometryLoader:
+    # TODO move this class to brainbox.io
     def __init__(self, one):
         self.one = one
 
@@ -38,10 +40,12 @@ class PhotometryLoader:
         # TODO design choice: what if only one channel is measured per eid?
         # Still return a nap.TsdFrame or nap.Tsd?
         raw_photometry_df = self.one.load_dataset(eid, 'photometry.signal.pqt')
-        if signal is not None:
-            raw_photometry_df = raw_photometry_df.groupby('name').get_group(signal)
-        locations = self._load_locations(eid)
-        raw_photometry_df = raw_photometry_df.set_index('times')[locations.index]
+        raw_photometry_tf = io.from_dataframe(raw_photometry_df)[signal]
+
+        # if signal is not None:
+        #     raw_photometry_df = raw_photometry_df.groupby('name').get_group(signal)
+        # locations = self._load_locations(eid)
+        # raw_photometry_df = raw_photometry_df.set_index('times')[locations.index]
 
         # if TsdFrame.columns should be renamed to brain_regions
         # if rename:
@@ -72,6 +76,7 @@ class AlexLoader(PhotometryLoader):
 
 
 class KceniaLoader(PhotometryLoader):
+    # OBSOLETE
     def _load_data_from_pid(self, pid: str, signal=None):
         eid, pname = self.pid2eid(pid)
         session_path = self.one.eid2path(eid)
