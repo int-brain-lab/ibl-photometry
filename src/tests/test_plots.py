@@ -4,6 +4,7 @@ from one.api import ONE
 import numpy as np
 from iblphotometry.behavior import psth
 import iblphotometry.plots as plots
+from iblphotometry.plots import PlotSignal
 from iblphotometry.synthetic import synthetic101
 import matplotlib.pyplot as plt
 
@@ -97,6 +98,18 @@ def test_plot_raw_signals():
         plt.close()
 
 
+def test_plot_photometry_correlation():
+    # --- Use real data for test ---
+    df_nph, _, fs = get_test_data()
+
+    signal_lp = ffpr.low_pass_filter(df_nph['raw_calcium'].values, fs)
+    isosbestic_lp = ffpr.low_pass_filter(df_nph['raw_isosbestic'].values, fs)
+    times = df_nph['times'].values
+    plots.plot_photometry_correlation(signal_lp, isosbestic_lp, times)
+    plt.show()
+    plt.close()
+
+
 def test_plot_processed_signal():
     # --- Use synthetic data for test ---
     df_nph, _, fs = get_synthetic_data()
@@ -117,5 +130,21 @@ def test_plot_event_tick():
 
     # TODO Test labels
     # plots.plot_event_tick(t_events, labels='test_label')
+    plt.show()
+    plt.close()
+
+
+''' TEST CLASS '''
+def test_class_plotsignal():
+    # --- Use real data for test ---
+    df_nph, _, fs = get_test_data()
+
+    raw_signal = df_nph['raw_calcium'].values
+    raw_isosbestic = df_nph['raw_isosbestic'].values
+    processed_signal = df_nph['signal_processed'].values
+    times = df_nph['times'].values
+
+    plotobj = PlotSignal(raw_signal, times, raw_isosbestic, processed_signal)
+    plotobj.raw_processed_figure()
     plt.show()
     plt.close()

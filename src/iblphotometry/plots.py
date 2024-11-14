@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import iblphotometry.preprocessing as ffpr
 from iblphotometry.behavior import filter_trials_by_trial_idx
 
 LINE_COLOURS = {
@@ -22,24 +23,48 @@ def set_axis_style(ax, fontsize=12, **kwargs):
 
     return ax
 
+"""
+------------------------------------------------
+Loader objects for plotting
+------------------------------------------------
+"""
 
-def plot_psth(psth_mat, fs, axs=None, vmin=-0.01, vmax=0.01, cmap='PuOr'):
-    time = np.arange(0, psth_mat.shape[0]) / fs
-    if axs is None:
-        fig, axs = plt.subplots(2, 1)
-    else:
-        fig = axs[0].get_figure()
+class PlotSignal:
+    def __init__(self, raw_signal, times, raw_isosbestic=None,
+                 processed_signal=None, fs=None):
 
-    sns.heatmap(psth_mat.T, cbar=False, ax=axs[0], cmap=cmap, vmin=vmin, vmax=vmax)
+        # TODO this init could change, pass in a dataframe with specific keys and LP processing done earlier
+        self.raw_signal = raw_signal
+        self.raw_isosbestic = raw_isosbestic
+        self.processed_signal = processed_signal
+        self.times = times
 
-    mean_psth = np.nanmean(psth_mat, axis=1)
-    std_psth = np.nanstd(psth_mat, axis=1)
-    axs[1].plot(time, mean_psth, 'k')
-    axs[1].plot(time, mean_psth + std_psth, 'k--')
-    axs[1].plot(time, mean_psth - std_psth, 'k--')
+        # Low pass filter for plotting
+        if fs is None:
+            # Ugly way to get sampling frequency
+            time_diffs = np.diff(self.times)
+            fs = 1 / np.nanmedian(time_diffs)
+        self.lp_signal = ffpr.low_pass_filter(self.raw_signal, fs)
+        if self.raw_isosbestic is not None:
+            self.lp_isosbestic = ffpr.low_pass_filter(self.raw_isosbestic, fs)
 
-    return fig, axs
 
+    def raw_processed_figure(self):
+        fig, axs = plt.subplots(3, 1)
+        plot_raw_signals(self.raw_signal, self.times, self.raw_isosbestic, ax=axs[0])
+
+        if self.processed_signal is not None:
+            plot_processed_signal(self.processed_signal, self.times, ax=axs[1])
+
+        if self.raw_isosbestic is not None:
+            plot_photometry_correlation(self.lp_signal, self.lp_isosbestic, self.times, ax=axs[2])
+        return fig, axs
+
+"""
+------------------------------------------------
+Plotting functions requiring FF signals only
+------------------------------------------------
+"""
 
 def plot_raw_signals(raw_signal, times, raw_isosbestic=None,
                      ax=None, xlim=None, ylim=None, xlabel='Time', ylabel=None, title=None):
@@ -83,6 +108,49 @@ def plot_processed_signal(signal, times, ax=None, xlim=None, ylim=None,
 
     return fig, ax
 
+
+
+def plot_photometry_correlation(signal_lp, isosbestic_lp, times, ax=None, ax_cbar=None, title=None):
+    # Requires the Low pass filtered signals at minima
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+    else:
+        fig = ax.get_figure()
+
+    if ax_cbar is None:
+        ax_cbar = ax
+
+    scat = ax.scatter(isosbestic_lp, signal_lp, s=1, c=times,
+                      cmap='magma', alpha=.8)
+    set_axis_style(ax, xlabel='raw isobestic', ylabel='raw calcium', title=title)
+    fig.colorbar(scat, ax=ax_cbar, orientation='horizontal', label='Time in session (s)',
+                 shrink=0.3, anchor=(1.0, 1.0))
+
+    return fig, ax
+
+
+"""
+------------------------------------------------
+Plotting functions requiring behavioral events
+------------------------------------------------
+"""
+
+def plot_psth(psth_mat, fs, axs=None, vmin=-0.01, vmax=0.01, cmap='PuOr'):
+    time = np.arange(0, psth_mat.shape[0]) / fs
+    if axs is None:
+        fig, axs = plt.subplots(2, 1)
+    else:
+        fig = axs[0].get_figure()
+
+    sns.heatmap(psth_mat.T, cbar=False, ax=axs[0], cmap=cmap, vmin=vmin, vmax=vmax)
+
+    mean_psth = np.nanmean(psth_mat, axis=1)
+    std_psth = np.nanstd(psth_mat, axis=1)
+    axs[1].plot(time, mean_psth, 'k')
+    axs[1].plot(time, mean_psth + std_psth, 'k--')
+    axs[1].plot(time, mean_psth - std_psth, 'k--')
+
+    return fig, axs
 
 
 # from brainbox.task.trials import find_trial_ids
