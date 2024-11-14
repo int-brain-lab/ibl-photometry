@@ -47,17 +47,21 @@ class PlotSignal:
         self.lp_signal = ffpr.low_pass_filter(self.raw_signal, fs)
         if self.raw_isosbestic is not None:
             self.lp_isosbestic = ffpr.low_pass_filter(self.raw_isosbestic, fs)
+        else:
+            self.lp_isosbestic = None
 
 
     def raw_processed_figure(self):
-        fig, axs = plt.subplots(3, 1)
-        plot_raw_signals(self.raw_signal, self.times, self.raw_isosbestic, ax=axs[0])
+        fig, axs = plt.subplots(2, 2)
+        plot_raw_signals(self.raw_signal, self.times, self.raw_isosbestic, ax=axs[0, 0], title='Raw')
+        plot_raw_signals(self.lp_signal, self.times, self.lp_isosbestic, ax=axs[0, 1], title='Low pass')
 
         if self.processed_signal is not None:
-            plot_processed_signal(self.processed_signal, self.times, ax=axs[1])
+            plot_processed_signal(self.processed_signal, self.times, ax=axs[1, 0])
 
         if self.raw_isosbestic is not None:
-            plot_photometry_correlation(self.lp_signal, self.lp_isosbestic, self.times, ax=axs[2])
+            plot_photometry_correlation(self.lp_signal, self.lp_isosbestic, self.times, ax=axs[1, 1])
+        fig.tight_layout()
         return fig, axs
 
 """
@@ -124,10 +128,20 @@ def plot_photometry_correlation(signal_lp, isosbestic_lp, times, ax=None, ax_cba
                       cmap='magma', alpha=.8)
     set_axis_style(ax, xlabel='raw isobestic', ylabel='raw calcium', title=title)
     fig.colorbar(scat, ax=ax_cbar, orientation='horizontal', label='Time in session (s)',
-                 shrink=0.3, anchor=(1.0, 1.0))
+                 shrink=0.3, anchor=(0.0, 1.0))
 
     return fig, ax
 
+
+def plot_psd(signal, ax=None, **line_kwargs):
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+    else:
+        fig = ax.get_figure()
+    line_kwargs.setdefault('linewidth', 2)
+    ax.psd(signal.values, **line_kwargs)
+
+    return fig, ax
 
 """
 ------------------------------------------------

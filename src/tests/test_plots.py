@@ -53,6 +53,9 @@ def get_test_data():
 
     return df_nph, t_events, fs
 
+'''
+Signal plots
+'''
 
 def test_plot_psth():
     peri_event_window = [-1.5, 2.75]
@@ -119,6 +122,20 @@ def test_plot_processed_signal():
     plots.plot_processed_signal(signal, times)
     plt.show()
     plt.close()
+
+
+def test_plot_psd():
+    # --- Use synthetic data for test ---
+    df_nph, _, fs = get_synthetic_data()
+
+    signal = df_nph['signal_processed'].values
+    plots.plot_psd(signal)
+    plt.show()
+    plt.close()
+
+'''
+Behavior plots
+'''
 
 
 def test_plot_event_tick():
