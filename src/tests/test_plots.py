@@ -16,6 +16,11 @@ np.random.seed(seed=0)
 one = ONE()
 DATA_PATH = Path(__file__).parent / 'data'
 
+"""
+------------------------------------------------
+Functions to get test data
+------------------------------------------------
+"""
 
 def get_synthetic_data():
     fs = 50
@@ -53,9 +58,90 @@ def get_test_data():
 
     return df_nph, t_events, fs
 
+
+"""
+------------------------------------------------
+TEST: Loader objects for plotting
+------------------------------------------------
+"""
+
+def test_class_plotsignal():
+    # --- Use real data for test ---
+    df_nph, _, fs = get_test_data()
+
+    raw_signal = df_nph['raw_calcium'].values
+    raw_isosbestic = df_nph['raw_isosbestic'].values
+    processed_signal = df_nph['signal_processed'].values
+    times = df_nph['times'].values
+
+    plotobj = PlotSignal(raw_signal, times, raw_isosbestic, processed_signal)
+    plotobj.raw_processed_figure()
+    plt.show()
+    plt.close()
+
 '''
-Signal plots
+------------------------------------------------
+TEST: Plotting functions requiring FF signals only
+------------------------------------------------
 '''
+
+def test_plot_raw_signals():
+    for test_case in ['synt', 'real']:
+
+        match test_case:
+            case 'synt':
+                # --- Use real data for test ---
+                df_nph, _, fs = get_test_data()
+            case 'real':
+                # --- Use synthetic data for test ---
+                df_nph, _, fs = get_synthetic_data()
+
+        raw_signal = df_nph['raw_calcium'].values
+        raw_isosbestic = df_nph['raw_isosbestic'].values
+        times = df_nph['times'].values
+
+        plots.plot_raw_signals(raw_signal, times, raw_isosbestic)
+        plt.show()
+        plt.close()
+
+
+def test_plot_processed_signal():
+    # --- Use synthetic data for test ---
+    df_nph, _, fs = get_synthetic_data()
+
+    signal = df_nph['signal_processed'].values
+    times = df_nph['times'].values
+    plots.plot_processed_signal(signal, times)
+    plt.show()
+    plt.close()
+
+
+def test_plot_photometry_correlation():
+    # --- Use real data for test ---
+    df_nph, _, fs = get_test_data()
+
+    signal_lp = ffpr.low_pass_filter(df_nph['raw_calcium'].values, fs)
+    isosbestic_lp = ffpr.low_pass_filter(df_nph['raw_isosbestic'].values, fs)
+    times = df_nph['times'].values
+    plots.plot_photometry_correlation(signal_lp, isosbestic_lp, times)
+    plt.show()
+    plt.close()
+
+
+def test_plot_psd():
+    # --- Use synthetic data for test ---
+    df_nph, _, fs = get_synthetic_data()
+
+    signal = df_nph['signal_processed'].values
+    plots.plot_psd(signal)
+    plt.show()
+    plt.close()
+
+"""
+------------------------------------------------
+TEST: Plotting functions requiring behavioral events
+------------------------------------------------
+"""
 
 def test_plot_psth():
     peri_event_window = [-1.5, 2.75]
@@ -80,64 +166,6 @@ def test_plot_psth():
         plt.show()
         plt.close()
 
-
-def test_plot_raw_signals():
-    for test_case in ['synt', 'real']:
-
-        match test_case:
-            case 'synt':
-                # --- Use real data for test ---
-                df_nph, _, fs = get_test_data()
-            case 'real':
-                # --- Use synthetic data for test ---
-                df_nph, _, fs = get_synthetic_data()
-
-        raw_signal = df_nph['raw_calcium'].values
-        raw_isosbestic = df_nph['raw_isosbestic'].values
-        times = df_nph['times'].values
-
-        plots.plot_raw_signals(raw_signal, times, raw_isosbestic)
-        plt.show()
-        plt.close()
-
-
-def test_plot_photometry_correlation():
-    # --- Use real data for test ---
-    df_nph, _, fs = get_test_data()
-
-    signal_lp = ffpr.low_pass_filter(df_nph['raw_calcium'].values, fs)
-    isosbestic_lp = ffpr.low_pass_filter(df_nph['raw_isosbestic'].values, fs)
-    times = df_nph['times'].values
-    plots.plot_photometry_correlation(signal_lp, isosbestic_lp, times)
-    plt.show()
-    plt.close()
-
-
-def test_plot_processed_signal():
-    # --- Use synthetic data for test ---
-    df_nph, _, fs = get_synthetic_data()
-
-    signal = df_nph['signal_processed'].values
-    times = df_nph['times'].values
-    plots.plot_processed_signal(signal, times)
-    plt.show()
-    plt.close()
-
-
-def test_plot_psd():
-    # --- Use synthetic data for test ---
-    df_nph, _, fs = get_synthetic_data()
-
-    signal = df_nph['signal_processed'].values
-    plots.plot_psd(signal)
-    plt.show()
-    plt.close()
-
-'''
-Behavior plots
-'''
-
-
 def test_plot_event_tick():
     # --- Use synthetic data for test ---
     df_nph, t_events, fs = get_synthetic_data()
@@ -147,21 +175,5 @@ def test_plot_event_tick():
 
     # TODO Test labels
     # plots.plot_event_tick(t_events, labels='test_label')
-    plt.show()
-    plt.close()
-
-
-''' TEST CLASS '''
-def test_class_plotsignal():
-    # --- Use real data for test ---
-    df_nph, _, fs = get_test_data()
-
-    raw_signal = df_nph['raw_calcium'].values
-    raw_isosbestic = df_nph['raw_isosbestic'].values
-    processed_signal = df_nph['signal_processed'].values
-    times = df_nph['times'].values
-
-    plotobj = PlotSignal(raw_signal, times, raw_isosbestic, processed_signal)
-    plotobj.raw_processed_figure()
     plt.show()
     plt.close()
