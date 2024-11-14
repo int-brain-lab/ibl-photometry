@@ -311,8 +311,8 @@ class LowpassBleachCorrection:
 
 
 # convenience functions for pipelines
-def lowpass_bleachcorrect(F: nap.Tsd, filter_params, correction_method):
-    bc = LowpassBleachCorrection(filter_params, correction_method)
+def lowpass_bleachcorrect(F: nap.Tsd, **kwargs):
+    bc = LowpassBleachCorrection(**kwargs)
     return bc.correct(F)
 
 
