@@ -13,13 +13,13 @@ LINE_COLOURS = {
 
 
 
-def set_axis_style(ax, fontsize=12, **kwargs):
+def set_axis_style(ax, fontsize=10, **kwargs):
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
 
     ax.set_xlabel(kwargs.get('xlabel', None), fontsize=fontsize)
     ax.set_ylabel(kwargs.get('ylabel', None), fontsize=fontsize)
-    ax.set_title(kwargs.get('title', None), fontsize=fontsize)
+    ax.set_title(kwargs.get('title', None), fontsize=fontsize+2)
 
     return ax
 
@@ -52,13 +52,16 @@ class PlotSignal:
 
 
     def raw_processed_figure(self):
-        fig, axs = plt.subplots(2, 2)
+        fig, axs = plt.subplots(3, 2)
+        axs[2, 1].axis('off')
+
+        # --- Column 0
         plot_raw_signals(self.raw_signal, self.times, self.raw_isosbestic, ax=axs[0, 0], title='Raw')
-        plot_raw_signals(self.lp_signal, self.times, self.lp_isosbestic, ax=axs[0, 1], title='Low pass')
-
         if self.processed_signal is not None:
-            plot_processed_signal(self.processed_signal, self.times, ax=axs[1, 0])
-
+            plot_processed_signal(self.processed_signal, self.times, ax=axs[1, 0], title='Processed Signal')
+        plot_psd(self.processed_signal, ax=axs[2, 0], title='Processed Signal PSD')
+        #--- Column 1
+        plot_raw_signals(self.lp_signal, self.times, self.lp_isosbestic, ax=axs[0, 1], title='Low pass')
         if self.raw_isosbestic is not None:
             plot_photometry_correlation(self.lp_signal, self.lp_isosbestic, self.times, ax=axs[1, 1])
         fig.tight_layout()
@@ -80,10 +83,13 @@ def plot_raw_signals(raw_signal, times, raw_isosbestic=None,
 
         linewidth = 0.1 if xlim is None else 1
         # Plot signal
-        ax.plot(times, raw_signal, linewidth=linewidth, c=LINE_COLOURS['raw_signal'])
+        ax.plot(times, raw_signal, linewidth=linewidth,
+                c=LINE_COLOURS['raw_signal'], label='signal')
         # Plot isosbestic if passed in
         if raw_isosbestic is not None:
-            ax.plot(times, raw_isosbestic, linewidth=linewidth, c=LINE_COLOURS['raw_isosbestic'])
+            ax.plot(times, raw_isosbestic, linewidth=linewidth,
+                    c=LINE_COLOURS['raw_isosbestic'], label='isosbestic')
+        ax.legend(fontsize=6)
 
         ax.set_xlim(xlim)
         ax.set_ylim(ylim)
@@ -128,18 +134,19 @@ def plot_photometry_correlation(signal_lp, isosbestic_lp, times, ax=None, ax_cba
                       cmap='magma', alpha=.8)
     set_axis_style(ax, xlabel='raw isobestic', ylabel='raw calcium', title=title)
     fig.colorbar(scat, ax=ax_cbar, orientation='horizontal', label='Time in session (s)',
-                 shrink=0.3, anchor=(0.0, 1.0))
+                 shrink=0.3, anchor=(0.0, 1.0), location='top')
 
     return fig, ax
 
 
-def plot_psd(signal, ax=None, **line_kwargs):
+def plot_psd(signal, ax=None, title=None, **line_kwargs):
     if ax is None:
         fig, ax = plt.subplots(1, 1)
     else:
         fig = ax.get_figure()
     line_kwargs.setdefault('linewidth', 2)
-    ax.psd(signal.values, **line_kwargs)
+    ax.psd(signal, **line_kwargs)
+    ax.set_title(title)
 
     return fig, ax
 
