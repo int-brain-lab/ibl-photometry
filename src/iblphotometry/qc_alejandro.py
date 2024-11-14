@@ -1,3 +1,7 @@
+# %% just here
+%load_ext autoreload
+%autoreload 2
+
 # %%
 import pandas as pd
 from iblphotometry import metrics, outlier_detection, pipelines
@@ -20,9 +24,8 @@ debug = True
 
 # %% ONE related
 one = ONE(mode='remote')
-eids = list(one.search(dataset='photometry.signal.pqt'))[:5]  # <- debug here
-pids = list(chain.from_iterable([one.eid2pid(eid)[0] for eid in eids]))
-data_loader = loaders.AlexLoader(one)
+eids = list(one.search(dataset='photometry.signal.pqt', lab='wittenlab'))[:5]  # <- debug here
+data_loader = loaders.PhotometryLoader(one, verbose=False)
 
 
 # %%
@@ -86,12 +89,14 @@ pipelines_reg = dict(
 # %% run qc
 qc_dfs = qc.run_qc(
     data_loader,
-    pids,
+    eids,
     pipelines_reg,
     qc_metrics,
 )
 
 # storing all the qc
-for pipe_name in pipelines_reg.keys():
-    df = pd.DataFrame(qc_dfs[pipe_name]).T
-    df.to_csv(output_folder / f'qc_{run_name}_{pipe_name}.csv')
+# for pipe_name in pipelines_reg.keys():
+#     df = pd.DataFrame(qc_dfs[pipe_name]).T
+#     df.to_csv(output_folder / f'qc_{run_name}_{pipe_name}.csv')
+
+# %%

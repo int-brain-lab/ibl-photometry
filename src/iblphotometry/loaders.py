@@ -7,55 +7,51 @@ from iblphotometry import io
 
 class PhotometryLoader:
     # TODO move this class to brainbox.io
-    def __init__(self, one):
+    def __init__(self, one, verbose=False):
         self.one = one
+        self.verbose = verbose
 
-    def load_photometry_data(self, eid=None, pid=None, signal=None) -> nap.TsdFrame:
-        # TODO design choice: should loading data with a pid return a nap.Tsd? I think it should
-        # TODO design choice: what should be the column names? Right now they are Region0X, I think they should be brain_regions
-        if eid is not None and pid is not None:
-            if pid not in self.eid2pid(eid)[0]:
-                raise ValueError(
-                    'both pid and eid are provided, however, the pid does not belong to the eid'
-                )
-            # TODO discuss: decide what to return in this case. I think Tsd based on pid
+    def load_photometry_data(
+        self, eid=None, pid=None, return_regions=False
+    ) -> nap.TsdFrame:
+        # if eid is not None and pid is not None:
+        #     if pid not in self.eid2pid(eid)[0]:
+        #         raise ValueError(
+        #             'both pid and eid are provided, however, the pid does not belong to the eid'
+        #         )
 
         if pid is not None:
-            return self._load_data_from_pid(pid, signal=signal)
+            # raise NotImplementedError
+            return self._load_data_from_pid(pid)
 
         if eid is not None:
-            return self._load_data_from_eid(eid, signal=signal)
+            return self._load_data_from_eid(eid, return_regions=return_regions)
 
-    def load_trials_table(self, eid):
-        return self.one.load_dataset(eid, '*trials.table')
+    # def load_trials_table(self, eid):
+    #     return self.one.load_dataset(eid, '*trials.table')
 
-    def get_mappable(self, eid):
-        return self._load_locations(eid).reset_index().columns
+    # def get_mappable(self, eid):
+    #     return self._load_locations(eid).reset_index().columns
 
-    def get_mapping(self, eid, key=None, value=None):
-        locations = self._load_locations(eid)
-        return locations.reset_index().set_index(key)[value].to_dict()
+    # def get_mapping(self, eid, key=None, value=None):
+    #     locations = self._load_locations(eid)
+    #     return locations.reset_index().set_index(key)[value].to_dict()
 
-    def _load_data_from_eid(self, eid, signal=None) -> nap.TsdFrame:
-        # TODO design choice: what if only one channel is measured per eid?
-        # Still return a nap.TsdFrame or nap.Tsd?
+    def _load_data_from_eid(self, eid, return_regions=False) -> nap.TsdFrame:
         raw_photometry_df = self.one.load_dataset(eid, 'photometry.signal.pqt')
-        raw_photometry_tf = io.from_dataframe(raw_photometry_df)[signal]
+        locations_df = self.one.load_dataset(eid, 'photometryROI.locations.pqt')
+        read_config = dict(data_columns=list(locations_df.index))
+        raw_tfs = io.from_dataframe(raw_photometry_df, **read_config)
 
-        # if signal is not None:
-        #     raw_photometry_df = raw_photometry_df.groupby('name').get_group(signal)
-        # locations = self._load_locations(eid)
-        # raw_photometry_df = raw_photometry_df.set_index('times')[locations.index]
+        cols = list(raw_tfs[list(raw_tfs.keys())[0]].columns)
+        if self.verbose:
+            print(f'available signal bands: {list(raw_tfs.keys())}')
+            print(f'available brain regions: {cols}')
 
-        # if TsdFrame.columns should be renamed to brain_regions
-        # if rename:
-        #     rename_map = self.get_mapping(eid, key='ROI', value='brain_region')
-        #     raw_photometry_df = raw_photometry_df.rename(rename_map)
-
-        return nap.TsdFrame(raw_photometry_df)
-
-    def _load_locations(self, eid) -> pd.DataFrame:
-        return self.one.load_dataset(eid, 'photometryROI.locations.pqt')
+        if return_regions:
+            return raw_tfs, cols
+        else:
+            return raw_tfs
 
     def _load_data_from_pid(self, pid=None, signal=None) -> nap.Tsd:
         eid, pname = self.one.pid2eid(pid)
@@ -63,196 +59,63 @@ class PhotometryLoader:
         roi_name = dict(zip(locations['fiber'], locations.index))[pname]
         return self._load_data_from_eid(eid, signal=signal)[roi_name]
 
-    def pid2eid(self, pid: str) -> tuple[str, str]:
-        return self.one.pid2eid(pid)
+    # def pid2eid(self, pid: str) -> tuple[str, str]:
+    #     return self.one.pid2eid(pid)
 
-    def eid2pid(self, eid: str):
-        return self.one.eid2pid(eid)
-
-
-class AlexLoader(PhotometryLoader):
-    def load_photometry_data(self, eid=None, pid=None):
-        return super().load_photometry_data(eid=eid, pid=pid, signal='GCaMP')
+    # def eid2pid(self, eid: str):
+    #     return self.one.eid2pid(eid)
 
 
 class KceniaLoader(PhotometryLoader):
-    # OBSOLETE
-    def _load_data_from_pid(self, pid: str, signal=None):
-        eid, pname = self.pid2eid(pid)
+    # soon do be OBSOLETE
+    def _load_data_from_eid(self, eid: str, return_regions=False):
         session_path = self.one.eid2path(eid)
-        pqt_path = session_path / 'alf' / pname / 'raw_photometry.pqt'
-        raw_photometry_df = pd.read_parquet(pqt_path)
-        raw_photometry = nap.TsdFrame(raw_photometry_df.set_index('times'))
-        return raw_photometry
-
-    def _load_data_from_eid(self, eid, signal=None):
-        raise NotImplementedError
-
-    def get_mappable(self, eid):
-        raise NotImplementedError
-
-    def get_mapping(self, eid, key=None, value=None):
-        raise NotImplementedError
-
-    def pid2eid(self, pid: str) -> tuple[str, str]:
-        return pid.split('_')
-
-    def eid2pid(self, eid):
         pnames = self._eid2pnames(eid)
-        pids = [f'{eid}_{pname}' for pname in pnames]
-        return (pids, pnames)
+
+        raw_dfs = {}
+        for pname in pnames:
+            pqt_path = session_path / 'alf' / pname / 'raw_photometry.pqt'
+            raw_dfs[pname] = pd.read_parquet(pqt_path).set_index('times')
+
+        signal_bands = ['raw_calcium', 'raw_isosbestic']  # HARDCODED but fine
+
+        raw_tfs = {}
+        for band in signal_bands:
+            df = pd.DataFrame([raw_dfs[pname][band].values for pname in pnames]).T
+            df.columns = pnames
+            raw_tfs[band] = nap.TsdFrame(df)
+
+        if self.verbose:
+            print(f'available signal bands: {list(raw_tfs.keys())}')
+            cols = list(raw_tfs[list(raw_tfs.keys())[0]].columns)
+            print(f'available brain regions: {cols}')
+
+        if return_regions:
+            return raw_tfs, pnames
+        else:
+            return raw_tfs
+
+    # def _load_data_from_eid(self, eid, signal=None):
+    #     raise NotImplementedError
+
+    # def get_mappable(self, eid):
+    #     raise NotImplementedError
+
+    # def get_mapping(self, eid, key=None, value=None):
+    #     raise NotImplementedError
+
+    # def pid2eid(self, pid: str) -> tuple[str, str]:
+    #     return pid.split('_')
+
+    # def eid2pid(self, eid):
+    #     pnames = self._eid2pnames(eid)
+    #     pids = [f'{eid}_{pname}' for pname in pnames]
+    #     return (pids, pnames)
 
     def _eid2pnames(self, eid: str):
         session_path = self.one.eid2path(eid)
         pnames = [reg.name for reg in session_path.joinpath('alf').glob('Region*')]
         return pnames
-
-
-# class BaseLoader(ABC):
-#     i = 0
-
-#     @property
-#     @abstractmethod
-#     def size(self) -> int:
-#         ...
-#         # has to be set to the number of datasets
-
-#     @abstractmethod
-#     def get_data(self) -> tuple[nap.TsdFrame, pd.DataFrame, dict]:
-#         ...
-#         # should return the photometry data, the behavioral data (a trials table)
-#         # and a dict with the metadata
-
-#     def __iter__(self):
-#         return self
-
-#     def __next__(self):
-#         if self.i < self.size:
-#             self.i += 1
-#             return self.get_data()
-#         else:
-#             raise StopIteration
-
-
-# class OneLoader(BaseLoader):
-#     """serves as a base class for ONE compatible data loaders, Kcenias data is still a special case of this"""
-
-#     size = None
-
-#     def __init__(self, one, eids: list[str] = None, pids: list[str] = None, *args):
-#         self.one = one
-#         if eids is None and pids is None:
-#             raise ValueError('either eids or pids must be provided')
-
-#         # time for pydantic
-#         # for name, _list in zip(['eids', 'pids'], [eids, pids]):
-#         #     if not isinstance(_list, list):
-#         #         raise TypeError(f'{name} has to be a list of str')
-
-#         if eids is not None:
-#             self.eids = eids
-#             if pids is None:
-#                 self.pids = list(
-#                     chain.from_iterable([one.eid2pid(eid)[0] for eid in self.eids])
-#                 )
-
-#         if pids is not None:
-#             self.pids = pids
-#             if eids is None:
-#                 self.eids = list(np.unique([one.pid2eid(pid)[0] for pid in pids]))
-
-#         self.size = len(self.pids)
-
-#     def get_trials_data(self, pid: str) -> pd.DataFrame:
-#         # set up like this so it can be overridden in subclass
-#         eid, _ = self.pid2eid(pid)
-#         return self.one.load_dataset(eid, '*trials.table')
-
-#     def get_photometry_data(self, pid: str, signal_name: str = None) -> nap.TsdFrame:
-#         # set up like this so it can be overridden in subclass
-#         eid, _ = self.one.pid2eid(pid)
-
-#         # photometry.signal.pqt comes with ROIs as column names.
-#         raw_photometry_df = self.one.load_dataset(eid, 'photometry.signal.pqt')
-#         if signal_name is not None:
-#             raw_photometry_df = raw_photometry_df.groupby('name').get_group(signal_name)
-
-#         # conversion to nap.TsdFrame: time as index, and restricting to regions
-#         locations = self.one.load_dataset(eid, 'photometryROI.locations.pqt')
-#         raw_photometry = nap.TsdFrame(
-#             raw_photometry_df.set_index('times')[locations.index]
-#         )
-#         return raw_photometry
-
-#     def get_meta_data(self, pid: str) -> dict:
-#         # set up like this so it can be overridden in subclass
-#         eid, pname = self.pid2eid(pid)
-#         return dict(eid=eid, pid=pid, pname=pname)
-
-#     def pid2eid(self, pid: str) -> tuple[str, str]:
-#         # set up like this so it can be overridden
-#         return self.one.pid2eid(pid)
-
-#     def get_data(self) -> tuple[nap.TsdFrame, pd.DataFrame, dict]:
-#         """iterates over pids!"""
-#         pid = self.pids[self.i]  # uses the index defined in the base class
-
-#         # Get photometry data and convert to pynapple
-#         raw_photometry = self.get_photometry_data(pid)
-
-#         # Get trials data
-#         trials = self.get_trials_data(pid)
-
-#         # meta
-#         meta = self.get_meta_data(pid)
-
-#         return raw_photometry, trials, meta
-
-
-# class KceniaLoader(OneLoader):
-#     def __init__(self, one, eids: list[str]):
-#         self.one = one
-#         pids = []
-#         for eid in eids:
-#             pnames = self.eid2pnames(eid)
-#             for pname in pnames:
-#                 pids.append(f'{eid}_{pname}')
-#         super().__init__(one, eids=eids, pids=pids)
-
-#     def pid2eid(self, pid: str):
-#         return pid.split('_')
-
-#     def eid2pnames(self, eid: str):
-#         session_path = self.one.eid2path(eid)
-#         pnames = [reg.name for reg in session_path.joinpath('alf').glob('Region*')]
-#         return pnames
-
-#     def get_photometry_data(self, pid: str):
-#         eid, pname = self.pid2eid(pid)
-#         session_path = self.one.eid2path(eid)
-#         pqt_path = session_path / 'alf' / pname / 'raw_photometry.pqt'
-#         raw_photometry_df = pd.read_parquet(pqt_path)
-#         raw_photometry = nap.TsdFrame(raw_photometry_df.set_index('times'))
-#         return raw_photometry
-
-
-# class AlexLoader(OneLoader):
-#     def __init__(self, one, eids: list[str] = None):
-#         eids = (
-#             list(one.search(dataset='photometry.signal.pqt')) if eids is None else eids
-#         )
-#         super().__init__(one, eids=eids)
-
-#     def get_photometry_data(self, pid: str):
-#         eid, pname = self.one.pid2eid(pid)
-
-#         # mapping pname to roi
-#         locations = self.one.load_dataset(eid, 'photometryROI.locations.pqt')
-#         roi = dict(zip(locations['fiber'], locations.index))[pname]
-
-#         # signal_name is the part that is specific to alejaandro
-#         raw_photometry = super().get_photometry_data(pid, signal_name='GCaMP')
-#         return raw_photometry[roi]
 
 
 # TODO delete this once analysis settled

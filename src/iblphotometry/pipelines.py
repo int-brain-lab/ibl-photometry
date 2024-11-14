@@ -14,22 +14,53 @@ from copy import copy
 logger = logging.getLogger()
 
 
-def run_pipeline(F: nap.Tsd | nap.TsdFrame, pipeline):
-    Fc = copy(F)  # copy
+# def run_pipeline(Fd: dict, pipeline):
+#     # now photometry is a dict with keys of bands
+#     Fc = copy(Fd)  # copy
+
+#     # iterate over the individual processing steps of the pipeline
+#     for i, (pipe_func, pipe_args) in enumerate(pipeline):
+#         # if pipeline function is to be executed on columns of a TsdFrame
+#         if pipe_args.get('on_columns', True) and isinstance(Fc, nap.TsdFrame):
+#             d_ = np.zeros_like(Fc.d)
+#             for i, col in enumerate(Fc.columns):
+#                 d_[:, i] = pipe_func(Fc[col], **pipe_args)
+#             Fc = nap.TsdFrame(t=Fc.t, d=d_, columns=Fc.columns)
+#         else:  # this is for pipeline functions that require TsdFrames
+#             if 'on_columns' in pipe_args:
+#                 # make sure the entry is gone so it can't be passed on
+#                 del pipe_args['on_columns']
+#             Fc = pipe_func(Fc, **pipe_args)
+#     return Fc
+
+
+def run_pipeline(
+    pipeline,
+    F_signal: nap.TsdFrame | nap.Tsd,
+    F_reference: nap.TsdFrame | nap.Tsd = None,
+) -> nap.TsdFrame:
+    # copy
+    Fc = copy(F_signal)
+    if F_reference is not None:
+        Fc_ref = copy(F_reference)
 
     # iterate over the individual processing steps of the pipeline
     for i, (pipe_func, pipe_args) in enumerate(pipeline):
         # if pipeline function is to be executed on columns of a TsdFrame
-        if pipe_args.get('on_columns', True) and isinstance(Fc, nap.TsdFrame):
-            d_ = np.zeros_like(Fc.d)
+        if 'needs_reference' in pipe_args:
+            del pipe_args['needs_reference']
+            # check if F_ref is not None
+            _d = np.zeros_like(Fc.d)
+            # _Fcd_ref = np.zeros_like(Fc_ref.d)
             for i, col in enumerate(Fc.columns):
-                d_[:, i] = pipe_func(Fc[col], **pipe_args)
-            Fc = nap.TsdFrame(t=Fc.t, d=d_, columns=Fc.columns)
-        else:  # this is for pipeline functions that require TsdFrames
-            if 'on_columns' in pipe_args:
-                # make sure the entry is gone so it can't be passed on
-                del pipe_args['on_columns']
-            Fc = pipe_func(Fc, **pipe_args)
+                _d[:, i] = pipe_func(Fc[col], Fc_ref[col], **pipe_args)
+            # this step consumes the reference!
+            Fc = nap.TsdFrame(t=Fc.t, d=_d, columns=Fc.columns)
+        else:
+            _d = np.zeros_like(Fc.d)
+            for i, col in enumerate(Fc.columns):
+                _d[:, i] = pipe_func(Fc[col], **pipe_args)
+            Fc = nap.TsdFrame(t=Fc.t, d=_d, columns=Fc.columns)
     return Fc
 
 
