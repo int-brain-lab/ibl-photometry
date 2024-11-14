@@ -4,7 +4,8 @@ from iblutil.util import Bunch
 
 
 def psth_times(fs, event_window):
-    psth_times = np.arange(event_window[0] * fs, event_window[1] * fs + 1)
+    psth_samples = np.arange(event_window[0] * fs, event_window[1] * fs + 1)
+    psth_times = psth_samples / fs
     return psth_times
 
 def psth(signal, times, t_events, fs=None, event_window=np.array([-1, 2])):
