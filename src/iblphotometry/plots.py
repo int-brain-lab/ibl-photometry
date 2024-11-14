@@ -61,7 +61,7 @@ class PlotSignal:
             plot_processed_signal(self.processed_signal, self.times, ax=axs[1, 0], title='Processed Signal')
         plot_psd(self.processed_signal, ax=axs[2, 0], title='Processed Signal PSD')
         #--- Column 1
-        plot_raw_signals(self.lp_signal, self.times, self.lp_isosbestic, ax=axs[0, 1], title='Low pass')
+        plot_raw_signals(self.lp_signal, self.times, self.lp_isosbestic, ax=axs[0, 1], title='Low Pass')
         if self.raw_isosbestic is not None:
             plot_photometry_correlation(self.lp_signal, self.lp_isosbestic, self.times, ax=axs[1, 1])
         fig.tight_layout()
@@ -132,7 +132,7 @@ def plot_photometry_correlation(signal_lp, isosbestic_lp, times, ax=None, ax_cba
 
     scat = ax.scatter(isosbestic_lp, signal_lp, s=1, c=times,
                       cmap='magma', alpha=.8)
-    set_axis_style(ax, xlabel='raw isobestic', ylabel='raw calcium', title=title)
+    set_axis_style(ax, xlabel='isobestic', ylabel='signal', title=title)
     fig.colorbar(scat, ax=ax_cbar, orientation='horizontal', label='Time in session (s)',
                  shrink=0.3, anchor=(0.0, 1.0), location='top')
 
