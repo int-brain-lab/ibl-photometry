@@ -2,9 +2,8 @@ import pandas as pd
 from pathlib import Path
 from one.api import ONE
 import numpy as np
-from iblphotometry.behavior import psth
+from iblphotometry.behavior import psth, psth_times
 import iblphotometry.plots as plots
-from iblphotometry.plots import PlotSignal
 from iblphotometry.synthetic import synthetic101
 import matplotlib.pyplot as plt
 
@@ -74,10 +73,26 @@ def test_class_plotsignal():
     processed_signal = df_nph['signal_processed'].values
     times = df_nph['times'].values
 
-    plotobj = PlotSignal(raw_signal, times, raw_isosbestic, processed_signal)
+    plotobj = plots.PlotSignal(raw_signal, times, raw_isosbestic, processed_signal)
     plotobj.raw_processed_figure()
     plt.show()
     plt.close()
+
+
+def test_class_plotsignalresponse():
+    # --- Use real data for test ---
+    df_nph, _, fs = get_test_data()
+    processed_signal = df_nph['signal_processed'].values
+    times = df_nph['times'].values
+    # Load trial from ONE
+    eid = '77a6741c-81cc-475f-9454-a9b997be02a4'
+    trials = one.load_object(eid, 'trials')
+
+    plotobj = plots.PlotSignalResponse(trials, processed_signal, times)
+    plotobj.plot_trialsort_psth()
+    plt.show()
+    plt.close()
+
 
 '''
 ------------------------------------------------
@@ -144,7 +159,7 @@ TEST: Plotting functions requiring behavioral events
 """
 
 def test_plot_psth():
-    peri_event_window = [-1.5, 2.75]
+    event_window = [-1.5, 2.75]
 
     for test_case in ['synt', 'real']:
 
@@ -160,9 +175,10 @@ def test_plot_psth():
         times = df_nph['times'].values
 
         # Compute PSTH
-        psth_mat, _ = psth(signal, times, t_events, fs=fs, peri_event_window=peri_event_window)
+        psth_mat, _ = psth(signal, times, t_events, fs=fs, event_window=event_window)
+        times = psth_times(fs, event_window)
         # Plot PSTH
-        plots.plot_psth(psth_mat, fs)
+        plots.plot_psth(psth_mat, times)
         plt.show()
         plt.close()
 
