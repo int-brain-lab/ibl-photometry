@@ -3,7 +3,7 @@ import copy
 from iblutil.util import Bunch
 
 
-def psth(calcium, times, t_events, fs=None, peri_event_window=None):
+def psth(calcium, times, t_events, fs=None, peri_event_window=[-1, 2]):
     """
     Compute the peri-event time histogram of a calcium signal
     :param calcium:
@@ -13,8 +13,8 @@ def psth(calcium, times, t_events, fs=None, peri_event_window=None):
     :param peri_event_window:
     :return:
     """
-    fs = 1 / np.median(np.diff(times)) if fs is None else fs
-    peri_event_window = [-1, 2] if peri_event_window is None else peri_event_window
+    if fs is None:
+        fs = 1 / np.nanmedian(np.diff(times))
     # compute a vector of indices corresponding to the perievent window at the given sampling rate
     sample_window = np.round(
         np.arange(peri_event_window[0] * fs, peri_event_window[1] * fs + 1)

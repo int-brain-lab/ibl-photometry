@@ -41,9 +41,7 @@ class PlotSignal:
 
         # Low pass filter for plotting
         if fs is None:
-            # Ugly way to get sampling frequency
-            time_diffs = np.diff(self.times)
-            fs = 1 / np.nanmedian(time_diffs)
+            fs = 1 / np.nanmedian(np.diff(times))
         self.lp_signal = ffpr.low_pass_filter(self.raw_signal, fs)
         if self.raw_isosbestic is not None:
             self.lp_isosbestic = ffpr.low_pass_filter(self.raw_isosbestic, fs)
