@@ -15,9 +15,9 @@ LINE_COLOURS = {
 
 
 PSTH_EVENTS = {
-    'feedback_times': 'T from Feedback (s)',
-    'stimOnTrigger_times': 'T from Stim on (s)',
-    'firstMovement_times': 'T from First move (s)'
+    'feedback_times': 'Feedback',
+    'stimOnTrigger_times': 'Stim on',
+    'firstMovement_times': 'First move'
 }
 
 def set_axis_style(ax, fontsize=10, **kwargs):
@@ -103,7 +103,7 @@ class PlotSignalResponse():
         for iaxs, event in enumerate(PSTH_EVENTS.keys()):
             axs_plt = [axs[0, iaxs],
                        axs[1, iaxs]]
-            plot_psth(self.psth_dict[event], self.psth_dict['times'], axs=axs_plt, title=event)
+            plot_psth(self.psth_dict[event], self.psth_dict['times'], axs=axs_plt, title=PSTH_EVENTS[event])
 
             if iaxs == 0:
                 axs[0, iaxs].set_xlabel('Frames')
