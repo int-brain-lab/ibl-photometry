@@ -14,6 +14,8 @@ from iblphotometry.sliding_operations import make_sliding_window
 from pipelines import run_pipeline
 import warnings
 
+warnings.filterwarnings('once', category=DeprecationWarning, module='pynapple')
+
 logger = logging.getLogger()
 
 
@@ -76,30 +78,31 @@ def eval_metric(
 
 
 def qc_Tsd(
-    raw_tf: nap.TsdFrame,
+    F: nap.Tsd,
     qc_metrics: dict,
     sliding_kwargs=None,  # if present, calculate everything in a sliding manner
     trials=None,  # if present, put trials into params
-    eid: str = None,  # just for logging purposes
+    eid: str = None,  # FIXME but left as is for now just to keep the logger happy
+    brain_region: str = None,  # FIXME but left as is for now just to keep the logger happy
 ) -> dict:
+    if isinstance(F, nap.TsdFrame):
+        raise TypeError('F can not be nap.TsdFrame')
+
     # should cover all cases
     qc_results = {}
     for metric, params in qc_metrics:
-        # iterate over brain regions
-        for brain_region in raw_tf.columns:
-            F = raw_tf[brain_region]
-            try:
-                if trials:
-                    params['trials'] = trials
-                res = eval_metric(F, metric, params, sliding_kwargs)
-                qc_results[f'{metric.__name__}_{brain_region}'] = res['value']
-                if sliding_kwargs:
-                    qc_results[f'{metric.__name__}_r'] = res['rval']
-                    qc_results[f'{metric.__name__}_p'] = res['pval']
-            except Exception as e:
-                logger.warning(
-                    f'{eid}, {brain_region}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
-                )
+        try:
+            if trials:  # if trials are passed
+                params['trials'] = trials
+            res = eval_metric(F, metric, params, sliding_kwargs)
+            qc_results[f'{metric.__name__}'] = res['value']
+            if sliding_kwargs:
+                qc_results[f'{metric.__name__}_r'] = res['rval']
+                qc_results[f'{metric.__name__}_p'] = res['pval']
+        except Exception as e:
+            logger.warning(
+                f'{eid}, {brain_region}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
+            )
     return qc_results
 
 
@@ -111,49 +114,39 @@ def run_qc(
     qc_metrics: dict,  # metrics. keys: raw, processed, repsonse, sliding_kwargs
     sigref_mapping: dict = None,  # think about this one - the mapping of signal and reference # dict(signal=signal_band_name, reference=ref_band_name)
 ):
-    # HOW TO STORE THE RESULTS
-    # how it was before seems reasonable. One .csv per pipeline, each row is eid, brain_region , metrics ...
-    qc = {}
-    for pipeline_name in pipelines_reg.keys():
-        qc[pipeline_name] = {}
-    # make a ginormous pandas dataframe
-
-    # Creating dictionary of dictionary, with each key being the pipeline name
-    # qc_dfs = dict((name, {}) for name in pipelines_reg.keys())
-    qc_eid = {}
+    qc_results = []
     for eid in tqdm(eids):
-        qc_eid[eid] = {}
-
         # get data
         raw_tfs, brain_regions = data_loader.load_photometry_data(
             eid=eid, return_regions=True
         )
-        # eid, pname = data_loader.pid2eid(pid)
+        # TODO this should be provided
         trials = data_loader.one.load_dataset(eid, '*trials.table.pqt')
-        # trials = data_loader.load_trials_table(eid)
 
-        # qc on the raw data
-        qc_eid[eid]['raw'] = {}
-        for band in raw_tfs.keys():
-            qc_eid[eid]['raw'][band] = qc_Tsd(
-                raw_tfs[band], qc_metrics['raw'], None, eid
-            )
+        for band in raw_tfs.keys():  # TODO this should be bands
+            raw_tf = raw_tfs[band]
+            for region in brain_regions:
+                qc_result = qc_Tsd(
+                    raw_tf[region], qc_metrics['raw'], sliding_kwargs=None, eid=eid
+                )
+                qc_results.append(
+                    dict(eid=eid, pipeline='raw', band=band, region=region, **qc_result)
+                )
 
         # run the pipelines and qc on the processed data
         # here it needs to be specified if one band is a reference of the other
-        qc_eid[eid]['processed'] = {}
         for pipeline_name, pipeline in pipelines_reg.items():
-            if sigref_mapping:  # this is for isosbestic pipelines
+            if 'reference' in sigref_mapping:  # this is for isosbestic pipelines
                 proc_tf = run_pipeline(
                     pipeline,
                     raw_tfs[sigref_mapping['signal']],
                     raw_tfs[sigref_mapping['reference']],
                 )
             else:
-                # FUCK this fails for true-multiband
-                proc_tf = run_pipeline(pipeline, raw_tfs)
+                # FIXME this fails for true-multiband
+                # this hack works for single-band
+                proc_tf = run_pipeline(pipeline, raw_tfs[sigref_mapping['signal']])
 
-            qc_eid[eid]['processed'][pipeline_name] = {}
             for region in brain_regions:
                 # sliding qc of the processed data
                 qc_proc = qc_Tsd(
@@ -161,6 +154,7 @@ def run_qc(
                     qc_metrics=qc_metrics['processed'],
                     sliding_kwargs=qc_metrics['sliding_kwargs'],
                     eid=eid,
+                    brain_region=region,
                 )
 
                 # qc with metrics that use behavior
@@ -169,13 +163,17 @@ def run_qc(
                     qc_metrics['response'],
                     trials=trials,
                     eid=eid,
+                    brain_region=region,
                 )
-
-                qc_eid[eid]['processed'][pipeline_name][region] = qc_proc | qc_resp
-
-    #     for pipe in pipelines_reg.keys():
-    #         qc_res[pipe]['pname'] = pname
-    #         qc_dfs[pipe][eid] = qc_res[pipe]
-
+                qc_result = qc_proc | qc_resp
+                qc_results.append(
+                    dict(
+                        eid=eid,
+                        pipeline=pipeline_name,
+                        band=band,
+                        region=region,
+                        **qc_result,
+                    )
+                )
     #     gc.collect()
-    # return qc_dfs
+    return qc_results

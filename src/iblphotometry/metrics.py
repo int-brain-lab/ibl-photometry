@@ -75,6 +75,8 @@ def n_unique_samples(A: nap.Tsd) -> int:
     Returns:
         int: _description_
     """
+    if pd.isna(np.unique(A.values).shape[0]):
+        print('arg')
     return np.unique(A.values).shape[0]
 
 
@@ -173,7 +175,7 @@ def has_response_to_event(
     P = psth(y, t, event_times.times(), fs=fs, peri_event_window=window)[0]
 
     # or: pynapple style
-    # in the long run, this will be the preferred way as this will 
+    # in the long run, this will be the preferred way as this will
     # respect the .time_support of the pynapple object. # TODO verify this
     # P = nap.compute_perievent_continuous(A, event_times, window).values
 

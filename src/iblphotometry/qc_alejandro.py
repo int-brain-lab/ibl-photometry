@@ -1,6 +1,6 @@
 # %% just here
-%load_ext autoreload
-%autoreload 2
+# %load_ext autoreload
+# %autoreload 2
 
 # %%
 import pandas as pd
@@ -9,7 +9,6 @@ from one.api import ONE
 import logging
 import iblphotometry.qc as qc
 import iblphotometry.loaders as loaders
-from itertools import chain
 
 # %% config
 
@@ -19,14 +18,15 @@ output_folder = path_user['dir_results'].joinpath('Alejandro')
 output_folder.mkdir(parents=True, exist_ok=True)
 
 ## params
-run_name = 'debug'
-debug = True
+run_name = 'full_run_1'
+debug = False
 
 # %% ONE related
 one = ONE(mode='remote')
-eids = list(one.search(dataset='photometry.signal.pqt', lab='wittenlab'))[:5]  # <- debug here
+eids = list(one.search(dataset='photometry.signal.pqt', lab='wittenlab'))
+if debug:
+    eids = eids[:5]
 data_loader = loaders.PhotometryLoader(one, verbose=False)
-
 
 # %%
 # logging related
@@ -87,11 +87,8 @@ pipelines_reg = dict(
 )
 
 # %% run qc
-qc_dfs = qc.run_qc(
-    data_loader,
-    eids,
-    pipelines_reg,
-    qc_metrics,
+qc_result = qc.run_qc(
+    data_loader, eids, pipelines_reg, qc_metrics, sigref_mapping=dict(signal='GCaMP')
 )
 
 # storing all the qc
@@ -99,4 +96,9 @@ qc_dfs = qc.run_qc(
 #     df = pd.DataFrame(qc_dfs[pipe_name]).T
 #     df.to_csv(output_folder / f'qc_{run_name}_{pipe_name}.csv')
 
+# %%
+len(qc_result)
+# %%
+qc_df = pd.DataFrame(qc_result)
+qc_df.to_csv(output_folder / 'qc_alejandro.csv')
 # %%
