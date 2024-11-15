@@ -14,6 +14,8 @@ from iblphotometry.sliding_operations import make_sliding_window
 from pipelines import run_pipeline
 import warnings
 
+from brainbox.io.one import SessionLoader
+
 warnings.filterwarnings('once', category=DeprecationWarning, module='pynapple')
 
 logger = logging.getLogger()
@@ -116,12 +118,21 @@ def run_qc(
 ):
     qc_results = []
     for eid in tqdm(eids):
+        print(eid)
         # get data
-        raw_tfs, brain_regions = data_loader.load_photometry_data(
-            eid=eid, return_regions=True
-        )
+        try:
+            raw_tfs, brain_regions = data_loader.load_photometry_data(
+                eid=eid, return_regions=True
+            )
+        except ValueError:  # happens in Kcenia
+            continue
         # TODO this should be provided
-        trials = data_loader.one.load_dataset(eid, '*trials.table.pqt')
+        sl = SessionLoader(eid=eid, one=data_loader.one)
+        trials = sl.load_trials(
+            collection='alf/task_00'
+        )  # this is necessary fo caroline
+        trials = sl.load_trials()  # should be good for all others
+        # trials = data_loader.one.load_dataset(eid, '*trials.table.pqt')
 
         for band in raw_tfs.keys():  # TODO this should be bands
             raw_tf = raw_tfs[band]
@@ -170,10 +181,9 @@ def run_qc(
                     dict(
                         eid=eid,
                         pipeline=pipeline_name,
-                        band=band,
                         region=region,
                         **qc_result,
                     )
                 )
-    #     gc.collect()
+        gc.collect()
     return qc_results

@@ -33,7 +33,8 @@ def from_dataframe(
         channel_names = raw_df[channel_column].unique()
 
     # drop empty acquisition channels
-    channel_names = [ch for ch in channel_names if ch != 'None']
+    to_drop = ['None', '']
+    channel_names = [ch for ch in channel_names if ch not in to_drop]
 
     raw_tfs = {}
     for channel in channel_names:

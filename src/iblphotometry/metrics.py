@@ -163,7 +163,7 @@ def has_response_to_event(
     fs: float = None,
     window: tuple = (-1, 1),
     alpha: float = 0.005,
-    mode='mean',
+    mode='peak',
 ) -> bool:
     # checks if there is a significant response to an event
 

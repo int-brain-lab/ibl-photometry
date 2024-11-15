@@ -18,17 +18,16 @@ warnings.simplefilter('ignore', category=DeprecationWarning)
 
 # User case specific variable
 path_user = loaders.user_config('georg')
-output_folder = path_user['dir_results'].joinpath('Alejandro')
+output_folder = path_user['dir_results'].joinpath('Carolina')
 output_folder.mkdir(parents=True, exist_ok=True)
 
 ## params
-run_name = 'alex_full'
+run_name = 'caro_debug'
 debug = False
 
 # %% ONE related
 one = ONE(mode='remote')
-eids = list(one.search(dataset='photometry.signal.pqt', lab='wittenlab'))
-eids = eids[:200]  # manual subsetting
+eids = list(one.search(dataset='photometry.signal.pqt', lab='cortexlab'))
 if debug:
     eids = eids[:5]
 data_loader = loaders.PhotometryLoader(one, verbose=False)
@@ -108,5 +107,5 @@ qc_result = qc.run_qc(
     data_loader, eids, pipelines_reg, qc_metrics, sigref_mapping=dict(signal='GCaMP')
 )
 qc_df = pd.DataFrame(qc_result)
-qc_df.to_csv(output_folder / f'qc_alejandro_{run_name}.csv')
+qc_df.to_csv(output_folder / f'qc_caroline_{run_name}.csv')
 # %%

@@ -107,7 +107,6 @@ pipeline = [
 ]
 
 pipelines_reg = dict(sliding_mad=pipeline)
-pipelines_reg = dict(test=pipeline)
 
 # %% run qc
 
@@ -121,4 +120,4 @@ qc_result = qc.run_qc(
 )
 
 qc_df = pd.DataFrame(qc_result)
-qc_df.to_csv(output_folder / 'qc_kcenia.csv')
+qc_df.to_csv(output_folder / f'qc_kcenia_{'run_name'}.csv')
