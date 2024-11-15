@@ -114,6 +114,15 @@ class PlotSignalResponse():
                 axs[1, iaxs].set_yticks([])
         fig.tight_layout()
         return fig, axs
+
+    def plot_processed_trialtick(self, event_key = 'stimOnTrigger_times'):
+        fig, ax = plt.subplots(1, 1)
+        plt.figure(figsize=(10, 6))
+        events = self.trials[event_key]
+        ax.set_ylim([-0.2, 0.1])
+        plot_event_tick(events, ax=ax, color='#FFC0CB', ls='-')
+        plot_processed_signal(self.processed_signal, self.times, ax=ax)
+        return fig, ax
 """
 ------------------------------------------------
 Plotting functions requiring FF signals only

@@ -90,6 +90,7 @@ def test_class_plotsignalresponse():
 
     plotobj = plots.PlotSignalResponse(trials, processed_signal, times)
     plotobj.plot_trialsort_psth()
+    plotobj.plot_processed_trialtick()
     plt.show()
     plt.close()
 
