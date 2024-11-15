@@ -75,8 +75,6 @@ def n_unique_samples(A: nap.Tsd) -> int:
     Returns:
         int: _description_
     """
-    if pd.isna(np.unique(A.values).shape[0]):
-        print('arg')
     return np.unique(A.values).shape[0]
 
 
@@ -165,7 +163,7 @@ def has_response_to_event(
     fs: float = None,
     window: tuple = (-1, 1),
     alpha: float = 0.005,
-    mode='peak',
+    mode='mean',
 ) -> bool:
     # checks if there is a significant response to an event
 
@@ -179,9 +177,10 @@ def has_response_to_event(
     # respect the .time_support of the pynapple object. # TODO verify this
     # P = nap.compute_perievent_continuous(A, event_times, window).values
 
-    # assuming time is on dim 1
+    # temporally averages the samples in the window. Sensitive to window size!
     if mode == 'mean':
         sig_samples = np.average(P, axis=0)
+    # takes the peak sample, minus one sd
     if mode == 'peak':
         sig_samples = np.max(P, axis=0) - np.std(y)
 

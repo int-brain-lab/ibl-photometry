@@ -92,7 +92,7 @@ def qc_Tsd(
     qc_results = {}
     for metric, params in qc_metrics:
         try:
-            if trials:  # if trials are passed
+            if trials is not None:  # if trials are passed
                 params['trials'] = trials
             res = eval_metric(F, metric, params, sliding_kwargs)
             qc_results[f'{metric.__name__}'] = res['value']

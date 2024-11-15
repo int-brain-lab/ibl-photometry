@@ -10,6 +10,10 @@ import logging
 import iblphotometry.qc as qc
 import iblphotometry.loaders as loaders
 
+import warnings
+
+warnings.simplefilter('ignore', category=DeprecationWarning)
+
 # %% config
 
 # User case specific variable
@@ -18,8 +22,8 @@ output_folder = path_user['dir_results'].joinpath('Alejandro')
 output_folder.mkdir(parents=True, exist_ok=True)
 
 ## params
-run_name = 'full_run_1'
-debug = False
+run_name = 'debug_run'
+debug = True
 
 # %% ONE related
 one = ONE(mode='remote')
@@ -71,34 +75,40 @@ BEHAV_EVENTS = [
 
 qc_metrics['response'] = [
     [metrics.ttest_pre_post, dict(event_name='feedback_times')],
-    [metrics.has_responses, dict(event_names=BEHAV_EVENTS)],  # <- to be included
+    [metrics.has_responses, dict(event_names=['feedback_times'])],
 ]
-
+qc_metrics['response'] = [
+    [metrics.ttest_pre_post, dict(event_name='feedback_times')],
+    [metrics.has_responses, dict(event_names=['feedback_times'])],
+]
 qc_metrics['sliding_kwargs'] = dict(w_len=10, n_wins=15)  # 10 seconds
 
 # %% pipeline definition / registrations
+from iblphotometry.outlier_detection import remove_spikes
+from iblphotometry.bleach_corrections import lowpass_bleachcorrect
+from iblphotometry.sliding_operations import sliding_mad
+from iblphotometry.pipelines import run_pipeline
+from iblphotometry.helpers import zscore
 
-# note care has to be taken that all the output and input of consecutive pipeline funcs are compatible
-pipelines_reg = dict(
-    sliding_mad=(
-        (outlier_detection.remove_spikes, dict(sd=5)),
-        (pipelines.bc_lp_sliding_mad, dict()),
-    )
-)
+pipeline = [
+    (remove_spikes, dict(sd=5)),
+    (
+        lowpass_bleachcorrect,
+        dict(
+            correction_method='subtract-divide',
+            filter_params=dict(N=3, Wn=0.01, btype='lowpass'),
+        ),
+    ),
+    (sliding_mad, dict(w_len=120, overlap=90)),
+    (zscore, dict(mode='median')),
+]
+
+pipelines_reg = dict(sliding_mad=pipeline)
 
 # %% run qc
 qc_result = qc.run_qc(
     data_loader, eids, pipelines_reg, qc_metrics, sigref_mapping=dict(signal='GCaMP')
 )
-
-# storing all the qc
-# for pipe_name in pipelines_reg.keys():
-#     df = pd.DataFrame(qc_dfs[pipe_name]).T
-#     df.to_csv(output_folder / f'qc_{run_name}_{pipe_name}.csv')
-
-# %%
-len(qc_result)
-# %%
 qc_df = pd.DataFrame(qc_result)
 qc_df.to_csv(output_folder / 'qc_alejandro.csv')
 # %%

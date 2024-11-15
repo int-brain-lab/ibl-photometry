@@ -83,6 +83,7 @@ class KceniaLoader(PhotometryLoader):
         for band in signal_bands:
             df = pd.DataFrame([raw_dfs[pname][band].values for pname in pnames]).T
             df.columns = pnames
+            df.index = raw_dfs[pname][band].index
             raw_tfs[band] = nap.TsdFrame(df)
 
         if self.verbose:

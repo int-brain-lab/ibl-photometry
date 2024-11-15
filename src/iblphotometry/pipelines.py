@@ -14,26 +14,6 @@ from copy import copy
 logger = logging.getLogger()
 
 
-# def run_pipeline(Fd: dict, pipeline):
-#     # now photometry is a dict with keys of bands
-#     Fc = copy(Fd)  # copy
-
-#     # iterate over the individual processing steps of the pipeline
-#     for i, (pipe_func, pipe_args) in enumerate(pipeline):
-#         # if pipeline function is to be executed on columns of a TsdFrame
-#         if pipe_args.get('on_columns', True) and isinstance(Fc, nap.TsdFrame):
-#             d_ = np.zeros_like(Fc.d)
-#             for i, col in enumerate(Fc.columns):
-#                 d_[:, i] = pipe_func(Fc[col], **pipe_args)
-#             Fc = nap.TsdFrame(t=Fc.t, d=d_, columns=Fc.columns)
-#         else:  # this is for pipeline functions that require TsdFrames
-#             if 'on_columns' in pipe_args:
-#                 # make sure the entry is gone so it can't be passed on
-#                 del pipe_args['on_columns']
-#             Fc = pipe_func(Fc, **pipe_args)
-#     return Fc
-
-
 def run_pipeline(
     pipeline,
     F_signal: nap.TsdFrame,

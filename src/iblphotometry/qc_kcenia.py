@@ -7,13 +7,16 @@ import iblphotometry.qc as qc
 import iblphotometry.loaders as loaders
 from itertools import chain
 
+import warnings
+
+warnings.filterwarnings('ignore', category=DeprecationWarning)
 ##
 # User case specific variable
 path_user = loaders.user_config('georg')
 
 ##
-run_name = 'test_post_merge'
-debug = True
+run_name = 'full'
+debug = False
 
 output_folder = path_user['dir_results'].joinpath('Kcenia')
 output_folder.mkdir(parents=True, exist_ok=True)
@@ -27,7 +30,9 @@ path_websitecsv = path_user['file_websheet']
 
 data_loader = loaders.KceniaLoader(one)
 df = pd.read_csv(path_websitecsv)
-eids = list(df['eid'])[:5]  # <- debug
+eids = list(df['eid'])
+if debug:
+    eids = eids[:5]
 
 
 # %%
@@ -73,67 +78,47 @@ BEHAV_EVENTS = [
 
 qc_metrics['response'] = [
     [metrics.ttest_pre_post, dict(event_name='feedback_times')],
-    [metrics.has_responses, dict(event_names=BEHAV_EVENTS)],
+    [
+        metrics.has_responses,
+        dict(event_names=['feedback_times']),
+    ],
 ]
 
 qc_metrics['sliding_kwargs'] = dict(w_len=10, n_wins=15)  # 10 seconds
 
 # %% pipeline definition / registrations
-
-# note care has to be taken that all the output and input of consecutive pipeline funcs are compatible
-# pipelines_reg = dict(
-#     sliding_mad=(
-#         (outlier_detection.remove_spikes, dict(sd=5)),
-#         (pipelines.bc_lp_sliding_mad, dict(signal_name='raw_calcium')),
-#     ),
-#     isosbestic=(
-#         (outlier_detection.remove_spikes, dict(sd=5)),
-#         (pipelines.isosbestic_regression, dict(regression_method='irls')),
-#     ),
-#     jove2019=((pipelines.jove2019, dict()),),
-# )
 from iblphotometry.outlier_detection import remove_spikes
-from iblphotometry.bleach_corrections import (
-    isosbestic_correct,
-    exponential_bleachcorrect,
-    lowpass_bleachcorrect,
-)
+from iblphotometry.bleach_corrections import lowpass_bleachcorrect
 from iblphotometry.sliding_operations import sliding_mad
-from iblphotometry.helpers import zscore
 from iblphotometry.pipelines import run_pipeline
+from iblphotometry.helpers import zscore
 
 pipeline = [
     (remove_spikes, dict(sd=5)),
     (
-        exponential_bleachcorrect,
-        dict(regression_method='huber', correction_method='subtract'),
-    ),
-    (
-        isosbestic_correct,
+        lowpass_bleachcorrect,
         dict(
-            needs_reference=True,
-            correction_method='subtract',
-            regression_method='huber',
-            lowpass_isosbestic=dict(N=3, Wn=0.01, btype='lowpass'),
+            correction_method='subtract-divide',
+            filter_params=dict(N=3, Wn=0.01, btype='lowpass'),
         ),
     ),
-    #   (sliding_mad, dict(w_len=120,overlap=90)),
+    (sliding_mad, dict(w_len=120, overlap=90)),
     (zscore, dict(mode='median')),
 ]
 
+pipelines_reg = dict(sliding_mad=pipeline)
 pipelines_reg = dict(test=pipeline)
 
 # %% run qc
 
-qc_dfs = qc.run_qc(
+qc_result = qc.run_qc(
     data_loader,
     eids,
     pipelines_reg,
     qc_metrics,
-    sigref_mapping=dict(signal='raw_calcium', reference='raw_isosbestic'),
+    # sigref_mapping=dict(signal='raw_calcium', reference='raw_isosbestic'),
+    sigref_mapping=dict(signal='raw_calcium'),
 )
 
-# storing all the qc
-# for pipe_name in pipelines_reg.keys():
-#     df = pd.DataFrame(qc_dfs[pipe_name]).T
-#     df.to_csv(output_folder / f'qc_{run_name}_{pipe_name}.csv')
+qc_df = pd.DataFrame(qc_result)
+qc_df.to_csv(output_folder / 'qc_kcenia.csv')
