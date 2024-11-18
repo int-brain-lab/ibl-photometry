@@ -76,6 +76,7 @@ def plot_TsdFrame(signal: nap.TsdFrame, axes=None):
 
     for col in signal.columns:
         plot_Tsd(signal[col], axes=axes, label=col)
+    axes.legend()
 
     return axes
 
@@ -95,8 +96,8 @@ def plot_psd_Tsd(signal: nap.Tsd, fs=None, axes=None, **line_kwargs):
 
 
 def plot_isosbestic_overview(
-    calcium: nap.Tsd,
-    isosbestic: nap.Tsd,
+    calcium: nap.Tsd | nap.TsdFrame,
+    isosbestic: nap.Tsd | nap.TsdFrame,
     low_pass_cross_plot=0.01,
     suptitle=None,
     output_file=None,

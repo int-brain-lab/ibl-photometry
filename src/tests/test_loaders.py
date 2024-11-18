@@ -4,9 +4,10 @@ import unittest
 from iblphotometry.synthetic import synthetic101
 import iblphotometry.io as fio
 
-data_folder = Path(__file__).parent / 'data'  # this depends on the install location
+data_folder = Path(__file__).parent / 'data'
 
 # TODO make this a list and have a few
+# this is currently ony alejandro
 session_folder = Path('wittenlab/Subjects/fip_40/2023-05-18/001')
 signal_pqt_path_rel = Path('alf/photometry/photometry.signal.pqt')
 photometryROI_locations_pqt_path_rel = Path(
