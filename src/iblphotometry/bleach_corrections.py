@@ -315,9 +315,13 @@ def lowpass_bleachcorrect(F: nap.Tsd, **kwargs):
     bc = LowpassBleachCorrection(**kwargs)
     return bc.correct(F)
 
+def exponential_bleachcorrect(F:nap.Tsd, **kwargs):
+    model = DoubleExponDecay()
+    ec = BleachCorrection(model, **kwargs)
+    return ec.correct(F)
 
 def isosbestic_correct(
-    F: nap.TsdFrame, signal_name=None, reference_name=None, **kwargs
+    F_sig: nap.TsdFrame, F_ref: nap.TsdFrame, **kwargs
 ):
     ic = IsosbesticCorrection(**kwargs)
-    return ic.correct(F[signal_name], F[reference_name])
+    return ic.correct(F_sig, F_ref)
