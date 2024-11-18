@@ -4,9 +4,16 @@ import numpy as np
 import pandas as pd
 import pynapple as nap
 from iblphotometry.helpers import z, psth, filt
-from ibldsp.utils import WindowGenerator
+
+# from ibldsp.utils import WindowGenerator
 from iblphotometry import sliding_operations
 from iblphotometry import bleach_corrections
+from iblphotometry.outlier_detection import remove_spikes
+from iblphotometry.bleach_corrections import lowpass_bleachcorrect
+from iblphotometry.sliding_operations import sliding_mad
+
+# TODO this will probably be refactored to to processing
+from iblphotometry.helpers import zscore
 
 import logging
 from copy import copy
@@ -49,6 +56,23 @@ def run_pipeline(
     return Fc
 
 
+# these are now pipelines
+sliding_mad_pipeline = [
+    (remove_spikes, dict(sd=5)),
+    (
+        lowpass_bleachcorrect,
+        dict(
+            correction_method='subtract-divide',
+            filter_params=dict(N=3, Wn=0.01, btype='lowpass'),
+        ),
+    ),
+    (sliding_mad, dict(w_len=120, overlap=90)),
+    (zscore, dict(mode='median')),
+]
+
+
+# TODO this is not following the definition of a pipeline anymore
+# to be reconstructed
 def bc_lp_sliding_mad(
     F: nap.Tsd | nap.TsdFrame,
     w_len: float = 120,
@@ -85,6 +109,7 @@ def bc_lp_sliding_mad(
     return F_res
 
 
+# TODO this is not following the definition of a pipeline anymore
 def jove2019(
     F: nap.TsdFrame,
     ca_signal_name: str = 'raw_calcium',
@@ -127,6 +152,7 @@ def jove2019(
     return nap.Tsd(t=raw_calcium.times(), d=ph)
 
 
+# TODO this is not following the definition of a pipeline anymore
 def isosbestic_regression(
     F: nap.TsdFrame,
     ca_signal_name: str = 'raw_calcium',
