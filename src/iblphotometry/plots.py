@@ -240,7 +240,7 @@ from iblphotometry.helpers import psth
 # region = 'Region0G'
 
 
-def plot_psth(
+def plot_raster(
     F: nap.Tsd, trials: pd.DataFrame, event: str = None, split_by: str = None
 ):
     splits = {}
