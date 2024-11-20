@@ -241,7 +241,8 @@ from iblphotometry.helpers import psth
 
 
 def plot_raster(
-    F: nap.Tsd, trials: pd.DataFrame, event: str = None, split_by: str = None
+    F: nap.Tsd, trials: pd.DataFrame, event: str = None, split_by: str = None,
+    w_start: float = -2, w_stop: float = 2
 ):
     splits = {}
     for i, times in trials.groupby(split_by)[event]:
@@ -249,7 +250,6 @@ def plot_raster(
 
     n_per_split = [v.shape[0] for _, v in splits.items()]
     vmin, vmax = np.percentile(F, (1, 99))
-    w_start, w_stop = -2, 2
 
     fig, axes = plt.subplots(
         nrows=len(splits), gridspec_kw=dict(height_ratios=n_per_split)
