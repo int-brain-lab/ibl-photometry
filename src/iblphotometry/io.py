@@ -4,8 +4,10 @@ import pandas as pd
 import pynapple as nap
 from pathlib import Path
 import warnings
-from iblphotometry.neurophotometrics_definitions import NEUROPHOTOMETRICS_LED_STATES
-
+from ibllib.io.extractors.fibrephotometry import (
+    NEUROPHOTOMETRICS_LED_STATES,
+    LIGHT_SOURCE_MAP,
+)
 
 # def from_csv(): ...
 
@@ -78,6 +80,50 @@ def from_pqt(
     return from_dataframe(raw_df, **read_config)
 
 
+def from_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None):
+    # converting less meaninful ledstate code to nm value of the active LED
+    if rois is None:
+        rois = raw_df.columns[4:]
+
+    out_df = raw_df.filter(items=rois, axis=1).sort_index(axis=1)
+    timestamp_name = (
+        'SystemTimestamp' if 'SystemTimestamp' in raw_df.columns else 'Timestamp'
+    )
+    out_df['times'] = raw_df[timestamp_name]
+    out_df['wavelength'] = np.nan
+    out_df['name'] = ''
+    out_df['color'] = ''
+
+    # TODO the names column in this map should actually be user defined (experiment description file?)
+    channel_meta_map = pd.DataFrame(LIGHT_SOURCE_MAP)
+    led_states = pd.DataFrame(NEUROPHOTOMETRICS_LED_STATES).set_index('Condition')
+    states = raw_df['LedState']
+
+    for state in states.unique():
+        ir, ic = np.where(led_states == state)
+        # if not present, multiple LEDs are active
+        if ic.size == 0:
+            # find row
+            ir = np.argmax(led_states['No LED ON'] > state) - 1
+            # find active combo
+            possible_led_combos = [(1, 2), (1, 3), (2, 3), (1, 2, 3)]
+            for combo in possible_led_combos:  # drop enumerate
+                if state == sum([led_states.iloc[ir, c] for c in combo]):
+                    name = '+'.join([channel_meta_map['name'][c] for c in combo])
+                    color = '+'.join([channel_meta_map['color'][c] for c in combo])
+                    wavelength = np.nan
+                    out_df.loc[states == state, ['name', 'color', 'wavelength']] = (
+                        name,
+                        color,
+                        wavelength,
+                    )
+        else:
+            for cn in ['name', 'color', 'wavelength']:
+                out_df.loc[states == state, cn] = channel_meta_map.iloc[ic[0]][cn]
+
+    return out_df
+
+
 def from_raw_neurophotometrics(path: str | Path):
     warnings.warn(
         'loading a photometry from raw neurophotometrics output. The data will _not_ be synced and\
@@ -86,30 +132,13 @@ def from_raw_neurophotometrics(path: str | Path):
     if isinstance(path, str):
         path = Path(path)
     if path.suffix == '.csv':
+        # really raw as it comes out of the device
         # todo figure out the header
         raw_df = pd.read_csv(path)
     if path.suffix == '.pqt':
+        # as it is stored
         raw_df = pd.read_parquet(path)
     else:
         raise NotImplementedError
 
-    # led_states = raw_df['LedState'].unique()
-    # converting less meaninful ledstate code to nm value of the active LED
-    led_states_df = pd.DataFrame(NEUROPHOTOMETRICS_LED_STATES).set_index('Condition')
-    # FIXME
-    # this currently only takes care of the condition 'not additional signal'
-    # find out when this condition is true and when not
-    # (it is true for the example file present)
-    condition = 'No additional signal'
-    led_states = led_states_df.loc[condition]
-    led_state_to_nm = dict(zip(led_states.values, led_states.index))
-    raw_df['Led_nm'] = [
-        led_state_to_nm[led_state] for led_state in raw_df['LedState'].values
-    ]
-
-    read_config = dict(
-        channel_column='Led_nm',
-        time_column='Timestamp',
-    )
-
-    return from_dataframe(raw_df, **read_config)
+    return from_raw_neurophotometrics_df(raw_df)

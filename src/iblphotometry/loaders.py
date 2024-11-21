@@ -5,6 +5,11 @@ from pathlib import Path
 from iblphotometry import io
 from brainbox.io.one import SessionLoader
 
+# TODO extract Kcenias data ...
+
+# TODO
+# make this inherit from SessionLoader
+
 
 class PhotometryLoader:
     # TODO move this class to brainbox.io
