@@ -80,8 +80,8 @@ def from_pqt(
     return from_dataframe(raw_df, **read_config)
 
 
-def from_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None):
-    # converting less meaninful ledstate code to nm value of the active LED
+def _read_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None) -> pd.DataFrame:
+    #
     if rois is None:
         rois = raw_df.columns[4:]
 
@@ -124,7 +124,7 @@ def from_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None):
     return out_df
 
 
-def from_raw_neurophotometrics(path: str | Path):
+def from_raw_neurophotometrics(path: str | Path) -> nap.TsdFrame:
     warnings.warn(
         'loading a photometry from raw neurophotometrics output. The data will _not_ be synced and\
             is being split into channels by LedState (converted to LED wavelength in nm)'
@@ -141,4 +141,11 @@ def from_raw_neurophotometrics(path: str | Path):
     else:
         raise NotImplementedError
 
-    return from_raw_neurophotometrics_df(raw_df)
+    df = _read_raw_neurophotometrics_df(raw_df)
+
+    read_config = dict(
+        data_columns=raw_df.columns[4:],
+        time_column='times',
+        channel_column='name',
+    )
+    return from_dataframe(df, **read_config)
