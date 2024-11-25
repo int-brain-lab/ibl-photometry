@@ -87,10 +87,6 @@ class PlotSignalResponse():
         self.psth_dict = self.compute_events_psth()
 
     def compute_events_psth(self, event_window=np.array([-1, 2])):
-    for col in signal.columns:
-        plot_Tsd(signal[col], axes=axes, label=col)
-    axes.legend()
-
         psth_dict = dict()
         for event in PSTH_EVENTS.keys():
             psth_dict[event], _ = psth(self.processed_signal, self.times, self.trials[event],
@@ -134,40 +130,26 @@ Plotting functions requiring FF signals only
 
 def plot_raw_signals(raw_signal, times, raw_isosbestic=None,
                      ax=None, xlim=None, ylim=None, xlabel='Time', ylabel=None, title=None):
+    if ax is None:
+        fig, ax = plt.subplots(1, 1)
+    else:
+        fig = ax.get_figure()
 
-def plot_isosbestic_overview(
-    calcium: nap.Tsd | nap.TsdFrame,
-    isosbestic: nap.Tsd | nap.TsdFrame,
-    low_pass_cross_plot=0.01,
-    suptitle=None,
-    output_file=None,
-):
-    fig, axd = plt.subplot_mosaic(
-        [['top', 'top'], ['left', 'right']], constrained_layout=True, figsize=(14, 8)
-    )
-    # traces
-    plot_Tsd(calcium, axes=axd['top'], color='#279F95', label='calcium')
-    plot_Tsd(isosbestic, axes=axd['top'], color='#803896', label='isosbestic')
-        if ax is None:
-            fig, ax = plt.subplots(1, 1)
-        else:
-            fig = ax.get_figure()
+    linewidth = 0.1 if xlim is None else 1
+    # Plot signal
+    ax.plot(times, raw_signal, linewidth=linewidth,
+            c=LINE_COLOURS['raw_signal'], label='signal')
+    # Plot isosbestic if passed in
+    if raw_isosbestic is not None:
+        ax.plot(times, raw_isosbestic, linewidth=linewidth,
+                c=LINE_COLOURS['raw_isosbestic'], label='isosbestic')
+    ax.legend(fontsize=6)
 
-        linewidth = 0.1 if xlim is None else 1
-        # Plot signal
-        ax.plot(times, raw_signal, linewidth=linewidth,
-                c=LINE_COLOURS['raw_signal'], label='signal')
-        # Plot isosbestic if passed in
-        if raw_isosbestic is not None:
-            ax.plot(times, raw_isosbestic, linewidth=linewidth,
-                    c=LINE_COLOURS['raw_isosbestic'], label='isosbestic')
-        ax.legend(fontsize=6)
-
-        ax.set_xlim(xlim)
-        ax.set_ylim(ylim)
-        set_axis_style(ax, xlabel=xlabel, ylabel=ylabel, title=title)
-        ax.tick_params(axis='both', which='major')
-        return fig, ax
+    ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
+    set_axis_style(ax, xlabel=xlabel, ylabel=ylabel, title=title)
+    ax.tick_params(axis='both', which='major')
+    return fig, ax
 
 
 

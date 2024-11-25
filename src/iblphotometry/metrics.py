@@ -2,10 +2,13 @@ import numpy as np
 import pandas as pd
 import pynapple as nap
 from scipy import stats
-from iblphotometry.helpers import z, psth
+from scipy.stats import ttest_ind
+
+from iblphotometry.helpers import z
+from iblphotometry.behavior import psth
 from iblphotometry.bleach_corrections import Regression, ExponDecay
 from iblphotometry.outlier_detection import detect_spikes, grubbs_sliding
-from scipy.stats import ttest_ind
+
 
 ## this approach works as well
 # from functools import singledispatch
@@ -145,8 +148,8 @@ def ttest_pre_post(
 
     t_events = trials[event_name].values
 
-    psth_pre = psth(y, t, t_events, fs=fs, peri_event_window=pre_w)[0]
-    psth_post = psth(y, t, t_events, fs=fs, peri_event_window=post_w)[0]
+    psth_pre = psth(y, t, t_events, fs=fs, event_window=pre_w)[0]
+    psth_post = psth(y, t, t_events, fs=fs, event_window=post_w)[0]
 
     # Take median value of signal over time
     pre = np.median(psth_pre, axis=0)

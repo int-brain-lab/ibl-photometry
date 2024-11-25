@@ -1,9 +1,9 @@
 """this module holds a collection of processing pipelines for fiber photometry data"""
 
 import numpy as np
-import pandas as pd
 import pynapple as nap
-from iblphotometry.helpers import z, psth
+from iblphotometry.helpers import z
+from iblphotometry.behavior import psth
 from ibldsp.utils import WindowGenerator
 
 
@@ -114,7 +114,7 @@ def sliding_mad(F: nap.Tsd, w_len: float = None, fs=None, overlap=90):
     wg = WindowGenerator(ns=n_samples, nswin=w_size, overlap=overlap)
     trms = np.array([first for first, last in wg.firstlast]) / fs + t[0]
 
-    rmswin, _ = psth(y, t, t_events=trms, fs=fs, peri_event_window=[0, w_len])
+    rmswin, _ = psth(y, t, t_events=trms, fs=fs, event_window=[0, w_len])
     gain = np.nanmedian(np.abs(y)) / np.nanmedian(np.abs(rmswin), axis=0)
     gain = np.interp(t, trms, gain)
     return nap.Tsd(t=t, d=y * gain)
@@ -132,7 +132,7 @@ def sliding_mad(F: nap.Tsd, w_len: float = None, fs=None, overlap=90):
 # wg = WindowGenerator(ns=n_samples, nswin=w_size, overlap=overlap)
 # trms = np.array([first for first, last in wg.firstlast]) / fs + t[0]
 
-# rmswin, _ = psth(y, t, t_events=trms, fs=fs, peri_event_window=[0, w_len])
+# rmswin, _ = psth(y, t, t_events=trms, fs=fs, event_window=[0, w_len])
 # gain = np.nanmedian(np.abs(y)) / np.nanmedian(np.abs(rmswin), axis=0)
 # gain = np.interp(t, trms, gain)
 # return nap.Tsd(t=t, d=y * gain)

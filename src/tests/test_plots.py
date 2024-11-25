@@ -75,8 +75,7 @@ def test_class_plotsignal():
 
     plotobj = plots.PlotSignal(raw_signal, times, raw_isosbestic, processed_signal)
     plotobj.raw_processed_figure()
-    plt.show()
-    plt.close()
+    plt.close('all')
 
 
 def test_class_plotsignalresponse():
@@ -91,8 +90,7 @@ def test_class_plotsignalresponse():
     plotobj = plots.PlotSignalResponse(trials, processed_signal, times)
     plotobj.plot_trialsort_psth()
     plotobj.plot_processed_trialtick()
-    plt.show()
-    plt.close()
+    plt.close('all')
 
 
 '''
@@ -117,8 +115,7 @@ def test_plot_raw_signals():
         times = df_nph['times'].values
 
         plots.plot_raw_signals(raw_signal, times, raw_isosbestic)
-        plt.show()
-        plt.close()
+        plt.close('all')
 
 
 def test_plot_processed_signal():
@@ -128,8 +125,8 @@ def test_plot_processed_signal():
     signal = df_nph['signal_processed'].values
     times = df_nph['times'].values
     plots.plot_processed_signal(signal, times)
-    plt.show()
-    plt.close()
+    plt.close('all')
+
 
 
 def test_plot_photometry_correlation():
@@ -140,8 +137,7 @@ def test_plot_photometry_correlation():
     isosbestic_lp = ffpr.low_pass_filter(df_nph['raw_isosbestic'].values, fs)
     times = df_nph['times'].values
     plots.plot_photometry_correlation(signal_lp, isosbestic_lp, times)
-    plt.show()
-    plt.close()
+    plt.close('all')
 
 
 def test_plot_psd():
@@ -150,8 +146,7 @@ def test_plot_psd():
 
     signal = df_nph['signal_processed'].values
     plots.plot_psd(signal)
-    plt.show()
-    plt.close()
+    plt.close('all')
 
 """
 ------------------------------------------------
@@ -180,17 +175,11 @@ def test_plot_psth():
         times = psth_times(fs, event_window)
         # Plot PSTH
         plots.plot_psth(psth_mat, times)
-        plt.show()
-        plt.close()
+        plt.close('all')
+
 
 def test_plot_event_tick():
     # --- Use synthetic data for test ---
     df_nph, t_events, fs = get_synthetic_data()
     plots.plot_event_tick(t_events)
-    plt.show()
-    plt.close()
-
-    # TODO Test labels
-    # plots.plot_event_tick(t_events, labels='test_label')
-    plt.show()
-    plt.close()
+    plt.close('all')
