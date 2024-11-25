@@ -204,7 +204,7 @@ def has_responses(
     window: tuple = (-1, 1),
     alpha: float = 0.005,
 ) -> bool:
-    y, t = A.values, A.times()
+    t = A.times()
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
 
     res = []

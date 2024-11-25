@@ -40,7 +40,7 @@ def get_test_data():
     one = ONE()
 
     # Load NP file locally
-    df_nph = pd.read_parquet(nph_path.joinpath(f'raw_photometry.pqt'))
+    df_nph = pd.read_parquet(nph_path.joinpath('raw_photometry.pqt'))
 
     # Load trial from ONE
     a = one.load_object(eid, 'trials')

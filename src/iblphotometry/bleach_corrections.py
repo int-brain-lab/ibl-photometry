@@ -1,8 +1,6 @@
 from abc import ABC, abstractmethod
 import warnings
-from tqdm import tqdm
 import numpy as np
-import pandas as pd
 import pynapple as nap
 from scipy.optimize import minimize
 from scipy.stats.distributions import norm

@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import iblphotometry.preprocessing as ffpr
 # from iblphotometry.behavior import filter_trials_by_trial_idx
-from brainbox.task.trials import find_trial_ids
 from iblphotometry.behavior import psth, psth_times
 
 LINE_COLOURS = {
@@ -267,8 +266,8 @@ def plot_iblevents_tick(ax, trials):
     colors = ['b', 'g', 'r']
     labels = ['Stim On', 'First Move', 'Feedback']
 
-    for e, c, l in zip(events, colors, labels):
-        plot_event_tick(events=trials[e], ax=ax, labels=l, color=c)
+    for ev, col, lab in zip(events, colors, labels):
+        plot_event_tick(events=trials[ev], ax=ax, labels=lab, color=col)
 
     return ax
 

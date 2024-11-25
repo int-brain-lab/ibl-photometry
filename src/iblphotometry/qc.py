@@ -1,13 +1,11 @@
 # %%
 import numpy as np
 from scipy.stats import linregress
-import pandas as pd
 import pynapple as nap
 
 from tqdm import tqdm
 import logging
 
-from copy import copy
 import gc
 
 from iblphotometry.sliding_operations import make_sliding_window
