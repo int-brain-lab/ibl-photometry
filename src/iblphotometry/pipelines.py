@@ -4,9 +4,16 @@ import numpy as np
 import pandas as pd
 import pynapple as nap
 from iblphotometry.helpers import z, psth, filt
-from ibldsp.utils import WindowGenerator
+
+# from ibldsp.utils import WindowGenerator
 from iblphotometry import sliding_operations
 from iblphotometry import bleach_corrections
+from iblphotometry.outlier_detection import remove_spikes
+from iblphotometry.bleach_corrections import lowpass_bleachcorrect
+from iblphotometry.sliding_operations import sliding_mad
+
+# TODO this will probably be refactored to to processing
+from iblphotometry.helpers import zscore
 
 import logging
 from copy import copy
@@ -14,28 +21,58 @@ from copy import copy
 logger = logging.getLogger()
 
 
-def _run_pipeline(F: nap.Tsd, pipeline):
-    # run pipeline
-    Fc = copy(F)
+def run_pipeline(
+    pipeline,
+    F_signal: nap.TsdFrame,
+    F_reference: nap.TsdFrame = None,
+) -> nap.TsdFrame:
+    # copy
+    Fc = copy(F_signal)
+    if F_reference is not None:
+        Fc_ref = copy(F_reference)
+
+    if isinstance(F_signal, nap.Tsd):
+        raise TypeError(
+            'F_signal can not be nap.Tsd, is now required to be nap.TsdFrame'
+        )
+
+    # iterate over the individual processing steps of the pipeline
     for i, (pipe_func, pipe_args) in enumerate(pipeline):
-        Fc = pipe_func(Fc, **pipe_args)
+        # if pipeline function is to be executed on columns of a TsdFrame
+        if 'needs_reference' in pipe_args:
+            _pipe_args = {k: v for k, v in pipe_args.items() if k != 'needs_reference'}
+            # check if F_ref is not None
+            _d = np.zeros_like(Fc.d)
+            # _Fcd_ref = np.zeros_like(Fc_ref.d)
+            for i, col in enumerate(Fc.columns):
+                _d[:, i] = pipe_func(Fc[col], Fc_ref[col], **_pipe_args)
+            # this step consumes the reference!
+            Fc = nap.TsdFrame(t=Fc.t, d=_d, columns=Fc.columns)
+        else:
+            _d = np.zeros_like(Fc.d)
+            for i, col in enumerate(Fc.columns):
+                _d[:, i] = pipe_func(Fc[col], **pipe_args)
+            Fc = nap.TsdFrame(t=Fc.t, d=_d, columns=Fc.columns)
     return Fc
 
 
-def run_pipeline(F: nap.Tsd | nap.TsdFrame, pipeline, on_columns=False):
-    if isinstance(F, nap.Tsd):
-        return _run_pipeline(F, pipeline)
-    if isinstance(F, nap.TsdFrame):
-        if on_columns:
-            Fc = copy(F)
-            d_ = np.zeros_like(Fc.d)
-            for i, col in enumerate(Fc.columns):
-                d_[:, i] = run_pipeline(Fc[col], pipeline).values
-            return nap.TsdFrame(t=Fc.t, d=d_, columns=Fc.columns)
-        else:
-            return _run_pipeline(F, pipeline)
+# these are now pipelines
+sliding_mad_pipeline = [
+    (remove_spikes, dict(sd=5)),
+    (
+        lowpass_bleachcorrect,
+        dict(
+            correction_method='subtract-divide',
+            filter_params=dict(N=3, Wn=0.01, btype='lowpass'),
+        ),
+    ),
+    (sliding_mad, dict(w_len=120, overlap=90)),
+    (zscore, dict(mode='median')),
+]
 
 
+# TODO this is not following the definition of a pipeline anymore
+# to be reconstructed
 def bc_lp_sliding_mad(
     F: nap.Tsd | nap.TsdFrame,
     w_len: float = 120,
@@ -72,6 +109,7 @@ def bc_lp_sliding_mad(
     return F_res
 
 
+# TODO this is not following the definition of a pipeline anymore
 def jove2019(
     F: nap.TsdFrame,
     ca_signal_name: str = 'raw_calcium',
@@ -114,6 +152,7 @@ def jove2019(
     return nap.Tsd(t=raw_calcium.times(), d=ph)
 
 
+# TODO this is not following the definition of a pipeline anymore
 def isosbestic_regression(
     F: nap.TsdFrame,
     ca_signal_name: str = 'raw_calcium',

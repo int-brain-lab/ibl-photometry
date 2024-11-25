@@ -11,13 +11,17 @@ from copy import copy
 import gc
 
 from iblphotometry.sliding_operations import make_sliding_window
-
+from pipelines import run_pipeline
 import warnings
+
+from brainbox.io.one import SessionLoader
+
+warnings.filterwarnings('once', category=DeprecationWarning, module='pynapple')
 
 logger = logging.getLogger()
 
 
-# %%
+# %% # those could be in metrics
 def sliding_metric(
     F: nap.Tsd,
     w_len: float,
@@ -75,120 +79,111 @@ def eval_metric(
     return dict(value=m, rval=r, pval=p)
 
 
-# %%
-def qc_single(
-    raw_photometry: nap.Tsd | nap.TsdFrame,
-    trials: pd.DataFrame,
-    pipelines_reg: dict,
+def qc_Tsd(
+    F: nap.Tsd,
     qc_metrics: dict,
-    eid: str,  # <- should be pid
+    sliding_kwargs=None,  # if present, calculate everything in a sliding manner
+    trials=None,  # if present, put trials into params
+    eid: str = None,  # FIXME but left as is for now just to keep the logger happy
+    brain_region: str = None,  # FIXME but left as is for now just to keep the logger happy
 ) -> dict:
-    """run QC on a single experiment / photometry session.
+    if isinstance(F, nap.TsdFrame):
+        raise TypeError('F can not be nap.TsdFrame')
 
-    Args:
-        raw_photometry (nap.TsdFrame): _description_
-        trials (pd.DataFrame): _description_
-        pipelines_reg (dict): _description_
-        qc_metrics (dict): _description_
-
-    Returns:
-        dict: _description_
-    """
-
-    qc = {}  # dict of dicts - fist level keys are pipeline_names, second level keys are metrics
-    for pipe_name in pipelines_reg.keys():
-        qc[pipe_name] = {}
-
-    # restricting the fluorescence data to the time within the task
-    t_start = trials.iloc[0]['intervals_0'] - 10
-    t_stop = trials.iloc[-1]['intervals_1'] + 10
-    session_interval = nap.IntervalSet(t_start, t_stop)
-    raw_photometry = raw_photometry.restrict(session_interval)
-
-    # iterate over pipelines
-    for pipe_name, pipeline in pipelines_reg.items():
-        # run pipeline
+    # should cover all cases
+    qc_results = {}
+    for metric, params in qc_metrics:
         try:
-            photometry = copy(raw_photometry)
-            # run the entire pipeline function by funtion
-            # for this to work, the output and input types of each
-            # pipeline function have to be compatible!
-            for i, (pipe_func, pipe_args) in enumerate(pipeline):
-                photometry = pipe_func(photometry, **pipe_args)
+            if trials is not None:  # if trials are passed
+                params['trials'] = trials
+            res = eval_metric(F, metric, params, sliding_kwargs)
+            qc_results[f'{metric.__name__}'] = res['value']
+            if sliding_kwargs:
+                qc_results[f'{metric.__name__}_r'] = res['rval']
+                qc_results[f'{metric.__name__}_p'] = res['pval']
         except Exception as e:
             logger.warning(
-                f'{eid}: pipeline {pipe_name} fails with: {type(e).__name__}:{e}'
+                f'{eid}, {brain_region}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
             )
-            continue
-
-        # raw metrics - a bit redundant but just to have everyting combined together
-        # if multiple channels:
-        for metric, params in qc_metrics['raw']:
-            if isinstance(photometry, nap.TsdFrame):
-                for ch in photometry.columns:
-                    F = photometry[ch]
-                    try:
-                        res = eval_metric(F, metric, params)
-                        qc[pipe_name][f'{metric.__name__}_{ch}'] = res['value']
-                    except Exception as e:
-                        logger.warning(
-                            f'{eid}, {ch}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
-                        )
-
-            else:  # is a nap.Tsd
-                try:
-                    res = eval_metric(photometry, metric, params)
-                    qc[pipe_name][f'{metric.__name__}'] = res['value']
-                except Exception as e:
-                    logger.warning(
-                        f'{eid}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
-                    )
-
-        # metrics on the output of the pipeline
-        # at this point, photometry is a nap.Tsd
-        Fpp = photometry
-        for metric, params in qc_metrics['processed']:
-            try:
-                res = eval_metric(Fpp, metric, params, qc_metrics['sliding_kwargs'])
-                qc[pipe_name][f'{metric.__name__}'] = res['value']
-                qc[pipe_name][f'{metric.__name__}_r'] = res['rval']
-                qc[pipe_name][f'{metric.__name__}_p'] = res['pval']
-            except Exception as e:
-                logger.warning(
-                    f'{eid}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
-                )
-
-        # metrics that factor in behavior
-        for metric, params in qc_metrics['response']:
-            params['trials'] = trials
-            try:
-                res = eval_metric(Fpp, metric, params)
-                qc[pipe_name][f'{metric.__name__}'] = res['value']
-            except Exception as e:
-                logger.warning(
-                    f'{eid}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
-                )
-
-    return qc
+    return qc_results
 
 
 # %% main QC loop
+def run_qc(
+    data_loader,
+    eids: list[str],
+    pipelines_reg,  # registered pipelines
+    qc_metrics: dict,  # metrics. keys: raw, processed, repsonse, sliding_kwargs
+    sigref_mapping: dict = None,  # think about this one - the mapping of signal and reference # dict(signal=signal_band_name, reference=ref_band_name)
+):
+    qc_results = []
+    for eid in tqdm(eids):
+        print(eid)
+        # get data
+        try:
+            raw_tfs, brain_regions = data_loader.load_photometry_data(
+                eid=eid, return_regions=True
+            )
+        except ValueError:  # happens in Kcenia
+            continue
+        # TODO this should be provided
+        sl = SessionLoader(eid=eid, one=data_loader.one)
+        trials = sl.load_trials(
+            collection='alf/task_00'
+        )  # this is necessary fo caroline
+        trials = sl.load_trials()  # should be good for all others
+        # trials = data_loader.one.load_dataset(eid, '*trials.table.pqt')
 
+        for band in raw_tfs.keys():  # TODO this should be bands
+            raw_tf = raw_tfs[band]
+            for region in brain_regions:
+                qc_result = qc_Tsd(
+                    raw_tf[region], qc_metrics['raw'], sliding_kwargs=None, eid=eid
+                )
+                qc_results.append(
+                    dict(eid=eid, pipeline='raw', band=band, region=region, **qc_result)
+                )
 
-def run_qc(data_loader, pids: list[str], pipelines_reg, qc_metrics):
-    # Creating dictionary of dictionary, with each key being the pipeline name
-    qc_dfs = dict((ikey, dict()) for ikey in pipelines_reg.keys())
+        # run the pipelines and qc on the processed data
+        # here it needs to be specified if one band is a reference of the other
+        for pipeline_name, pipeline in pipelines_reg.items():
+            if 'reference' in sigref_mapping:  # this is for isosbestic pipelines
+                proc_tf = run_pipeline(
+                    pipeline,
+                    raw_tfs[sigref_mapping['signal']],
+                    raw_tfs[sigref_mapping['reference']],
+                )
+            else:
+                # FIXME this fails for true-multiband
+                # this hack works for single-band
+                proc_tf = run_pipeline(pipeline, raw_tfs[sigref_mapping['signal']])
 
-    for pid in tqdm(pids):
-        raw_photometry = data_loader.load_photometry_data(pid=pid)
-        eid, pname = data_loader.pid2eid(pid)
-        trials = data_loader.load_trials_table(eid)
+            for region in brain_regions:
+                # sliding qc of the processed data
+                qc_proc = qc_Tsd(
+                    proc_tf[region],
+                    qc_metrics=qc_metrics['processed'],
+                    sliding_kwargs=qc_metrics['sliding_kwargs'],
+                    eid=eid,
+                    brain_region=region,
+                )
 
-        qc_res = qc_single(raw_photometry, trials, pipelines_reg, qc_metrics, pid)
-
-        for pipe in pipelines_reg.keys():
-            qc_res[pipe]['pname'] = pname
-            qc_dfs[pipe][eid] = qc_res[pipe]
-
+                # qc with metrics that use behavior
+                qc_resp = qc_Tsd(
+                    proc_tf[region],
+                    qc_metrics['response'],
+                    trials=trials,
+                    eid=eid,
+                    brain_region=region,
+                )
+                qc_result = qc_proc | qc_resp
+                qc_results.append(
+                    dict(
+                        eid=eid,
+                        pipeline=pipeline_name,
+                        region=region,
+                        **qc_result,
+                    )
+                )
         gc.collect()
-    return qc_dfs
+    return qc_results

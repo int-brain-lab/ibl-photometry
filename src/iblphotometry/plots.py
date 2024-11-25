@@ -87,6 +87,9 @@ class PlotSignalResponse():
         self.psth_dict = self.compute_events_psth()
 
     def compute_events_psth(self, event_window=np.array([-1, 2])):
+    for col in signal.columns:
+        plot_Tsd(signal[col], axes=axes, label=col)
+    axes.legend()
 
         psth_dict = dict()
         for event in PSTH_EVENTS.keys():
@@ -132,6 +135,19 @@ Plotting functions requiring FF signals only
 def plot_raw_signals(raw_signal, times, raw_isosbestic=None,
                      ax=None, xlim=None, ylim=None, xlabel='Time', ylabel=None, title=None):
 
+def plot_isosbestic_overview(
+    calcium: nap.Tsd | nap.TsdFrame,
+    isosbestic: nap.Tsd | nap.TsdFrame,
+    low_pass_cross_plot=0.01,
+    suptitle=None,
+    output_file=None,
+):
+    fig, axd = plt.subplot_mosaic(
+        [['top', 'top'], ['left', 'right']], constrained_layout=True, figsize=(14, 8)
+    )
+    # traces
+    plot_Tsd(calcium, axes=axd['top'], color='#279F95', label='calcium')
+    plot_Tsd(isosbestic, axes=axd['top'], color='#803896', label='isosbestic')
         if ax is None:
             fig, ax = plt.subplots(1, 1)
         else:

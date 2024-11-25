@@ -173,13 +173,14 @@ def has_response_to_event(
     P = psth(y, t, event_times.times(), fs=fs, peri_event_window=window)[0]
 
     # or: pynapple style
-    # in the long run, this will be the preferred way as this will 
+    # in the long run, this will be the preferred way as this will
     # respect the .time_support of the pynapple object. # TODO verify this
     # P = nap.compute_perievent_continuous(A, event_times, window).values
 
-    # assuming time is on dim 1
+    # temporally averages the samples in the window. Sensitive to window size!
     if mode == 'mean':
         sig_samples = np.average(P, axis=0)
+    # takes the peak sample, minus one sd
     if mode == 'peak':
         sig_samples = np.max(P, axis=0) - np.std(y)
 
