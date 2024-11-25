@@ -8,6 +8,7 @@ def psth_times(fs, event_window):
     psth_times = psth_samples / fs
     return psth_times
 
+
 def psth(signal, times, t_events, fs=None, event_window=np.array([-1, 2])):
     """
     Compute the peri-event time histogram of a calcium signal
@@ -34,7 +35,7 @@ def psth(signal, times, t_events, fs=None, event_window=np.array([-1, 2])):
     psth = signal[idx_psth]  # psth is a 2d array (ntimes, nevents)
     psth[i_out_of_bounds] = np.nan  # remove events that are out of bounds
 
-    return psth, idx_psth  #TODO transpose PSTH before return
+    return psth, idx_psth  # TODO transpose PSTH before return
 
 
 # -------------------------------------------------------------------------------------------------

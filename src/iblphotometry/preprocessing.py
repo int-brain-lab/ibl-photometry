@@ -1,11 +1,17 @@
 """
 This modules offers pre-processing for raw photometry data.
 """
+
 import scipy.signal
 
-def low_pass_filter(raw_signal ,fs):
+
+def low_pass_filter(raw_signal, fs):
     params = {}
-    sos = scipy.signal.butter(fs=fs, output='sos', **params.get('butterworth_lowpass', {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}))
+    sos = scipy.signal.butter(
+        fs=fs,
+        output='sos',
+        **params.get('butterworth_lowpass', {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}),
+    )
     signal_lp = scipy.signal.sosfiltfilt(sos, raw_signal)
     return signal_lp
 

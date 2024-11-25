@@ -21,17 +21,21 @@ Functions to get test data
 ------------------------------------------------
 """
 
+
 def get_synthetic_data():
     fs = 50
     df_nph, t_events = synthetic101(fs=50)
     # Get signal and process it
-    df_nph['signal_processed'] = ffpr.mad_raw_signal(df_nph['raw_calcium'].values, fs=fs)
+    df_nph['signal_processed'] = ffpr.mad_raw_signal(
+        df_nph['raw_calcium'].values, fs=fs
+    )
     return df_nph, t_events, fs
 
+
 def get_test_data():
-    '''
+    """
     This is a throw-away loader function to help testing the plotting functions
-    '''
+    """
     # --- Use real data for test ---
     event = 'feedback_times'
     eid = '77a6741c-81cc-475f-9454-a9b997be02a4'  # Good response to feedback times
@@ -49,11 +53,13 @@ def get_test_data():
     t_events = df_trials[event]
 
     # Ugly way to get sampling frequency
-    time_diffs = df_nph["times"].diff().dropna()
+    time_diffs = df_nph['times'].diff().dropna()
     fs = 1 / time_diffs.median()
 
     # Get signal and process it
-    df_nph['signal_processed'] = ffpr.mad_raw_signal(df_nph['raw_calcium'].values, fs=fs)
+    df_nph['signal_processed'] = ffpr.mad_raw_signal(
+        df_nph['raw_calcium'].values, fs=fs
+    )
 
     return df_nph, t_events, fs
 
@@ -63,6 +69,7 @@ def get_test_data():
 TEST: Loader objects for plotting
 ------------------------------------------------
 """
+
 
 def test_class_plotsignal():
     # --- Use real data for test ---
@@ -93,15 +100,15 @@ def test_class_plotsignalresponse():
     plt.close('all')
 
 
-'''
+"""
 ------------------------------------------------
 TEST: Plotting functions requiring FF signals only
 ------------------------------------------------
-'''
+"""
+
 
 def test_plot_raw_signals():
     for test_case in ['synt', 'real']:
-
         match test_case:
             case 'synt':
                 # --- Use real data for test ---
@@ -128,7 +135,6 @@ def test_plot_processed_signal():
     plt.close('all')
 
 
-
 def test_plot_photometry_correlation():
     # --- Use real data for test ---
     df_nph, _, fs = get_test_data()
@@ -148,17 +154,18 @@ def test_plot_psd():
     plots.plot_psd(signal)
     plt.close('all')
 
+
 """
 ------------------------------------------------
 TEST: Plotting functions requiring behavioral events
 ------------------------------------------------
 """
 
+
 def test_plot_psth():
     event_window = [-1.5, 2.75]
 
     for test_case in ['synt', 'real']:
-
         match test_case:
             case 'synt':
                 # --- Use real data for test ---

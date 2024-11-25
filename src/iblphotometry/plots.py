@@ -2,13 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import iblphotometry.preprocessing as ffpr
+
 # from iblphotometry.behavior import filter_trials_by_trial_idx
 from iblphotometry.behavior import psth, psth_times
 
 LINE_COLOURS = {
-    'raw_isosbestic': '#9d4edd', #purple
-    'raw_signal': '#43aa8b', #teal
-    'processed_signal': '#0081a7'
+    'raw_isosbestic': '#9d4edd',  # purple
+    'raw_signal': '#43aa8b',  # teal
+    'processed_signal': '#0081a7',
     # 'moving_avg': '#f4a261'
 }
 
@@ -16,8 +17,9 @@ LINE_COLOURS = {
 PSTH_EVENTS = {
     'feedback_times': 'Feedback',
     'stimOnTrigger_times': 'Stim on',
-    'firstMovement_times': 'First move'
+    'firstMovement_times': 'First move',
 }
+
 
 def set_axis_style(ax, fontsize=10, **kwargs):
     ax.spines['right'].set_visible(False)
@@ -25,9 +27,10 @@ def set_axis_style(ax, fontsize=10, **kwargs):
 
     ax.set_xlabel(kwargs.get('xlabel', None), fontsize=fontsize)
     ax.set_ylabel(kwargs.get('ylabel', None), fontsize=fontsize)
-    ax.set_title(kwargs.get('title', None), fontsize=fontsize+2)
+    ax.set_title(kwargs.get('title', None), fontsize=fontsize + 2)
 
     return ax
+
 
 """
 ------------------------------------------------
@@ -35,10 +38,11 @@ Loader objects for plotting
 ------------------------------------------------
 """
 
-class PlotSignal:
-    def __init__(self, raw_signal, times, raw_isosbestic=None,
-                 processed_signal=None, fs=None):
 
+class PlotSignal:
+    def __init__(
+        self, raw_signal, times, raw_isosbestic=None, processed_signal=None, fs=None
+    ):
         # TODO this init could change, pass in a dataframe with specific keys and LP processing done earlier
         self.raw_signal = raw_signal
         self.raw_isosbestic = raw_isosbestic
@@ -56,25 +60,39 @@ class PlotSignal:
         else:
             self.lp_isosbestic = None
 
-
     def raw_processed_figure(self):
         fig, axs = plt.subplots(3, 2)
         axs[2, 1].axis('off')
 
         # --- Column 0
-        plot_raw_signals(self.raw_signal, self.times, self.raw_isosbestic, ax=axs[0, 0], title='Raw')
+        plot_raw_signals(
+            self.raw_signal, self.times, self.raw_isosbestic, ax=axs[0, 0], title='Raw'
+        )
         if self.processed_signal is not None:
-            plot_processed_signal(self.processed_signal, self.times, ax=axs[1, 0], title='Processed Signal')
+            plot_processed_signal(
+                self.processed_signal,
+                self.times,
+                ax=axs[1, 0],
+                title='Processed Signal',
+            )
         plot_psd(self.processed_signal, ax=axs[2, 0], title='Processed Signal PSD')
-        #--- Column 1
-        plot_raw_signals(self.lp_signal, self.times, self.lp_isosbestic, ax=axs[0, 1], title='Low Pass')
+        # --- Column 1
+        plot_raw_signals(
+            self.lp_signal,
+            self.times,
+            self.lp_isosbestic,
+            ax=axs[0, 1],
+            title='Low Pass',
+        )
         if self.raw_isosbestic is not None:
-            plot_photometry_correlation(self.lp_signal, self.lp_isosbestic, self.times, ax=axs[1, 1])
+            plot_photometry_correlation(
+                self.lp_signal, self.lp_isosbestic, self.times, ax=axs[1, 1]
+            )
         fig.tight_layout()
         return fig, axs
 
-class PlotSignalResponse():
 
+class PlotSignalResponse:
     def __init__(self, trials, processed_signal, times, fs=None):
         self.trials = trials
         self.times = times
@@ -88,8 +106,13 @@ class PlotSignalResponse():
     def compute_events_psth(self, event_window=np.array([-1, 2])):
         psth_dict = dict()
         for event in PSTH_EVENTS.keys():
-            psth_dict[event], _ = psth(self.processed_signal, self.times, self.trials[event],
-                                                   self.fs, event_window=event_window)
+            psth_dict[event], _ = psth(
+                self.processed_signal,
+                self.times,
+                self.trials[event],
+                self.fs,
+                event_window=event_window,
+            )
             # psth_dict[event] = psth_dict[event].T
 
         psth_dict['times'] = psth_times(self.fs, event_window)
@@ -99,9 +122,13 @@ class PlotSignalResponse():
         fig, axs = plt.subplots(2, len(PSTH_EVENTS.keys()))
 
         for iaxs, event in enumerate(PSTH_EVENTS.keys()):
-            axs_plt = [axs[0, iaxs],
-                       axs[1, iaxs]]
-            plot_psth(self.psth_dict[event], self.psth_dict['times'], axs=axs_plt, title=PSTH_EVENTS[event])
+            axs_plt = [axs[0, iaxs], axs[1, iaxs]]
+            plot_psth(
+                self.psth_dict[event],
+                self.psth_dict['times'],
+                axs=axs_plt,
+                title=PSTH_EVENTS[event],
+            )
 
             if iaxs == 0:
                 axs[0, iaxs].set_xlabel('Frames')
@@ -113,7 +140,7 @@ class PlotSignalResponse():
         fig.tight_layout()
         return fig, axs
 
-    def plot_processed_trialtick(self, event_key = 'stimOnTrigger_times'):
+    def plot_processed_trialtick(self, event_key='stimOnTrigger_times'):
         fig, ax = plt.subplots(1, 1)
         plt.figure(figsize=(10, 6))
         events = self.trials[event_key]
@@ -121,14 +148,26 @@ class PlotSignalResponse():
         plot_event_tick(events, ax=ax, color='#FFC0CB', ls='-')
         plot_processed_signal(self.processed_signal, self.times, ax=ax)
         return fig, ax
+
+
 """
 ------------------------------------------------
 Plotting functions requiring FF signals only
 ------------------------------------------------
 """
 
-def plot_raw_signals(raw_signal, times, raw_isosbestic=None,
-                     ax=None, xlim=None, ylim=None, xlabel='Time', ylabel=None, title=None):
+
+def plot_raw_signals(
+    raw_signal,
+    times,
+    raw_isosbestic=None,
+    ax=None,
+    xlim=None,
+    ylim=None,
+    xlabel='Time',
+    ylabel=None,
+    title=None,
+):
     if ax is None:
         fig, ax = plt.subplots(1, 1)
     else:
@@ -136,12 +175,22 @@ def plot_raw_signals(raw_signal, times, raw_isosbestic=None,
 
     linewidth = 0.1 if xlim is None else 1
     # Plot signal
-    ax.plot(times, raw_signal, linewidth=linewidth,
-            c=LINE_COLOURS['raw_signal'], label='signal')
+    ax.plot(
+        times,
+        raw_signal,
+        linewidth=linewidth,
+        c=LINE_COLOURS['raw_signal'],
+        label='signal',
+    )
     # Plot isosbestic if passed in
     if raw_isosbestic is not None:
-        ax.plot(times, raw_isosbestic, linewidth=linewidth,
-                c=LINE_COLOURS['raw_isosbestic'], label='isosbestic')
+        ax.plot(
+            times,
+            raw_isosbestic,
+            linewidth=linewidth,
+            c=LINE_COLOURS['raw_isosbestic'],
+            label='isosbestic',
+        )
     ax.legend(fontsize=6)
 
     ax.set_xlim(xlim)
@@ -151,10 +200,9 @@ def plot_raw_signals(raw_signal, times, raw_isosbestic=None,
     return fig, ax
 
 
-
-def plot_processed_signal(signal, times, ax=None, xlim=None, ylim=None,
-                          xlabel='Time', ylabel=None, title=None):
-
+def plot_processed_signal(
+    signal, times, ax=None, xlim=None, ylim=None, xlabel='Time', ylabel=None, title=None
+):
     if ax is None:
         fig, ax = plt.subplots(1, 1)
     else:
@@ -172,8 +220,9 @@ def plot_processed_signal(signal, times, ax=None, xlim=None, ylim=None,
     return fig, ax
 
 
-
-def plot_photometry_correlation(signal_lp, isosbestic_lp, times, ax=None, ax_cbar=None, title=None):
+def plot_photometry_correlation(
+    signal_lp, isosbestic_lp, times, ax=None, ax_cbar=None, title=None
+):
     # Requires the Low pass filtered signals at minima
     if ax is None:
         fig, ax = plt.subplots(1, 1)
@@ -183,11 +232,17 @@ def plot_photometry_correlation(signal_lp, isosbestic_lp, times, ax=None, ax_cba
     if ax_cbar is None:
         ax_cbar = ax
 
-    scat = ax.scatter(isosbestic_lp, signal_lp, s=1, c=times,
-                      cmap='magma', alpha=.8)
+    scat = ax.scatter(isosbestic_lp, signal_lp, s=1, c=times, cmap='magma', alpha=0.8)
     set_axis_style(ax, xlabel='isobestic', ylabel='signal', title=title)
-    fig.colorbar(scat, ax=ax_cbar, orientation='horizontal', label='Time in session (s)',
-                 shrink=0.3, anchor=(0.0, 1.0), location='top')
+    fig.colorbar(
+        scat,
+        ax=ax_cbar,
+        orientation='horizontal',
+        label='Time in session (s)',
+        shrink=0.3,
+        anchor=(0.0, 1.0),
+        location='top',
+    )
 
     return fig, ax
 
@@ -204,11 +259,13 @@ def plot_psd(signal, ax=None, title=None, **line_kwargs):
 
     return fig, ax
 
+
 """
 ------------------------------------------------
 Plotting functions requiring behavioral events
 ------------------------------------------------
 """
+
 
 def plot_psth(psth_mat, time, axs=None, vmin=-0.01, vmax=0.01, cmap='PuOr', title=None):
     # if time is None:
@@ -248,8 +305,9 @@ def plot_event_tick(events, ax=None, labels=None, color=None, ls='--'):
 
     return fig, ax
 
+
 def plot_iblevents_tick(ax, trials):
-    '''
+    """
 
     Parameters
     ----------
@@ -260,7 +318,7 @@ def plot_iblevents_tick(ax, trials):
     Returns
     -------
 
-    '''
+    """
 
     events = ['stimOnTrigger_times', 'firstMovement_times', 'feedback_times']
     colors = ['b', 'g', 'r']
@@ -272,11 +330,10 @@ def plot_iblevents_tick(ax, trials):
     return ax
 
 
-
 # from brainbox.task.trials import find_trial_ids
 # trial_idx, dividers = find_trial_ids(trials, sort='choice')
 
-'''
+"""
 def plot_left_right_psth(psth, trials, ax=None, xlabel='T from Feedback (s)',
                            ylabel0='Signal', ylabel1='Sorted Trial Number',
                            order='trial num'):
@@ -330,4 +387,4 @@ def remove_spines(ax, spines=('left', 'right', 'top', 'bottom')):
         ax.spines[sp].set_visible(False)
 
     return ax
-'''
+"""

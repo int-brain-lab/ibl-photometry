@@ -4,6 +4,7 @@ import pynapple as nap
 from ibldsp.utils import WindowGenerator
 from iblutil.numerical import rcoeff
 
+
 # TODO move to processing
 def z(A: np.array, mode='classic'):
     """classic z-score. Deviation from sample mean in units of sd
@@ -19,6 +20,7 @@ def z(A: np.array, mode='classic'):
     if mode == 'median':
         return (A - np.median(A)) / np.std(A)
 
+
 # TODO move to processing
 def mad(A: np.array):
     """
@@ -33,10 +35,12 @@ def mad(A: np.array):
     """
     return np.median(np.absolute(A - np.median(A)), axis=-1)
 
+
 # TODO move to processing
 def madscore(F: nap.Tsd):
     y, t = F.values, F.times()
     return nap.Tsd(t=t, d=mad(y))
+
 
 # TODO move to processing
 def zscore(F: nap.Tsd, mode='classic'):
@@ -51,6 +55,7 @@ def zscore(F: nap.Tsd, mode='classic'):
     y, t = F.values, F.times()
     # mu, sig = np.average(y), np.std(y)
     return nap.Tsd(t=t, d=z(y, mode=mode))
+
 
 # TODO move to processing
 def filt(F: nap.Tsd, N: int, Wn: float, fs: float = None, btype='low'):
