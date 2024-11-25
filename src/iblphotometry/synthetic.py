@@ -7,7 +7,7 @@ import pandas as pd
 import scipy.signal
 
 
-def synthetic101(fs=30, rl=1000, event_rate=.2):
+def synthetic101(fs=30, rl=1000, event_rate=0.2):
     """
     Generates synthetic photometry data with
     :param fs: sampling frequency
@@ -19,8 +19,8 @@ def synthetic101(fs=30, rl=1000, event_rate=.2):
     photobleach = np.exp(-(tscale + 1) / 200)
     ric = scipy.signal.ricker(int(fs * 4), 8)
 
-    event_times = np.cumsum(- np.log(np.random.rand(int(rl * event_rate))) / event_rate)
-    event_times = event_times[:np.searchsorted(event_times, rl - 10)]
+    event_times = np.cumsum(-np.log(np.random.rand(int(rl * event_rate))) / event_rate)
+    event_times = event_times[: np.searchsorted(event_times, rl - 10)]
 
     transients = np.zeros(ns)
     transients[np.int32(event_times * fs - len(ric) / 2)] = 1
@@ -31,4 +31,6 @@ def synthetic101(fs=30, rl=1000, event_rate=.2):
     # # plt.plot(ric)
     # plt.plot(isosbestic)
     # plt.plot(calcium)
-    return pd.DataFrame({'times': tscale, 'raw_isosbestic': isosbestic, 'raw_calcium': calcium}), event_times
+    return pd.DataFrame(
+        {'times': tscale, 'raw_isosbestic': isosbestic, 'raw_calcium': calcium}
+    ), event_times

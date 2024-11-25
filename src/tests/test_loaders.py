@@ -1,7 +1,5 @@
-import numpy as np
 from pathlib import Path
 import unittest
-from iblphotometry.synthetic import synthetic101
 import iblphotometry.io as fio
 
 data_folder = Path(__file__).parent / 'data'

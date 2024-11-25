@@ -4,6 +4,7 @@ import pynapple as nap
 from ibldsp.utils import WindowGenerator
 from iblutil.numerical import rcoeff
 
+
 # TODO move to processing
 def z(A: np.array, mode='classic'):
     """classic z-score. Deviation from sample mean in units of sd
@@ -19,6 +20,7 @@ def z(A: np.array, mode='classic'):
     if mode == 'median':
         return (A - np.median(A)) / np.std(A)
 
+
 # TODO move to processing
 def mad(A: np.array):
     """
@@ -33,10 +35,12 @@ def mad(A: np.array):
     """
     return np.median(np.absolute(A - np.median(A)), axis=-1)
 
+
 # TODO move to processing
 def madscore(F: nap.Tsd):
     y, t = F.values, F.times()
     return nap.Tsd(t=t, d=mad(y))
+
 
 # TODO move to processing
 def zscore(F: nap.Tsd, mode='classic'):
@@ -51,6 +55,7 @@ def zscore(F: nap.Tsd, mode='classic'):
     y, t = F.values, F.times()
     # mu, sig = np.average(y), np.std(y)
     return nap.Tsd(t=t, d=z(y, mode=mode))
+
 
 # TODO move to processing
 def filt(F: nap.Tsd, N: int, Wn: float, fs: float = None, btype='low'):
@@ -73,35 +78,7 @@ def filt(F: nap.Tsd, N: int, Wn: float, fs: float = None, btype='low'):
     y_filt = signal.sosfiltfilt(sos, y)
     return nap.Tsd(t=t, d=y_filt)
 
-# TODO move to processing
-def psth(calcium, times, t_events, fs=None, peri_event_window=None):
-    """
-    Compute the peri-event time histogram of a calcium signal
-    :param calcium:
-    :param times:
-    :param t_events:
-    :param fs:
-    :param peri_event_window:
-    :return:
-    """
-    fs = 1 / np.median(np.diff(times)) if fs is None else fs
-    peri_event_window = [-1, 2] if peri_event_window is None else peri_event_window
-    # compute a vector of indices corresponding to the perievent window at the given sampling rate
-    sample_window = np.round(
-        np.arange(peri_event_window[0] * fs, peri_event_window[1] * fs + 1)
-    ).astype(int)
-    # we inflate this vector to a 2d array where each column corresponds to an event
-    idx_psth = np.tile(sample_window[:, np.newaxis], (1, t_events.size))
-    # we add the index of each event too their respective column
-    idx_event = np.searchsorted(times, t_events)
-    idx_psth += idx_event
-    i_out_of_bounds = np.logical_or(idx_psth > (calcium.size - 1), idx_psth < 0)
-    idx_psth[i_out_of_bounds] = -1
-    psth = calcium[idx_psth]  # psth is a 2d array (ntimes, nevents)
-    psth[i_out_of_bounds] = np.nan  # remove events that are out of bounds
-    return psth, idx_psth
 
-# ?
 def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):
     """
     Computes the local correlation coefficient between two signals in sliding windows

@@ -1,9 +1,8 @@
 """this module holds a collection of processing pipelines for fiber photometry data"""
 
 import numpy as np
-import pandas as pd
 import pynapple as nap
-from iblphotometry.helpers import z, psth, filt
+from iblphotometry.helpers import z, filt
 
 # from ibldsp.utils import WindowGenerator
 from iblphotometry import sliding_operations
