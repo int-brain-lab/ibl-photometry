@@ -125,9 +125,9 @@ def _read_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None) -> pd.DataFr
     return out_df
 
 
-def read_raw_data(path_csv_raw_photometry, path_csv_digital_inputs, columns=None):
-    if columns is None:
-        columns = dict()
+def read_raw_data(path_csv_raw_photometry, path_csv_digital_inputs, rois=None):
+    if rois is None:
+        rois = dict()
     # Get CSV
     df_raw_photometry = pd.read_csv(path_csv_raw_photometry)
     df_digital_inputs = pd.read_csv(path_csv_digital_inputs, header=None)
@@ -140,7 +140,7 @@ def read_raw_data(path_csv_raw_photometry, path_csv_digital_inputs, columns=None
             SystemTimestamp=pandera.Column(pandera.Float64),
             LedState=pandera.Column(pandera.Int16, coerce=True),
             ComputerTimestamp=pandera.Column(pandera.Float64),
-            **{k: pandera.Column(pandera.Float64) for k in columns},
+            **{k: pandera.Column(pandera.Float64) for k in rois},
         )
     )
     schema_digital_inputs = pandera.DataFrameSchema(
@@ -169,7 +169,7 @@ def from_raw_neurophotometrics(path: str | Path) -> nap.TsdFrame:
         # really raw as it comes out of the device
         # todo figure out the header
         raw_df = pd.read_csv(path)
-    if path.suffix == '.pqt':
+    elif path.suffix == '.pqt':
         # as it is stored
         raw_df = pd.read_parquet(path)
     else:
