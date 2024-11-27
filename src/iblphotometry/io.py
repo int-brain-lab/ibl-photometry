@@ -1,4 +1,5 @@
 # %%
+import pandera
 import numpy as np
 import pandas as pd
 import pynapple as nap
@@ -122,6 +123,39 @@ def _read_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None) -> pd.DataFr
                 out_df.loc[states == state, cn] = channel_meta_map.iloc[ic[0]][cn]
 
     return out_df
+
+
+def read_raw_data(path_csv_raw_photometry, path_csv_digital_inputs, columns=None):
+    if columns is None:
+        columns = dict()
+    # Get CSV
+    df_raw_photometry = pd.read_csv(path_csv_raw_photometry)
+    df_digital_inputs = pd.read_csv(path_csv_digital_inputs, header=None)
+    df_digital_inputs.columns = ['ChannelName', 'Channel', 'AlwaysTrue', 'SystemTimestamp', 'ComputerTimestamp']
+    # this will ensure the columns are present, and that there was no magic new format on a new Bonsai version
+
+    schema_raw_data = pandera.DataFrameSchema(
+        columns=dict(
+            FrameCounter=pandera.Column(pandera.Int64),
+            SystemTimestamp=pandera.Column(pandera.Float64),
+            LedState=pandera.Column(pandera.Int16, coerce=True),
+            ComputerTimestamp=pandera.Column(pandera.Float64),
+            **{k: pandera.Column(pandera.Float64) for k in columns},
+        )
+    )
+    schema_digital_inputs = pandera.DataFrameSchema(
+        columns=dict(
+            ChannelName=pandera.Column(str, coerce=True),
+            Channel=pandera.Column(pandera.Int8, coerce=True),
+            AlwaysTrue=pandera.Column(bool, coerce=True),
+            SystemTimestamp=pandera.Column(pandera.Float64),
+            ComputerTimestamp=pandera.Column(pandera.Float64),
+        )
+    )
+    df_raw_photometry = schema_raw_data.validate(df_raw_photometry)
+    df_digital_inputs = schema_digital_inputs.validate(df_digital_inputs)
+
+    return df_raw_photometry, df_digital_inputs
 
 
 def from_raw_neurophotometrics(path: str | Path) -> nap.TsdFrame:
