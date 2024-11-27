@@ -91,6 +91,30 @@ class PlotSignal:
         fig.tight_layout()
         return fig, axs
 
+    def raw_processed_figure2(self):
+        str_mosaic = \
+            '''
+            AA
+            BB
+            DE
+            '''
+        fig, axd = plt.subplot_mosaic(str_mosaic, constrained_layout=True, figsize=(14, 8))
+        plot_raw_signals(
+            self.raw_signal, self.times, self.raw_isosbestic, ax=axd['A'], title='Raw'
+        )
+        if self.processed_signal is not None:
+            plot_processed_signal(
+                self.processed_signal,
+                self.times,
+                ax=axd['B'],
+                title='Processed Signal',
+            )
+            plot_psd(self.processed_signal, self.fs, ax=axd['D'], title='Processed Signal PSD')
+
+        if self.raw_isosbestic is not None:
+            plot_photometry_correlation(
+                self.lp_signal, self.lp_isosbestic, self.times, ax=axd['E']
+            )
 
 class PlotSignalResponse:
     def __init__(self, trials, processed_signal, times, fs=None):
