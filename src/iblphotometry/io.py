@@ -82,6 +82,7 @@ def from_pqt(
 def _read_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None) -> pd.DataFrame:
     #
     if rois is None:
+        # TODO change this so it align to the Pandera schema
         rois = raw_df.columns[4:]
 
     out_df = raw_df.filter(items=rois, axis=1).sort_index(axis=1)
