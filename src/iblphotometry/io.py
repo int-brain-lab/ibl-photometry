@@ -4,7 +4,10 @@ import pandas as pd
 import pynapple as nap
 from pathlib import Path
 import warnings
-from ibllib.pipes.neurophotometrics import LED_STATES, LIGHT_SOURCE_MAP
+from ibllib.io.extractors.fibrephotometry import (
+    LIGHT_SOURCE_MAP,
+    NEUROPHOTOMETRICS_LED_STATES,
+)
 
 
 def from_dataframe(
@@ -95,7 +98,7 @@ def _read_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None) -> pd.DataFr
 
     # TODO the names column in this map should actually be user defined (experiment description file?)
     channel_meta_map = pd.DataFrame(LIGHT_SOURCE_MAP)
-    led_states = pd.DataFrame(LED_STATES).set_index('Condition')
+    led_states = pd.DataFrame(NEUROPHOTOMETRICS_LED_STATES).set_index('Condition')
     states = raw_df['LedState']
 
     for state in states.unique():
@@ -134,7 +137,7 @@ def from_raw_neurophotometrics(path: str | Path) -> nap.TsdFrame:
         # really raw as it comes out of the device
         # todo figure out the header
         raw_df = pd.read_csv(path)
-    if path.suffix == '.pqt':
+    elif path.suffix == '.pqt':
         # as it is stored
         raw_df = pd.read_parquet(path)
     else:
@@ -142,8 +145,9 @@ def from_raw_neurophotometrics(path: str | Path) -> nap.TsdFrame:
 
     df = _read_raw_neurophotometrics_df(raw_df)
 
+    data_columns = [col for col in df.columns if col.startswith('G')]
     read_config = dict(
-        data_columns=raw_df.columns[4:],
+        data_columns=data_columns,
         time_column='times',
         channel_column='name',
     )

@@ -2,11 +2,7 @@ import pynapple as nap
 import pandas as pd
 from pathlib import Path
 from iblphotometry import io
-
-# TODO extract Kcenias data ...
-
-# TODO
-# make this inherit from SessionLoader
+# from brainbox.io.one import SessionLoader
 
 
 class PhotometryLoader:
