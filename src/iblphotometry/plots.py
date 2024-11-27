@@ -75,7 +75,7 @@ class PlotSignal:
                 ax=axs[1, 0],
                 title='Processed Signal',
             )
-        plot_psd(self.processed_signal, ax=axs[2, 0], title='Processed Signal PSD')
+            plot_psd(self.processed_signal, self.fs, ax=axs[2, 0], title='Processed Signal PSD')
         # --- Column 1
         plot_raw_signals(
             self.lp_signal,
@@ -247,13 +247,13 @@ def plot_photometry_correlation(
     return fig, ax
 
 
-def plot_psd(signal, ax=None, title=None, **line_kwargs):
+def plot_psd(signal, fs, ax=None, title=None, **line_kwargs):
     if ax is None:
         fig, ax = plt.subplots(1, 1)
     else:
         fig = ax.get_figure()
     line_kwargs.setdefault('linewidth', 2)
-    ax.psd(signal, **line_kwargs)
+    ax.psd(signal, Fs = fs, **line_kwargs)
     # TODO the freq x-axis is currently not informative
     ax.set_title(title)
 
@@ -329,7 +329,7 @@ def plot_iblevents_tick(ax, trials):
 
     return ax
 
-
+'''
 def plot_photometry_traces(
     photometry,
     event_times=None,
@@ -410,7 +410,7 @@ def plot_photometry_traces(
     plt.show()
     return fig, axd
 
-
+'''
 
 # from brainbox.task.trials import find_trial_ids
 # trial_idx, dividers = find_trial_ids(trials, sort='choice')
