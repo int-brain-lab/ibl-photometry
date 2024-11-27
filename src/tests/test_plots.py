@@ -151,7 +151,9 @@ def test_plot_psd():
     df_nph, _, fs = get_synthetic_data()
 
     signal = df_nph['signal_processed'].values
-    plots.plot_psd(signal)
+    times = df_nph['times'].values
+    fs = 1 / np.median(np.diff(times))
+    plots.plot_psd(signal, fs)
     plt.close('all')
 
 
