@@ -18,20 +18,22 @@ def from_dataframe(
     time_column: str = None,
     channel_column: str = 'name',
     channel_names: list[str] = None,
+    rename: dict = None,
 ):
     # from a raw dataframe as it is stored in ONE (signal.pqt)
     # data_columns is a list of str that specifies the names of the column that hold the actual data, like 'RegionXX'
     # channel_column is the column that specifies the temporally multiplexed acquisition channels
+
+    # infer if not explicitly provided: defaults to everything that starts with 'Region'
     if data_columns is None:
-        # infer if not explicitly provided: defaults to everything that starts with 'Region'
         data_columns = [col for col in raw_df.columns if col.startswith('Region')]
 
+    # infer name of time column if not provided
     if time_column is None:
-        # infer name of time column if not provided
         (time_column,) = [col for col in raw_df.columns if 'time' in col.lower()]
 
+    # infer channel names if they are not explicitly provided
     if channel_names is None:
-        # infer channel names if they are not explicitly provided
         channel_names = raw_df[channel_column].unique()
 
     # drop empty acquisition channels
@@ -42,14 +44,16 @@ def from_dataframe(
     for channel in channel_names:
         # TODO include the use of raw_df['include'] to set the time_support of the pynapple object
         # requires conversion of boolen to nap.IntervalSet (have done this somewhere already. find code)
+
         # TODO check pynappe PR#343 https://github.com/pynapple-org/pynapple/pull/343 for future
         # inclusion of locations_df as metadata
-        # TODO think about the renaming feature
-        # relevant for the user is not 'RegionXX' but rather brain_region or similar
-        # if rename:
-        #     rename_map = self.get_mapping(eid, key='ROI', value='brain_region')
-        #     raw_photometry_df = raw_photometry_df.rename(rename_map)
+
+        # get the data for the band
         df = raw_df.groupby(channel_column).get_group(channel)
+        # if rename dict is passed, rename Region0X to the corresponding brain region
+        if rename is not None:
+            df = df.rename(columns=rename)
+            data_columns = rename.values()
         raw_tfs[channel] = nap.TsdFrame(df.set_index(time_column)[data_columns])
 
     return raw_tfs
