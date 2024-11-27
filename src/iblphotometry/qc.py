@@ -117,22 +117,24 @@ def run_qc(
     qc_results = []
     for eid in tqdm(eids):
         print(eid)
-        # get data
-        try:
-            raw_tfs, brain_regions = data_loader.load_photometry_data(
-                eid=eid, return_regions=True
-            )
-        except ValueError:  # happens in Kcenia
-            continue
+        # get photometry data
+        raw_tfs = data_loader.load_photometry_data(eid=eid)
+        signal_bands = list(raw_tfs.keys())
+        brain_regions = raw_tfs[signal_bands[0]]
+
+        # get behavioral data
         # TODO this should be provided
         sl = SessionLoader(eid=eid, one=data_loader.one)
-        trials = sl.load_trials(
-            collection='alf/task_00'
-        )  # this is necessary fo caroline
+        # for caroline
+        # trials = sl.load_trials(
+        #     collection='alf/task_00'
+        # )  # this is necessary fo caroline
         trials = sl.load_trials()  # should be good for all others
+
+        # the old way
         # trials = data_loader.one.load_dataset(eid, '*trials.table.pqt')
 
-        for band in raw_tfs.keys():  # TODO this should be bands
+        for band in signal_bands:
             raw_tf = raw_tfs[band]
             for region in brain_regions:
                 qc_result = qc_Tsd(
@@ -154,6 +156,7 @@ def run_qc(
             else:
                 # FIXME this fails for true-multiband
                 # this hack works for single-band
+                # possible fix could be that signal could be a list
                 proc_tf = run_pipeline(pipeline, raw_tfs[sigref_mapping['signal']])
 
             for region in brain_regions:

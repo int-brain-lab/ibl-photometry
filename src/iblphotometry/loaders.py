@@ -10,58 +10,47 @@ from iblphotometry import io
 
 
 class PhotometryLoader:
+    # TODO make this class a subclass of SessionLoader
     # TODO move this class to brainbox.io
+
     def __init__(self, one, verbose=False):
         self.one = one
         self.verbose = verbose
 
-    def load_photometry_data(
-        self, eid=None, pid=None, return_regions=False
-    ) -> nap.TsdFrame:
-        # if eid is not None and pid is not None:
-        #     if pid not in self.eid2pid(eid)[0]:
-        #         raise ValueError(
-        #             'both pid and eid are provided, however, the pid does not belong to the eid'
-        #         )
-
+    def load_photometry_data(self, eid=None, pid=None, rename=True) -> nap.TsdFrame:
         if pid is not None:
-            # raise NotImplementedError
-            return self._load_data_from_pid(pid)
+            raise NotImplementedError
+            # return self._load_data_from_pid(pid)
 
         if eid is not None:
-            return self._load_data_from_eid(eid, return_regions=return_regions)
+            return self._load_data_from_eid(eid, rename=rename)
 
-    # def load_trials_table(self, eid):
-    #     return self.one.load_dataset(eid, '*trials.table')
-
-    # def get_mappable(self, eid):
-    #     return self._load_locations(eid).reset_index().columns
-
-    # def get_mapping(self, eid, key=None, value=None):
-    #     locations = self._load_locations(eid)
-    #     return locations.reset_index().set_index(key)[value].to_dict()
-
-    def _load_data_from_eid(self, eid, return_regions=False) -> nap.TsdFrame:
+    def _load_data_from_eid(self, eid, rename=True) -> nap.TsdFrame:
         raw_photometry_df = self.one.load_dataset(eid, 'photometry.signal.pqt')
         locations_df = self.one.load_dataset(eid, 'photometryROI.locations.pqt')
-        read_config = dict(data_columns=list(locations_df.index))
+        read_config = dict(
+            data_columns=list(locations_df.index),
+            rename=locations_df['brain_region'].to_dict() if rename else None,
+        )
         raw_tfs = io.from_dataframe(raw_photometry_df, **read_config)
 
-        cols = list(raw_tfs[list(raw_tfs.keys())[0]].columns)
+        signal_band_names = list(raw_tfs.keys())
+        col_names = list(raw_tfs[signal_band_names[0]].columns)
         if self.verbose:
-            print(f'available signal bands: {list(raw_tfs.keys())}')
-            print(f'available brain regions: {cols}')
+            print(f'available signal bands: {signal_band_names}')
+            print(f'available brain regions: {col_names}')
 
-        if return_regions:
-            return raw_tfs, cols
-        else:
-            return raw_tfs
+        return raw_tfs
+        # if return_regions:
+        #     return raw_tfs, cols
+        # else:
+        #     return raw_tfs
 
-    def _load_data_from_pid(self, pid=None, signal=None) -> nap.Tsd:
-        eid, pname = self.one.pid2eid(pid)
-        locations = self._load_locations(eid)
-        roi_name = dict(zip(locations['fiber'], locations.index))[pname]
-        return self._load_data_from_eid(eid, signal=signal)[roi_name]
+    # def _load_data_from_pid(self, pid=None, signal=None) -> nap.Tsd:
+    #     eid, pname = self.one.pid2eid(pid)
+    #     locations = self._load_locations(eid)
+    #     roi_name = dict(zip(locations['fiber'], locations.index))[pname]
+    #     return self._load_data_from_eid(eid, signal=signal)[roi_name]
 
     # def pid2eid(self, pid: str) -> tuple[str, str]:
     #     return self.one.pid2eid(pid)
@@ -72,7 +61,7 @@ class PhotometryLoader:
 
 class KceniaLoader(PhotometryLoader):
     # soon do be OBSOLETE
-    def _load_data_from_eid(self, eid: str, return_regions=False):
+    def _load_data_from_eid(self, eid: str):
         session_path = self.one.eid2path(eid)
         pnames = self._eid2pnames(eid)
 
@@ -83,6 +72,7 @@ class KceniaLoader(PhotometryLoader):
 
         signal_bands = ['raw_calcium', 'raw_isosbestic']  # HARDCODED but fine
 
+        # flipping the data representation
         raw_tfs = {}
         for band in signal_bands:
             df = pd.DataFrame([raw_dfs[pname][band].values for pname in pnames]).T
@@ -95,10 +85,10 @@ class KceniaLoader(PhotometryLoader):
             cols = list(raw_tfs[list(raw_tfs.keys())[0]].columns)
             print(f'available brain regions: {cols}')
 
-        if return_regions:
-            return raw_tfs, pnames
-        else:
-            return raw_tfs
+        # if return_regions:
+        #     return raw_tfs, pnames
+        # else:
+        return raw_tfs
 
     # def _load_data_from_eid(self, eid, signal=None):
     #     raise NotImplementedError
