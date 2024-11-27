@@ -4,12 +4,7 @@ import pandas as pd
 import pynapple as nap
 from pathlib import Path
 import warnings
-from ibllib.io.extractors.fibrephotometry import (
-    NEUROPHOTOMETRICS_LED_STATES,
-    LIGHT_SOURCE_MAP,
-)
-
-# def from_csv(): ...
+from ibllib.pipes.neurophotometrics import LED_STATES, LIGHT_SOURCE_MAP
 
 
 def from_dataframe(
@@ -100,7 +95,7 @@ def _read_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None) -> pd.DataFr
 
     # TODO the names column in this map should actually be user defined (experiment description file?)
     channel_meta_map = pd.DataFrame(LIGHT_SOURCE_MAP)
-    led_states = pd.DataFrame(NEUROPHOTOMETRICS_LED_STATES).set_index('Condition')
+    led_states = pd.DataFrame(LED_STATES).set_index('Condition')
     states = raw_df['LedState']
 
     for state in states.unique():
