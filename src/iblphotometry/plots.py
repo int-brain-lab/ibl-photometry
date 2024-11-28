@@ -40,7 +40,7 @@ Loader objects for plotting
 
 
 class PlotSignal:
-    def __init__(
+    def set_data(
         self, raw_signal, times, raw_isosbestic=None, processed_signal=None, fs=None
     ):
         # TODO this init could change, pass in a dataframe with specific keys and LP processing done earlier
@@ -91,7 +91,8 @@ class PlotSignal:
         fig.tight_layout()
         return fig, axs
 
-    def raw_processed_figure2(self):
+
+    def set_fig_layout2(self):
         str_mosaic = \
             '''
             AA
@@ -99,6 +100,11 @@ class PlotSignal:
             DE
             '''
         fig, axd = plt.subplot_mosaic(str_mosaic, constrained_layout=True, figsize=(14, 8))
+        return fig, axd
+
+
+    def raw_processed_figure2(self, axd):
+
         plot_raw_signals(
             self.raw_signal, self.times, self.raw_isosbestic, ax=axd['A'], title='Raw'
         )
