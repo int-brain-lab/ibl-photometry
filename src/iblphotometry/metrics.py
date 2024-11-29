@@ -40,8 +40,10 @@ def percentile_dist(A: nap.Tsd | np.ndarray, pc: tuple = (50, 95), axis=-1) -> f
     """
     if isinstance(A, nap.Tsd):  # "overloading"
         P = np.percentile(z(A.values), pc)
-    if isinstance(A, np.ndarray):
+    elif isinstance(A, np.ndarray):
         P = np.percentile(z(A), pc, axis=axis)
+    else:
+        raise TypeError("A must be nap.Tsd or np.ndarray.")
     return P[1] - P[0]
 
 
