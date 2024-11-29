@@ -326,7 +326,7 @@ Plotting functions requiring behavioral events
 """
 
 
-def plot_psth(psth_mat, time, axs=None, vmin=-0.01, vmax=0.01, cmap='PuOr', title=None):
+def plot_psth(psth_mat, time, axs=None, vmin=None, vmax=None, cmap='PuOr', title=None):
     # if time is None:
     #     time = np.arange(0, psth_mat.shape[0]) / fs
     if axs is None:
