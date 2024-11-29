@@ -57,7 +57,7 @@ class PhotometryLoader:
 
 class KceniaLoader(PhotometryLoader):
     # soon do be OBSOLETE
-    def _load_data_from_eid(self, eid: str):
+    def _load_data_from_eid(self, eid: str, rename=True):
         session_path = self.one.eid2path(eid)
         pnames = self._eid2pnames(eid)
 
