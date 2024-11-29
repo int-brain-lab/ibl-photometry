@@ -92,14 +92,18 @@ class PlotSignal:
         return fig, axs
 
 
-    def set_fig_layout2(self):
+    def set_fig_layout2(self, figure=None):
         str_mosaic = \
             '''
             AA
             BB
             DE
             '''
-        fig, axd = plt.subplot_mosaic(str_mosaic, constrained_layout=True, figsize=(14, 8))
+        if figure is None:
+            fig, axd = plt.subplot_mosaic(str_mosaic, constrained_layout=True, figsize=(14, 8))  # , constrained_layout=True
+        else:
+            axd = figure.subplot_mosaic(str_mosaic)
+            fig = figure
         return fig, axd
 
 
