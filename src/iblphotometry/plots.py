@@ -104,6 +104,9 @@ class PlotSignal:
         else:
             axd = figure.subplot_mosaic(str_mosaic)
             fig = figure
+
+        axd['A'].sharex(axd['B'])
+
         return fig, axd
 
 
