@@ -98,17 +98,20 @@ def from_pqt(
     raw_df = pd.read_parquet(signal_pqt_path)
     if locations_pqt_path is not None:
         locations_df = pd.read_parquet(locations_pqt_path)
-        data_columns = list(locations_df.index)
+        data_columns = (list(locations_df.index),)
+        rename = locations_df['brain_region'].to_dict()
     else:
         warnings.warn(
             'loading a photometry.signal.pqt file without its corresponding photometryROI.locations.pqt'
         )
         data_columns = None
+        rename = None
 
     read_config = dict(
         data_columns=data_columns,
         time_column='times',
         channel_column='name',
+        rename=rename,
     )
 
     return from_dataframe(raw_df, **read_config)
