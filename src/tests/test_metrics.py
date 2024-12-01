@@ -33,15 +33,12 @@ class TestMetrics(unittest.TestCase):
 
     def test_metrics(self):
         # get data
-        raw_tfs = fio.from_pqt(signal_pqt_path)
+        raw_tfs = fio.from_pqt(signal_pqt_path, photometryROI_locations_pqt_path)
         trials = pd.read_parquet(trials_table_file_path)
 
-        signal_bands = list(raw_tfs.keys())
-        raw_tf = raw_tfs[signal_bands[0]]
-        raw_tsd = raw_tf[:, 0]
-
         # testing metrics with nap.Tsd
-        # metrics.bleaching_tau(raw_tsd)
+        raw_tsd = raw_tfs['GCaMP']['DMS']
+        metrics.bleaching_tau(raw_tsd)
         metrics.n_spikes(raw_tsd)
         metrics.detect_spikes(raw_tsd)
         metrics.n_outliers(raw_tsd)
@@ -60,5 +57,16 @@ class TestMetrics(unittest.TestCase):
             # 'intervals_1',
         ]
         for event_name in BEHAV_EVENTS:
-            metrics.ttest_pre_post(raw_tf, trials, event_name)
+            metrics.ttest_pre_post(raw_tsd, trials, event_name)
             metrics.has_responses(raw_tsd, trials, BEHAV_EVENTS)
+
+        # testing metrics with np.array
+        raw_array = raw_tfs['GCaMP']['DMS'].d
+        # metrics.bleaching_tau(raw_tsd)
+        metrics.n_spikes(raw_array)
+        metrics.detect_spikes(raw_array)
+        metrics.n_outliers(raw_array)
+        metrics.n_unique_samples(raw_array)
+        metrics.signal_asymmetry(raw_array)
+        metrics.signal_skew(raw_array)
+        metrics.percentile_dist(raw_array)
