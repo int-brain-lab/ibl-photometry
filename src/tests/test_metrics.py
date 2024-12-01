@@ -1,31 +1,8 @@
-from pathlib import Path
 import unittest
 import iblphotometry.io as fio
 import iblphotometry.metrics as metrics
 import pandas as pd
-
-data_folder = Path(__file__).parent / 'data'
-
-# TODO make this a list and have a few
-# this is currently ony alejandro
-session_folder = Path('wittenlab/Subjects/fip_40/2023-05-18/001')
-signal_pqt_path_rel = Path('alf/photometry/photometry.signal.pqt')
-photometryROI_locations_pqt_path_rel = Path(
-    'alf/photometry/photometryROI.locations.pqt'
-)
-raw_neurophotometrics_file_path_rel = Path(
-    'raw_photometry_data/_neurophotometrics_fpData.raw.pqt'
-)
-
-signal_pqt_path = data_folder / session_folder / signal_pqt_path_rel
-photometryROI_locations_pqt_path = (
-    data_folder / session_folder / photometryROI_locations_pqt_path_rel
-)
-raw_neurophotometrics_file_path = (
-    data_folder / session_folder / raw_neurophotometrics_file_path_rel
-)
-
-trials_table_file_path = data_folder / session_folder / 'alf/_ibl_trials.table.pqt'
+import data_paths
 
 
 class TestMetrics(unittest.TestCase):
@@ -33,11 +10,14 @@ class TestMetrics(unittest.TestCase):
 
     def test_metrics(self):
         # get data
-        raw_tfs = fio.from_pqt(signal_pqt_path, photometryROI_locations_pqt_path)
-        trials = pd.read_parquet(trials_table_file_path)
+        raw_tfs = fio.from_pqt(
+            data_paths.signal_pqt, data_paths.photometryROI_locations_pqt
+        )
+        trials = pd.read_parquet(data_paths.trials_table_pqt)
 
         # testing metrics with nap.Tsd
         raw_tsd = raw_tfs['GCaMP']['DMS']
+
         metrics.bleaching_tau(raw_tsd)
         metrics.n_spikes(raw_tsd)
         metrics.detect_spikes(raw_tsd)
