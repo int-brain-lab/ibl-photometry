@@ -3,6 +3,7 @@ import iblphotometry.io as fio
 import numpy as np
 import tests.base_tests
 
+
 class TestLoaders(tests.base_tests.PhotometryDataTestCase):
     # think here about the possible use cases
 
@@ -22,5 +23,7 @@ class TestLoaders(tests.base_tests.PhotometryDataTestCase):
     # from pqt files as they are returned from ONE by .load_dataset()
     def test_from_pqt(self):
         fio.from_pqt(self.paths['photometry_signal_pqt'])
-        fio.from_pqt(self.paths['photometry_signal_pqt'], self.paths['photometryROI_locations_pqt'])
-
+        fio.from_pqt(
+            self.paths['photometry_signal_pqt'],
+            self.paths['photometryROI_locations_pqt'],
+        )

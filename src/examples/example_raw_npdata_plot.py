@@ -18,6 +18,7 @@ raw_isosbestic = td['Isosbestic'][column].d
 # Preprocess signal TODO change to use the proper pipeline
 import iblphotometry.preprocessing as ffpr
 import numpy as np
+
 fs = 1 / np.nanmedian(np.diff(times))
 processed_signal = ffpr.mad_raw_signal(raw_signal, fs)
 
