@@ -3,4 +3,5 @@ numpy
 matplotlib
 pytest
 scipy
+pandera
 pynapple
