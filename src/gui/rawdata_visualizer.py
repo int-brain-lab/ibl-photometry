@@ -2,10 +2,11 @@ import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QTableWidget, \
-    QTableWidgetItem, QComboBox, QGridLayout
+    QTableWidgetItem, QComboBox, QGridLayout, QLineEdit
 from PyQt5.QtCore import Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
+from pydantic.v1 import NoneStr
 
 from iblphotometry.io import from_raw_neurophotometrics
 import iblphotometry.plots as plots
@@ -22,6 +23,9 @@ class DataFrameVisualizerApp(QWidget):
         self.df = None  # Original DataFrame
         self.times = None
         self.dfiso = None  # Isosbestic Dataframe
+
+        self.plot_time_index = None
+
         self.filtered_df = None  # Filtered DataFrame used for plotting only
         self.init_ui()
 
@@ -57,7 +61,22 @@ class DataFrameVisualizerApp(QWidget):
         main_layout.addLayout(file_layout)
         # main_layout.addWidget(self.table)
 
-        # Set up plots layout (3 subplots in a grid)
+        # Input boxes for time range
+        time_layout = QHBoxLayout()
+        self.start_time_edit = QLineEdit(self)
+        self.start_time_edit.setPlaceholderText('Start Time (float)')
+        self.end_time_edit = QLineEdit(self)
+        self.end_time_edit.setPlaceholderText('End Time (float)')
+        time_layout.addWidget(self.start_time_edit)
+        time_layout.addWidget(self.end_time_edit)
+        # Button to apply time range filter
+        self.apply_button = QPushButton('Apply Time Range', self)
+        self.apply_button.clicked.connect(self.apply_time_range)
+        main_layout.addLayout(time_layout)
+        main_layout.addWidget(self.apply_button)
+
+
+        # Set up plots layout
         self.plot_layout = QGridLayout()
         self.plotobj = plots.PlotSignal()
         self.figure, self.axes = self.plotobj.set_fig_layout2()
@@ -90,6 +109,8 @@ class DataFrameVisualizerApp(QWidget):
                 if 'GCaMP' in self.td.keys():
                     self.df = self.td['GCaMP'].as_dataframe()
                     self.times = self.td['GCaMP'].t
+                    self.plot_time_index = np.arange(0, len(self.times))
+                    self.filtered_df = None
                 else:
                     raise ValueError("No GCaMP found")
 
@@ -119,6 +140,34 @@ class DataFrameVisualizerApp(QWidget):
             #     for col in range(len(self.df.columns)):
             #         self.table.setItem(row, col, QTableWidgetItem(str(self.df.iloc[row, col])))
 
+    def apply_time_range(self):
+        """Apply the time range filter and update the plot."""
+        start_time_str = self.start_time_edit.text()
+        end_time_str = self.end_time_edit.text()
+        try:
+            # Convert the start and end time inputs to numbers (float or int)
+
+            if start_time_str == '':
+                start_time = 0
+            else:
+                start_time = float(start_time_str)
+
+            if end_time_str == '':
+                end_time = self.times[len(self.times)-1]
+            else:
+                end_time = float(end_time_str)
+            # Filter dataframe based on user input
+            indx_time = (self.times >= start_time) & (self.times <= end_time)
+
+
+            if len(indx_time) == 0:
+                print("No data in the specified range.")
+            else:
+                self.plot_time_index = indx_time
+                self.update_plots()
+        except ValueError:
+            print("Invalid time format. Please enter a valid time point in the format of a float.")
+
     def update_column_selector(self):
         if self.df is not None:
             # Populate the column selector with column names from the original dataframe
@@ -131,10 +180,10 @@ class DataFrameVisualizerApp(QWidget):
 
         if selected_column and self.df is not None:
 
-            raw_signal = self.df[selected_column]
-            times = self.times
+            raw_signal = self.df[selected_column].values[self.plot_time_index]
+            times = self.times[self.plot_time_index]
             if self.dfiso is not None:
-                raw_isosbestic = self.dfiso[selected_column]
+                raw_isosbestic = self.dfiso[selected_column].values[self.plot_time_index]
             else:
                 raw_isosbestic = None
 
@@ -144,10 +193,12 @@ class DataFrameVisualizerApp(QWidget):
             if self.filtered_df is None:
                 processed_signal = None
             else:
-                processed_signal = self.filtered_df[selected_column]
+                processed_signal = self.filtered_df[selected_column].values[self.plot_time_index]
 
-            self.plotobj.set_data(raw_signal=raw_signal, times=times,
-                                  raw_isosbestic=raw_isosbestic, processed_signal=processed_signal)
+            self.plotobj.set_data(raw_signal=raw_signal,
+                                  times=times,
+                                  raw_isosbestic=raw_isosbestic,
+                                  processed_signal=processed_signal)
             self.plotobj.raw_processed_figure2(self.axes)
 
             # Redraw the canvas
@@ -175,7 +226,10 @@ class DataFrameVisualizerApp(QWidget):
         filter_option = self.filter_selector.currentText()
 
         if filter_option == "Select Filter":
-            return  # No filter selected, just return
+            self.filtered_df = None
+            # After applying the filter, update the plots
+            self.update_plots()
+
 
         # Apply the appropriate filter to the dataframe and get the modified data
         if filter_option == "Filter MAD":
