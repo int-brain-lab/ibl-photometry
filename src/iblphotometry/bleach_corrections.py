@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 import warnings
 import numpy as np
-import pynapple as nap
+import pandas as pd
 from scipy.optimize import minimize
 from scipy.stats.distributions import norm
 from scipy.stats import gaussian_kde
@@ -11,14 +11,14 @@ from iblphotometry.helpers import filt
 from inspect import signature
 
 
-def correct(signal: nap.Tsd, reference: nap.Tsd, mode: str = 'subtract') -> nap.Tsd:
+def correct(signal: pd.Series, reference: pd.Series, mode: str = 'subtract') -> pd.Series:
     if mode == 'subtract':
         signal_corrected = signal.values - reference.values
     if mode == 'divide':
         signal_corrected = signal.values / reference.values
     if mode == 'subtract-divide':
         signal_corrected = (signal.values - reference.values) / reference.values
-    return nap.Tsd(t=signal.times(), d=signal_corrected)
+    return pd.Series(signal_corrected, index=signal.index.values)
 
 
 def mse_loss(p, x, y, fun):
@@ -240,8 +240,8 @@ class Regression:
         y_hat = self.model.eq(x, *self.popt)
         if return_type == 'numpy':
             return y_hat
-        if return_type == 'pynapple':
-            return nap.Tsd(t=x, d=y_hat)
+        if return_type == 'pandas':
+            return pd.Series(y_hat, index=x)
 
 
 class BleachCorrection:
@@ -258,9 +258,9 @@ class BleachCorrection:
         )
         self.correction_method = correction_method
 
-    def correct(self, F: nap.Tsd):
-        self.regression.fit(F.times(), F.values)
-        ref = self.regression.predict(F.times(), return_type='pynapple')
+    def correct(self, F: pd.Series):
+        self.regression.fit(F.index.values, F.values)
+        ref = self.regression.predict(F.index.values, return_type='pandas')
         return correct(F, ref, mode=self.correction_method)
 
 
@@ -282,14 +282,14 @@ class IsosbesticCorrection:
 
     def correct(
         self,
-        F_ca: nap.Tsd,
-        F_iso: nap.Tsd,
+        F_ca: pd.Series,
+        F_iso: pd.Series,
     ):
         if self.lowpass_isosbestic is not None:
             F_iso = filt(F_iso, **self.lowpass_isosbestic)
 
         self.reg.fit(F_iso.values, F_ca.values)
-        F_iso_fit = self.reg.predict(F_iso.values, return_type='pynapple')
+        F_iso_fit = self.reg.predict(F_iso.values, return_type='pandas')
 
         return correct(F_ca, F_iso_fit, mode=self.correction_method)
 
@@ -303,23 +303,23 @@ class LowpassBleachCorrection:
         self.filter_params = filter_params
         self.correction_method = correction_method
 
-    def correct(self, F: nap.Tsd):
+    def correct(self, F: pd.Series):
         F_filt = filt(F, **self.filter_params)
         return correct(F, F_filt, mode=self.correction_method)
 
 
 # convenience functions for pipelines
-def lowpass_bleachcorrect(F: nap.Tsd, **kwargs):
+def lowpass_bleachcorrect(F: pd.Series, **kwargs):
     bc = LowpassBleachCorrection(**kwargs)
     return bc.correct(F)
 
 
-def exponential_bleachcorrect(F: nap.Tsd, **kwargs):
+def exponential_bleachcorrect(F: pd.Series, **kwargs):
     model = DoubleExponDecay()
     ec = BleachCorrection(model, **kwargs)
     return ec.correct(F)
 
 
-def isosbestic_correct(F_sig: nap.TsdFrame, F_ref: nap.TsdFrame, **kwargs):
+def isosbestic_correct(F_sig: pd.DataFrame, F_ref: pd.DataFrame, **kwargs):
     ic = IsosbesticCorrection(**kwargs)
     return ic.correct(F_sig, F_ref)

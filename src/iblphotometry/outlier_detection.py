@@ -1,6 +1,5 @@
 import numpy as np
 from scipy.stats import t
-import pynapple as nap
 from ibldsp.utils import WindowGenerator
 from copy import copy
 import pandas as pd
@@ -8,7 +7,7 @@ from scipy.stats import gaussian_kde as kde
 import warnings
 
 
-def _grubbs_single(y, alpha=0.005, mode='median'):
+def _grubbs_single(y: np.array, alpha: float =0.005, mode: str='median') -> bool:
     # to apply a single pass of grubbs outlier detection
     # see https://en.wikipedia.org/wiki/Grubbs%27s_test
 
@@ -28,7 +27,7 @@ def _grubbs_single(y, alpha=0.005, mode='median'):
         return False
 
 
-def grubbs_test(y, alpha=0.005, mode='median'):
+def grubbs_test(y: np.array, alpha: float =0.005, mode:str='median'):
     # apply grubbs test iteratively until no more outliers are found
     outliers = []
     while _grubbs_single(y, alpha=alpha):
@@ -88,15 +87,15 @@ def fillnan_kde(y: np.array, w: int = 25):
         return y
 
 
-def remove_outliers(F: nap.Tsd, w_size: int = 1000, alpha: float = 0.005, w: int = 25):
-    y, t = F.values, F.t
+def remove_outliers(F: pd.Series, w_size: int = 1000, alpha: float = 0.005, w: int = 25):
+    y, t = F.values, F.index.values
     y = copy(y)
     outliers = detect_outliers(y, w_size=w_size, alpha=alpha)
     while len(outliers) > 0:
         y[outliers] = np.nan
         y = fillnan_kde(y, w=w)
         outliers = detect_outliers(y, w_size=w_size, alpha=alpha)
-    return nap.Tsd(t=t, d=y)
+    return pd.Series(y, index=t)
 
 
 def detect_spikes(t: np.array, sd: int = 5):
@@ -105,8 +104,8 @@ def detect_spikes(t: np.array, sd: int = 5):
     return np.where(bad_inds)[0]
 
 
-def remove_spikes(F: nap.Tsd, sd: int = 5, w: int = 25):
-    y, t = F.values, F.t
+def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25):
+    y, t = F.values, F.index.values
     y = copy(y)
     outliers = detect_spikes(y, sd=sd)
     y[outliers] = np.nan
@@ -120,4 +119,4 @@ def remove_spikes(F: nap.Tsd, sd: int = 5, w: int = 25):
             y[outliers] = np.nanmedian(y)
             warnings.warn('KDE fillnan failed, using global median')  # TODO logger
 
-    return nap.Tsd(t=t, d=y)
+    return pd.Series(y, index=t)

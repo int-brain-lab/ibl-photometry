@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import signal
-import pynapple as nap
+import pandas as pd
 from ibldsp.utils import WindowGenerator
 from iblutil.numerical import rcoeff
 
@@ -37,13 +37,13 @@ def mad(A: np.array):
 
 
 # TODO move to processing
-def madscore(F: nap.Tsd):
-    y, t = F.values, F.times()
-    return nap.Tsd(t=t, d=mad(y))
+def madscore(F: pd.Series):
+    y, t = F.values, F.index.values
+    return pd.Series(mad(y), index=t)
 
 
 # TODO move to processing
-def zscore(F: nap.Tsd, mode='classic'):
+def zscore(F: pd.Series, mode='classic'):
     """pynapple friendly zscore
 
     Args:
@@ -52,13 +52,13 @@ def zscore(F: nap.Tsd, mode='classic'):
     Returns:
         _type_: z-scored nap.Tsd
     """
-    y, t = F.values, F.times()
+    y, t = F.values, F.index.values
     # mu, sig = np.average(y), np.std(y)
-    return nap.Tsd(t=t, d=z(y, mode=mode))
+    return pd.Series(z(y, mode=mode), index=t)
 
 
 # TODO move to processing
-def filt(F: nap.Tsd, N: int, Wn: float, fs: float = None, btype='low'):
+def filt(F: pd.Series, N: int, Wn: float, fs: float = None, btype='low'):
     """a pynapple friendly wrapper for scipy.signal.butter and sosfiltfilt
 
     Args:
@@ -71,12 +71,12 @@ def filt(F: nap.Tsd, N: int, Wn: float, fs: float = None, btype='low'):
     Returns:
         _type_: _description_
     """
-    y, t = F.values, F.times()
+    y, t = F.values, F.index.values
     if fs is None:
         fs = 1 / np.median(np.diff(t))
     sos = signal.butter(N, Wn, btype, fs=fs, output='sos')
     y_filt = signal.sosfiltfilt(sos, y)
-    return nap.Tsd(t=t, d=y_filt)
+    return pd.Series(y_filt, index=t)
 
 
 def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):

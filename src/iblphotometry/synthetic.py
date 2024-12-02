@@ -5,7 +5,7 @@ This module is useful to create synthetic data for testing and benchmarking purp
 import numpy as np
 import pandas as pd
 import scipy.signal
-import pynapple as nap
+
 
 
 def synthetic101(fs=30, rl=1000, event_rate=0.2):
@@ -37,7 +37,7 @@ def synthetic101(fs=30, rl=1000, event_rate=0.2):
     ), event_times
 
 
-def generate_TsdFrame(sigma: float = 0.01):
+def generate_dataframe(sigma: float = 0.01):
     # to generate synthetic data in the internal data representation in dict of nap.TsdFrames
     df, _ = synthetic101(30, 1000, 0.2)
     df = df.set_index('times')
@@ -46,16 +46,9 @@ def generate_TsdFrame(sigma: float = 0.01):
     if sigma is not None:
         df[['raw_calcium', 'raw_isosbestic']] += np.random.randn(*df.shape) * sigma
 
-    raw_tfs = dict(
-        signal=nap.TsdFrame(
-            t=df.index,
-            d=df['raw_calcium'],
-            columns=['Region01'],
-        ),
-        reference=nap.TsdFrame(
-            t=df.index,
-            d=df['raw_isosbestic'],
-            columns=['Region01'],
-        ),
+    raw_dfs = dict(
+        raw_calcium=pd.DataFrame(df['raw_calcium'].values, index=df.index, columns=['Region01']),
+        raw_isosbestic=pd.DataFrame(df['raw_isosbestic'].values, index=df.index, columns=['Region01']),
     )
-    return raw_tfs
+
+    return raw_dfs
