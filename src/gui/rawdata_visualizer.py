@@ -45,8 +45,8 @@ class DataFrameVisualizerApp(QWidget):
 
         # Add filter dropdown menu
         self.filter_selector = QComboBox(self)
-        self.filter_selector.addItem("Select Filter")
-        self.filter_selector.addItem("Filter MAD")
+        self.filter_selector.addItem('Select Filter')
+        self.filter_selector.addItem('Filter MAD')
         # self.filter_selector.addItem("Filter CAD")
         # self.filter_selector.addItem("Filter JOVE")
         self.filter_selector.currentIndexChanged.connect(self.apply_filter)
@@ -94,17 +94,20 @@ class DataFrameVisualizerApp(QWidget):
 
     def load_file(self):
         # Open a file dialog to choose the CSV or PQT file
-        file_path, _ = QFileDialog.getOpenFileName(self,
-                                                   'Open File',
-                                                   '',
-                                                   'CSV and PQT Files (*.csv *.pqt);;All Files (*)')
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 'Open File', '', 'CSV and PQT Files (*.csv *.pqt);;All Files (*)'
+        )
         if file_path:
             # Load the file into a DataFrame based on its extension
             try:
-                if file_path.endswith('.csv') or file_path.endswith('.pqt') or file_path.endswith('.parquet'):
+                if (
+                    file_path.endswith('.csv')
+                    or file_path.endswith('.pqt')
+                    or file_path.endswith('.parquet')
+                ):
                     self.td = from_raw_neurophotometrics(file_path)
                 else:
-                    raise ValueError("Unsupported file format")
+                    raise ValueError('Unsupported file format')
 
                 if 'GCaMP' in self.td.keys():
                     self.df = self.td['GCaMP'].as_dataframe()
@@ -112,7 +115,7 @@ class DataFrameVisualizerApp(QWidget):
                     self.plot_time_index = np.arange(0, len(self.times))
                     self.filtered_df = None
                 else:
-                    raise ValueError("No GCaMP found")
+                    raise ValueError('No GCaMP found')
 
                 if 'Isosbestic' in self.td.keys():
                     self.dfiso = self.td['Isosbestic'].as_dataframe()
@@ -129,7 +132,7 @@ class DataFrameVisualizerApp(QWidget):
                 self.filter_selector.setCurrentIndex(0)  # Reset to "Select Filter"
 
             except Exception as e:
-                print(f"Error loading file: {e}")
+                print(f'Error loading file: {e}')
 
     # TODO this does not work with pynapple as format, convert back to pandas DF
     # def display_dataframe(self):
@@ -139,9 +142,9 @@ class DataFrameVisualizerApp(QWidget):
     #         self.table.setColumnCount(len(self.df.columns))
     #         self.table.setHorizontalHeaderLabels(self.df.columns)
 
-            # for row in range(len(self.df)):
-            #     for col in range(len(self.df.columns)):
-            #         self.table.setItem(row, col, QTableWidgetItem(str(self.df.iloc[row, col])))
+    # for row in range(len(self.df)):
+    #     for col in range(len(self.df.columns)):
+    #         self.table.setItem(row, col, QTableWidgetItem(str(self.df.iloc[row, col])))
 
     def apply_time_range(self):
         """Apply the time range filter and update the plot."""
@@ -208,7 +211,6 @@ class DataFrameVisualizerApp(QWidget):
             self.canvas.draw()
 
     def clear_plots(self):
-
         self.figure.clear()
         _, self.axes = self.plotobj.set_fig_layout2(figure=self.figure)
 
@@ -235,7 +237,7 @@ class DataFrameVisualizerApp(QWidget):
 
 
         # Apply the appropriate filter to the dataframe and get the modified data
-        if filter_option == "Filter MAD":
+        if filter_option == 'Filter MAD':
             self.filtered_df = self.filter_mad(self.df)
         # elif filter_option == "Filter CAD":
         #     self.filtered_df = self.filter_cad(self.df)

@@ -1,39 +1,54 @@
-# import pandas as pd
-# from pathlib import Path
-# from one.api import ONE
-# from iblphotometry.preprocessing import jove2019
-# from iblphotometry.metrics import ttest_pre_post
+import unittest
+import iblphotometry.io as fio
+import iblphotometry.metrics as metrics
+import pandas as pd
+
+import tests.base_tests
 
 
-# def test_ttest_pre_post():
-#     # Get data
-#     one = ONE()
-#     eid = '77a6741c-81cc-475f-9454-a9b997be02a4'
+class TestMetrics(tests.base_tests.PhotometryDataTestCase):
+    # think here about the possible use cases
 
-#     # Load NP file locally - TODO: this is local directory to Github
-#     # nph_path = Path(f'../src/tests/data/{eid}')
-#     nph_path = Path(f'/Users/gaellechapuis/Desktop/FiberPhotometry/{eid}')
-#     df_nph = pd.read_parquet(nph_path.joinpath(f'raw_photometry.pqt'))
+    def test_metrics(self):
+        # get data
+        raw_tfs = fio.from_pqt(
+            self.paths['photometry_signal_pqt'],
+            self.paths['photometryROI_locations_pqt'],
+        )
+        trials = pd.read_parquet(self.paths['trials_table_pqt'])
 
-#     # Load trial from ONE
-#     a = one.load_object(eid, 'trials')
-#     df_trials = a.to_df()
+        # testing metrics with nap.Tsd
+        raw_tsd = raw_tfs['GCaMP']['DMS']
 
-#     # Ugly way to get sampling frequency
-#     time_diffs = df_nph["times"].diff().dropna()
-#     fs = 1 / time_diffs.median()
+        metrics.bleaching_tau(raw_tsd)
+        metrics.n_spikes(raw_tsd)
+        metrics.detect_spikes(raw_tsd)
+        metrics.n_outliers(raw_tsd)
+        metrics.n_unique_samples(raw_tsd)
+        metrics.signal_asymmetry(raw_tsd)
+        metrics.signal_skew(raw_tsd)
+        metrics.percentile_dist(raw_tsd)
 
-#     # Process signal
-#     df_nph['calcium_jove2019'] = jove2019(df_nph["raw_calcium"], df_nph["raw_isosbestic"], fs=fs)
+        BEHAV_EVENTS = [
+            # 'stimOn_times',
+            # 'goCue_times',
+            # 'response_times',
+            'feedback_times',
+            # 'firstMovement_times',
+            # 'intervals_0',
+            # 'intervals_1',
+        ]
+        for event_name in BEHAV_EVENTS:
+            metrics.ttest_pre_post(raw_tsd, trials, event_name)
+            metrics.has_responses(raw_tsd, trials, BEHAV_EVENTS)
 
-#     # Get event
-#     event = 'feedback_times'
-#     calcium = df_nph['calcium_jove2019'].values
-#     times = df_nph['times'].values
-#     t_events = df_trials[event]
-
-#     pre_w = [-1, -0.2]  # seconds
-#     post_w = [0.2, 1]  # seconds
-
-#     pass_test = ttest_pre_post(calcium, times, t_events, fs, pre_w=pre_w, post_w=post_w)
-#     assert pass_test == True
+        # testing metrics with np.array
+        raw_array = raw_tfs['GCaMP']['DMS'].d
+        # metrics.bleaching_tau(raw_tsd)
+        metrics.n_spikes(raw_array)
+        metrics.detect_spikes(raw_array)
+        metrics.n_outliers(raw_array)
+        metrics.n_unique_samples(raw_array)
+        metrics.signal_asymmetry(raw_array)
+        metrics.signal_skew(raw_array)
+        metrics.percentile_dist(raw_array)

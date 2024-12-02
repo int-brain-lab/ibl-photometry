@@ -8,7 +8,7 @@ from iblphotometry.helpers import z, filt
 from iblphotometry import sliding_operations
 from iblphotometry import bleach_corrections
 from iblphotometry.outlier_detection import remove_spikes
-from iblphotometry.bleach_corrections import lowpass_bleachcorrect
+from iblphotometry.bleach_corrections import lowpass_bleachcorrect, isosbestic_correct
 from iblphotometry.sliding_operations import sliding_mad
 
 # TODO this will probably be refactored to to processing
@@ -66,6 +66,20 @@ sliding_mad_pipeline = [
         ),
     ),
     (sliding_mad, dict(w_len=120, overlap=90)),
+    (zscore, dict(mode='median')),
+]
+
+isosbestic_correction_pipeline = [
+    (remove_spikes, dict(sd=5)),
+    (
+        isosbestic_correct,
+        dict(
+            needs_reference=True,
+            correction_method='subtract',
+            regression_method='huber',
+            lowpass_isosbestic=dict(N=3, Wn=0.01, btype='lowpass'),
+        ),
+    ),
     (zscore, dict(mode='median')),
 ]
 

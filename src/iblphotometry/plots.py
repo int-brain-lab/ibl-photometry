@@ -41,6 +41,9 @@ Loader objects for plotting
 
 
 class PlotSignal:
+    def __init__(self, *args, **kwargs):
+        self.set_data(*args, **kwargs)
+
     def set_data(
         self, raw_signal, times, raw_isosbestic=None, processed_signal=None, fs=None
     ):
@@ -76,7 +79,12 @@ class PlotSignal:
                 ax=axs[1, 0],
                 title='Processed Signal',
             )
-            plot_psd(self.processed_signal, self.fs, ax=axs[2, 0], title='Processed Signal PSD')
+            plot_psd(
+                self.processed_signal,
+                self.fs,
+                ax=axs[2, 0],
+                title='Processed Signal PSD',
+            )
         # --- Column 1
         plot_raw_signals(
             self.lp_signal,
@@ -92,16 +100,16 @@ class PlotSignal:
         fig.tight_layout()
         return fig, axs
 
-
     def set_fig_layout2(self, figure=None):
-        str_mosaic = \
-            '''
+        str_mosaic = """
             AA
             BB
             DE
-            '''
+            """
         if figure is None:
-            fig, axd = plt.subplot_mosaic(str_mosaic, constrained_layout=True, figsize=(14, 8))  # , constrained_layout=True
+            fig, axd = plt.subplot_mosaic(
+                str_mosaic, constrained_layout=True, figsize=(14, 8)
+            )  # , constrained_layout=True
         else:
             axd = figure.subplot_mosaic(str_mosaic)
             fig = figure
@@ -110,9 +118,7 @@ class PlotSignal:
 
         return fig, axd
 
-
     def raw_processed_figure2(self, axd):
-
         plot_raw_signals(
             self.raw_signal, self.times, self.raw_isosbestic, ax=axd['A'], title='Raw'
         )
@@ -123,12 +129,18 @@ class PlotSignal:
                 ax=axd['B'],
                 title='Processed Signal',
             )
-            plot_psd(self.processed_signal, self.fs, ax=axd['D'], title='Processed Signal PSD')
+            plot_psd(
+                self.processed_signal,
+                self.fs,
+                ax=axd['D'],
+                title='Processed Signal PSD',
+            )
 
         if self.raw_isosbestic is not None:
             plot_photometry_correlation(
                 self.lp_signal, self.lp_isosbestic, self.times, ax=axd['E']
             )
+
 
 class PlotSignalResponse:
     def __init__(self, trials, processed_signal, times, fs=None, event_window=np.array([-1, 2])):
@@ -312,7 +324,7 @@ def plot_psd(signal, fs, ax=None, title=None, **line_kwargs):
     else:
         fig = ax.get_figure()
     line_kwargs.setdefault('linewidth', 2)
-    ax.psd(signal, Fs = fs, **line_kwargs)
+    ax.psd(signal, Fs=fs, **line_kwargs)
     # TODO the freq x-axis is currently not informative
     ax.set_title(title)
 
@@ -388,7 +400,8 @@ def plot_iblevents_tick(ax, trials):
 
     return ax
 
-'''
+
+"""
 def plot_photometry_traces(
     photometry,
     event_times=None,
@@ -469,7 +482,7 @@ def plot_photometry_traces(
     plt.show()
     return fig, axd
 
-'''
+"""
 
 # from brainbox.task.trials import find_trial_ids
 # trial_idx, dividers = find_trial_ids(trials, sort='choice')
