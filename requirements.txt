@@ -1,5 +1,5 @@
-ibllib @ git+https://github.com/int-brain-lab/ibllib/tree/develop
-iblrig @ git+https://github.com/int-brain-lab/iblrig/tree/iblrigv8dev
+ibllib @ git+https://github.com/int-brain-lab/ibllib@develop
+iblrig @ git+https://github.com/int-brain-lab/iblrig@iblrigv8dev
 numpy
 matplotlib
 pytest
