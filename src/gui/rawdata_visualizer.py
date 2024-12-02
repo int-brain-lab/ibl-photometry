@@ -125,6 +125,9 @@ class DataFrameVisualizerApp(QWidget):
                 # Load into Pynapple dataframe
                 self.td = from_raw_neurophotometrics(file_path)
 
+                # Set filter combo box
+                self.filter_selector.setCurrentIndex(0)  # Reset to "Select Filter"
+
             except Exception as e:
                 print(f"Error loading file: {e}")
 
