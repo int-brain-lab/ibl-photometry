@@ -17,7 +17,7 @@ LINE_COLOURS = {
 
 PSTH_EVENTS = {
     'feedback_times': 'Feedback',
-    'stimOnTrigger_times': 'Stim on',
+    'stimOn_times': 'Stim on',
     'firstMovement_times': 'First move',
 }
 
@@ -209,7 +209,7 @@ class PlotSignalResponse:
         fig.tight_layout()
         return fig, axs
 
-    def plot_processed_trialtick(self, event_key='stimOnTrigger_times'):
+    def plot_processed_trialtick(self, event_key='stimOn_times'):
         fig, ax = plt.subplots(1, 1)
         plt.figure(figsize=(10, 6))
         events = self.trials[event_key]

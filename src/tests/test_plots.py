@@ -47,11 +47,11 @@ class TestPlotters(tests.base_tests.PhotometryDataTestCase):
 
         # Load NP file locally
         # df_nph = pd.read_parquet(nph_path.joinpath('raw_photometry.pqt'))
-        df_nph = pd.read_parquet(self.paths['photometry_signal_pqt'])
+        df_nph = pd.read_parquet(self.paths['raw_kcenia_pqt'])
         # Load trial from ONE
         # a = one.load_object(eid, 'trials')
         # df_trials = a.to_df()
-        df_trials = pd.read_parquet(self.paths['trials_table_pqt'])
+        df_trials = pd.read_parquet(self.paths['trials_table_kcenia_pqt'])
         # Get event
         t_events = df_trials[event]
 
@@ -93,7 +93,7 @@ class TestPlotters(tests.base_tests.PhotometryDataTestCase):
         # Load trial from ONE
         # eid = '77a6741c-81cc-475f-9454-a9b997be02a4'
         # trials = one.load_object(eid, 'trials')
-        trials = pd.read_parquet(self.paths['trials_table_pqt'])
+        trials = pd.read_parquet(self.paths['trials_table_kcenia_pqt'])
         plotobj = plots.PlotSignalResponse(trials, processed_signal, times)
         plotobj.plot_trialsort_psth()
         plotobj.plot_processed_trialtick()
