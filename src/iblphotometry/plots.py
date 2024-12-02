@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 import matplotlib.pyplot as plt
 import seaborn as sns
 import iblphotometry.preprocessing as ffpr
@@ -142,7 +143,7 @@ class PlotSignal:
 
 
 class PlotSignalResponse:
-    def __init__(self, trials, processed_signal, times, fs=None):
+    def __init__(self, trials, processed_signal, times, fs=None, event_window=np.array([-1, 2])):
         self.trials = trials
         self.times = times
         self.processed_signal = processed_signal
@@ -150,34 +151,55 @@ class PlotSignalResponse:
             self.fs = 1 / np.nanmedian(np.diff(times))
         else:
             self.fs = fs
+        self.event_window = event_window
         self.psth_dict = self.compute_events_psth()
 
-    def compute_events_psth(self, event_window=np.array([-1, 2])):
+    def compute_events_psth(self):
         psth_dict = dict()
         for event in PSTH_EVENTS.keys():
-            psth_dict[event], _ = psth(
+            try:
+                psth_dict[event], _ = psth(
+                    self.processed_signal,
+                    self.times,
+                    self.trials[event],
+                    self.fs,
+                    event_window=self.event_window,
+                )
+                # psth_dict[event] = psth_dict[event].T
+            except KeyError:
+                warnings.warn(f'Event {event} not found in trials table.')
+                continue
+
+        psth_dict['times'] = psth_times(self.fs, self.event_window)
+        return psth_dict
+
+    def update_psth_dict(self, event):     
+        try:
+            self.psth_dict[event], _ = psth(
                 self.processed_signal,
                 self.times,
                 self.trials[event],
                 self.fs,
-                event_window=event_window,
+                event_window=self.event_window,
             )
-            # psth_dict[event] = psth_dict[event].T
-
-        psth_dict['times'] = psth_times(self.fs, event_window)
-        return psth_dict
+        except KeyError:
+            warnings.warn(f'Event {event} not found in trials table.')
 
     def plot_trialsort_psth(self):
-        fig, axs = plt.subplots(2, len(PSTH_EVENTS.keys()))
+        fig, axs = plt.subplots(2, len(self.psth_dict.keys()) - 1)
 
-        for iaxs, event in enumerate(PSTH_EVENTS.keys()):
+        signal_keys = [k for k in self.psth_dict.keys() if k != 'times']
+        for iaxs, event in enumerate(signal_keys):
             axs_plt = [axs[0, iaxs], axs[1, iaxs]]
             plot_psth(
                 self.psth_dict[event],
                 self.psth_dict['times'],
-                axs=axs_plt,
-                title=PSTH_EVENTS[event],
+                axs=axs_plt
             )
+            if event in PSTH_EVENTS.keys():
+                axs_plt[0].set_title(PSTH_EVENTS[event])
+            else:
+                axs_plt[0].set_title(event)
 
             if iaxs == 0:
                 axs[0, iaxs].set_xlabel('Frames')
@@ -316,7 +338,7 @@ Plotting functions requiring behavioral events
 """
 
 
-def plot_psth(psth_mat, time, axs=None, vmin=-0.01, vmax=0.01, cmap='PuOr', title=None):
+def plot_psth(psth_mat, time, axs=None, vmin=None, vmax=None, cmap='PuOr', title=None):
     # if time is None:
     #     time = np.arange(0, psth_mat.shape[0]) / fs
     if axs is None:
