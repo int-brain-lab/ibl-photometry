@@ -7,7 +7,7 @@ from scipy.stats import ttest_ind
 from iblphotometry.helpers import z
 from iblphotometry.behavior import psth
 from iblphotometry.bleach_corrections import Regression, ExponDecay
-from iblphotometry.outlier_detection import detect_spikes, grubbs_sliding
+from iblphotometry.outlier_detection import detect_spikes, detect_outliers
 
 
 ## this approach works as well
@@ -103,9 +103,9 @@ def n_outliers(
     int: _description_
     """
     if isinstance(A, nap.Tsd):
-        return grubbs_sliding(A.values, w_size=w_size, alpha=alpha).shape[0]
+        return detect_outliers(A.values, w_size=w_size, alpha=alpha).shape[0]
     elif isinstance(A, np.ndarray):
-        return grubbs_sliding(A, w_size=w_size, alpha=alpha).shape[0]
+        return detect_outliers(A, w_size=w_size, alpha=alpha).shape[0]
     else:
         raise TypeError('A must be nap.Tsd or np.ndarray.')
 

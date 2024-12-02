@@ -2,18 +2,20 @@ import unittest
 import iblphotometry.io as fio
 import iblphotometry.metrics as metrics
 import pandas as pd
-import data_paths
+
+import tests.base_tests
 
 
-class TestMetrics(unittest.TestCase):
+class TestMetrics(tests.base_tests.PhotometryDataTestCase):
     # think here about the possible use cases
 
     def test_metrics(self):
         # get data
         raw_tfs = fio.from_pqt(
-            data_paths.signal_pqt, data_paths.photometryROI_locations_pqt
+            self.paths['photometry_signal_pqt'],
+            self.paths['photometryROI_locations_pqt'],
         )
-        trials = pd.read_parquet(data_paths.trials_table_pqt)
+        trials = pd.read_parquet(self.paths['trials_table_pqt'])
 
         # testing metrics with nap.Tsd
         raw_tsd = raw_tfs['GCaMP']['DMS']
