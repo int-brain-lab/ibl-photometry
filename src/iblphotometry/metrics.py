@@ -7,7 +7,7 @@ from scipy.stats import ttest_ind
 from iblphotometry.helpers import z
 from iblphotometry.behavior import psth
 from iblphotometry.bleach_corrections import Regression, ExponDecay
-from iblphotometry.outlier_detection import detect_spikes, grubbs_sliding
+from iblphotometry.outlier_detection import detect_spikes, detect_outliers
 
 
 ## this approach works as well
@@ -40,8 +40,10 @@ def percentile_dist(A: nap.Tsd | np.ndarray, pc: tuple = (50, 95), axis=-1) -> f
     """
     if isinstance(A, nap.Tsd):  # "overloading"
         P = np.percentile(z(A.values), pc)
-    if isinstance(A, np.ndarray):
+    elif isinstance(A, np.ndarray):
         P = np.percentile(z(A), pc, axis=axis)
+    else:
+        raise TypeError('A must be nap.Tsd or np.ndarray.')
     return P[1] - P[0]
 
 
@@ -56,6 +58,9 @@ def signal_asymmetry(A: nap.Tsd | np.ndarray, pc_comp: int = 95, axis=-1) -> flo
     Returns:
         float: _description_
     """
+    if not (isinstance(A, nap.Tsd) or isinstance(A, np.ndarray)):
+        raise TypeError('A must be nap.Tsd or np.ndarray.')
+
     a = np.absolute(percentile_dist(A, (50, pc_comp), axis=axis))
     b = np.absolute(percentile_dist(A, (100 - pc_comp, 50), axis=axis))
     return a / b
@@ -64,60 +69,50 @@ def signal_asymmetry(A: nap.Tsd | np.ndarray, pc_comp: int = 95, axis=-1) -> flo
 def signal_skew(A: nap.Tsd | np.ndarray, axis=-1) -> float:
     if isinstance(A, nap.Tsd):
         P = stats.skew(A.values)
-    if isinstance(A, np.ndarray):
+    elif isinstance(A, np.ndarray):
         P = stats.skew(A, axis=axis)
+    else:
+        raise TypeError('A must be nap.Tsd or np.ndarray.')
     return P
 
 
-def n_unique_samples(A: nap.Tsd) -> int:
-    """number of unique samples in the signal. Low values indicate that the signal during acquisition was not within the range of the digitizer.
-
-    Args:
-        A (nap.Tsd): _description_
-
-    Returns:
-        int: _description_
-    """
-    return np.unique(A.values).shape[0]
+def n_unique_samples(A: nap.Tsd | np.ndarray) -> int:
+    """number of unique samples in the signal. Low values indicate that the signal during acquisition was not within the range of the digitizer."""
+    if isinstance(A, nap.Tsd):
+        return np.unique(A.values).shape[0]
+    elif isinstance(A, np.ndarray):
+        return A.shape[0]
+    else:
+        raise TypeError('A must be nap.Tsd or np.ndarray.')
 
 
-def n_spikes(A: nap.Tsd, sd: int):
-    """count the number of spike artifacts in the recording.
-
-    Args:
-        A (nap.Tsd): _description_
-        sd (int): _description_
-
-    Returns:
-        _type_: _description_
-    """
-    return detect_spikes(A.values, sd=sd).shape[0]
+def n_spikes(A: nap.Tsd | np.ndarray, sd: int = 5):
+    """count the number of spike artifacts in the recording."""
+    if isinstance(A, nap.Tsd):
+        return detect_spikes(A.values, sd=sd).shape[0]
+    elif isinstance(A, np.ndarray):
+        return detect_spikes(A, sd=sd).shape[0]
+    else:
+        raise TypeError('A must be nap.Tsd or np.ndarray.')
 
 
-def n_outliers(A: nap.Tsd, w_size: int = 1000, alpha: float = 0.0005) -> int:
+def n_outliers(
+    A: nap.Tsd | np.ndarray, w_size: int = 1000, alpha: float = 0.0005
+) -> int:
     """counts the number of outliers as detected by grubbs test for outliers.
-
-    Args:
-        A (nap.Tsd): _description_
-        w_size (int, optional): _description_. Defaults to 1000.
-        alpha (float, optional): _description_. Defaults to 0.0005.
-
-    Returns:
-        int: _description_
+    int: _description_
     """
-    return grubbs_sliding(A.values, w_size=w_size, alpha=alpha).shape[0]
+    if isinstance(A, nap.Tsd):
+        return detect_outliers(A.values, w_size=w_size, alpha=alpha).shape[0]
+    elif isinstance(A, np.ndarray):
+        return detect_outliers(A, w_size=w_size, alpha=alpha).shape[0]
+    else:
+        raise TypeError('A must be nap.Tsd or np.ndarray.')
 
 
 def bleaching_tau(A: nap.Tsd) -> float:
-    """overall tau of bleaching.
-
-    Args:
-        A (nap.Tsd): _description_
-
-    Returns:
-        float: _description_
-    """
-    y, t = A.values, A.times()
+    """overall tau of bleaching."""
+    y, t = A.values, A.t
     reg = Regression(model=ExponDecay())
     reg.fit(y, t)
     return reg.popt[1]
@@ -126,7 +121,6 @@ def bleaching_tau(A: nap.Tsd) -> float:
 def ttest_pre_post(
     A: nap.Tsd,
     trials: pd.DataFrame,
-    # t_events: np.array,
     event_name: str,
     fs=None,
     pre_w=[-1, -0.2],
@@ -143,7 +137,7 @@ def ttest_pre_post(
     :param confid: float, confidence level (alpha)
     :return: boolean, True if metric passes
     """
-    y, t = A.values, A.times()
+    y, t = A.values, A.t
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
 
     t_events = trials[event_name].values
@@ -171,9 +165,9 @@ def has_response_to_event(
     # checks if there is a significant response to an event
 
     # ibldsb way
-    y, t = A.values, A.times()
+    y, t = A.values, A.t
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
-    P = psth(y, t, event_times.times(), fs=fs, peri_event_window=window)[0]
+    P = psth(y, t, event_times.t, fs=fs, event_window=window)[0]
 
     # or: pynapple style
     # in the long run, this will be the preferred way as this will
@@ -188,7 +182,7 @@ def has_response_to_event(
         sig_samples = np.max(P, axis=0) - np.std(y)
 
     # baseline is all samples that are not part of the response
-    ts = event_times.times()
+    ts = event_times.t
     gaps = nap.IntervalSet(start=ts + window[0], end=ts + window[1])
     base_samples = A.restrict(A.time_support.set_diff(gaps)).values
 
@@ -204,7 +198,7 @@ def has_responses(
     window: tuple = (-1, 1),
     alpha: float = 0.005,
 ) -> bool:
-    t = A.times()
+    t = A.t
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
 
     res = []
