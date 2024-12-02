@@ -1,5 +1,6 @@
 import pandas as pd
 from pathlib import Path
+
 # from one.api import ONE
 import numpy as np
 from iblphotometry.behavior import psth, psth_times
@@ -65,13 +66,11 @@ class TestPlotters(tests.base_tests.PhotometryDataTestCase):
 
         return df_nph, t_events, fs
 
-
     """
     ------------------------------------------------
     TEST: Loader objects for plotting
     ------------------------------------------------
     """
-
 
     def test_class_plotsignal(self):
         # --- Use real data for test ---
@@ -85,7 +84,6 @@ class TestPlotters(tests.base_tests.PhotometryDataTestCase):
         plotobj = plots.PlotSignal(raw_signal, times, raw_isosbestic, processed_signal)
         plotobj.raw_processed_figure()
         plt.close('all')
-
 
     def test_class_plotsignalresponse(self):
         # --- Use real data for test ---
@@ -101,13 +99,11 @@ class TestPlotters(tests.base_tests.PhotometryDataTestCase):
         plotobj.plot_processed_trialtick()
         plt.close('all')
 
-
     """
     ------------------------------------------------
     TEST: Plotting functions requiring FF signals only
     ------------------------------------------------
     """
-
 
     def test_plot_raw_signals(self):
         for test_case in ['synt', 'real']:
@@ -126,7 +122,6 @@ class TestPlotters(tests.base_tests.PhotometryDataTestCase):
             plots.plot_raw_signals(raw_signal, times, raw_isosbestic)
             plt.close('all')
 
-
     def test_plot_processed_signal(self):
         # --- Use synthetic data for test ---
         df_nph, _, fs = self.get_synthetic_data()
@@ -135,7 +130,6 @@ class TestPlotters(tests.base_tests.PhotometryDataTestCase):
         times = df_nph['times'].values
         plots.plot_processed_signal(signal, times)
         plt.close('all')
-
 
     def test_plot_photometry_correlation(self):
         # --- Use real data for test ---
@@ -147,7 +141,6 @@ class TestPlotters(tests.base_tests.PhotometryDataTestCase):
         plots.plot_photometry_correlation(signal_lp, isosbestic_lp, times)
         plt.close('all')
 
-
     def test_plot_psd(self):
         # --- Use synthetic data for test ---
         df_nph, _, fs = self.get_synthetic_data()
@@ -158,13 +151,11 @@ class TestPlotters(tests.base_tests.PhotometryDataTestCase):
         plots.plot_psd(signal, fs)
         plt.close('all')
 
-
     """
     ------------------------------------------------
     TEST: Plotting functions requiring behavioral events
     ------------------------------------------------
     """
-
 
     def test_plot_psth(self):
         event_window = [-1.5, 2.75]
@@ -182,12 +173,13 @@ class TestPlotters(tests.base_tests.PhotometryDataTestCase):
             times = df_nph['times'].values
 
             # Compute PSTH
-            psth_mat, _ = psth(signal, times, t_events, fs=fs, event_window=event_window)
+            psth_mat, _ = psth(
+                signal, times, t_events, fs=fs, event_window=event_window
+            )
             times = psth_times(fs, event_window)
             # Plot PSTH
             plots.plot_psth(psth_mat, times)
             plt.close('all')
-
 
     def test_plot_event_tick(self):
         # --- Use synthetic data for test ---

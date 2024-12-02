@@ -1,6 +1,4 @@
 import sys
-import pandas as pd
-import matplotlib.pyplot as plt
 from PyQt5.QtWidgets import (
     QApplication,
     QWidget,
@@ -8,23 +6,18 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QPushButton,
     QFileDialog,
-    QTableWidget,
-    QTableWidgetItem,
     QComboBox,
     QGridLayout,
     QLineEdit,
 )
-from PyQt5.QtCore import Qt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
-from pydantic.v1 import NoneStr
 
 from iblphotometry.io import from_raw_neurophotometrics
 import iblphotometry.plots as plots
 
 import iblphotometry.preprocessing as ffpr
 import numpy as np
-from matplotlib.colorbar import Colorbar
 
 
 class DataFrameVisualizerApp(QWidget):

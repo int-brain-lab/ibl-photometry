@@ -1,4 +1,3 @@
-import unittest
 import iblphotometry.io as fio
 import numpy as np
 import tests.base_tests

@@ -1,4 +1,3 @@
-import unittest
 import iblphotometry.io as fio
 import iblphotometry.metrics as metrics
 import pandas as pd
