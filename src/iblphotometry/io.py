@@ -6,9 +6,9 @@ from pathlib import Path
 import warnings
 import pandera
 
-from ibllib.io.extractors.fibrephotometry import (
+from ibllib.pipes.neurophotometrics import (
     LIGHT_SOURCE_MAP,
-    NEUROPHOTOMETRICS_LED_STATES,
+    LED_STATES,
 )
 
 
@@ -141,7 +141,7 @@ def _read_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None) -> pd.DataFr
 
     # TODO the names column in channel_meta_map should actually be user defined (experiment description file?)
     channel_meta_map = pd.DataFrame(LIGHT_SOURCE_MAP)
-    led_states = pd.DataFrame(NEUROPHOTOMETRICS_LED_STATES).set_index('Condition')
+    led_states = pd.DataFrame(LED_STATES).set_index('Condition')
     states = raw_df['LedState']
 
     for state in states.unique():
