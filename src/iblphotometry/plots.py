@@ -143,7 +143,9 @@ class PlotSignal:
 
 
 class PlotSignalResponse:
-    def __init__(self, trials, processed_signal, times, fs=None, event_window=np.array([-1, 2])):
+    def __init__(
+        self, trials, processed_signal, times, fs=None, event_window=np.array([-1, 2])
+    ):
         self.trials = trials
         self.times = times
         self.processed_signal = processed_signal
@@ -173,7 +175,7 @@ class PlotSignalResponse:
         psth_dict['times'] = psth_times(self.fs, self.event_window)
         return psth_dict
 
-    def update_psth_dict(self, event):     
+    def update_psth_dict(self, event):
         try:
             self.psth_dict[event], _ = psth(
                 self.processed_signal,
@@ -191,11 +193,7 @@ class PlotSignalResponse:
         signal_keys = [k for k in self.psth_dict.keys() if k != 'times']
         for iaxs, event in enumerate(signal_keys):
             axs_plt = [axs[0, iaxs], axs[1, iaxs]]
-            plot_psth(
-                self.psth_dict[event],
-                self.psth_dict['times'],
-                axs=axs_plt
-            )
+            plot_psth(self.psth_dict[event], self.psth_dict['times'], axs=axs_plt)
             if event in PSTH_EVENTS.keys():
                 axs_plt[0].set_title(PSTH_EVENTS[event])
             else:
