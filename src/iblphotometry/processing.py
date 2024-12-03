@@ -3,18 +3,15 @@ import warnings
 
 import numpy as np
 import scipy as sp
-from scipy import signal, stats
+from scipy import signal
 import pandas as pd
 
 from iblutil.numerical import rcoeff
 from ibldsp.utils import WindowGenerator
-from ibldsp.utils import WindowGenerator
 
 from scipy.optimize import minimize
 from scipy.stats.distributions import norm
-from scipy.stats import gaussian_kde
-from scipy.stats import gaussian_kde as kde
-from scipy.stats import t
+from scipy.stats import gaussian_kde, t
 from scipy.special import pseudo_huber
 
 from iblphotometry.behavior import psth
@@ -37,11 +34,11 @@ eps = np.finfo(np.float64).eps
 ##        #######  ##    ##  ######     ##    ####  #######  ##    ##  ######
 """
 
-def z(A: np.array, mode='classic'):
+def z(A: np.ndarray, mode='classic'):
     """classic z-score. Deviation from sample mean in units of sd
 
     :param A: _description_
-    :type A: np.array
+    :type A: np.ndarray
     :param mode: _description_, defaults to 'classic'
     :type mode: str, optional
     :return: _description_
@@ -52,12 +49,12 @@ def z(A: np.array, mode='classic'):
     if mode == 'median':
         return (A - np.median(A)) / np.std(A)
 
-def mad(A: np.array):
+def mad(A: np.ndarray):
     """ the MAD is defined as the median of the absolute deviations from the data's median
     see https://en.wikipedia.org/wiki/Median_absolute_deviation
     
     :param A: _description_
-    :type A: np.array
+    :type A: np.ndarray
     :return: _description_
     :rtype: _type_
     """
@@ -74,7 +71,7 @@ def zscore(F: pd.Series, mode='classic'):
     return pd.Series(z(y, mode=mode), index=t)
 
 
-def filt(F: pd.Series, N: int, Wn: float, fs: float = None, btype='low'):
+def filt(F: pd.Series, N: int, Wn: float, fs: float | None = None, btype='low'):
     """ a wrapper for scipy.signal.butter and sosfiltfilt
     """
     y, t = F.values, F.index.values
@@ -236,7 +233,7 @@ class Regression:
 class BleachCorrection:
     def __init__(
         self,
-        model: AbstractModel = None,
+        model = None, # TODO bring back type checking
         regression_method: str = 'mse',
         regression_params: dict = None,
         correction_method: str = 'subtract',
@@ -271,9 +268,9 @@ class IsosbesticCorrection:
     def __init__(
         self,
         regression_method: str = 'mse',
-        regression_params: dict = None,
+        regression_params: dict | None = None,
         correction_method: str = 'subtract-divide',
-        lowpass_isosbestic: dict = None,
+        lowpass_isosbestic: dict | None = None,
     ):
         self.reg = Regression(
             model=LinearModel(),
@@ -383,7 +380,7 @@ class LinearModel(AbstractModel):
     def eq(self, x, m, b):
         return x * m + b
 
-    def est_p0(self, x: np.array, y: np.array):
+    def est_p0(self, x: np.ndarray, y: np.ndarray):
         return tuple(np.polyfit(x, y, 1))
         # x, y = np.sort(x), np.sort(y)
         # dx = x[-1] - x[0]
@@ -399,7 +396,7 @@ class ExponDecay(AbstractModel):
     def eq(self, t, A, tau, b):
         return A * np.exp(-t / tau) + b
 
-    def est_p0(self, t: np.array, y: np.array):
+    def est_p0(self, t: np.ndarray, y: np.ndarray):
         return (y[0], t[int(t.shape[0] / 3)], y[-1])
 
 
@@ -415,7 +412,7 @@ class DoubleExponDecay(AbstractModel):
     def eq(self, t, A1, tau1, A2, tau2, b):
         return A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2) + b
 
-    def est_p0(self, t: np.array, y: np.array):
+    def est_p0(self, t: np.ndarray, y: np.ndarray):
         A_est = y[0]
         tau_est = t[int(t.shape[0] / 3)]
         b_est = y[-1]
@@ -438,7 +435,7 @@ class TripleExponDecay(AbstractModel):
             A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2) + A3 * np.exp(-t / tau3) + b
         )
 
-    def est_p0(self, t: np.array, y: np.array):
+    def est_p0(self, t: np.ndarray, y: np.ndarray):
         A_est = y[0]
         tau_est = t[int(t.shape[0] / 3)]
         b_est = y[-1]
@@ -488,7 +485,7 @@ def isosbestic_correct(F_sig: pd.DataFrame, F_ref: pd.DataFrame, **kwargs):
  #######   #######     ##    ######## #### ######## ##     ##    ########  ########    ##    ########  ######     ##    ####  #######  ##    ##
 """
 
-def _grubbs_single(y: np.array, alpha: float =0.005, mode: str='median') -> bool:
+def _grubbs_single(y: np.ndarray, alpha: float =0.005, mode: str='median') -> bool:
     # to apply a single pass of grubbs outlier detection
     # see https://en.wikipedia.org/wiki/Grubbs%27s_test
 
@@ -508,7 +505,7 @@ def _grubbs_single(y: np.array, alpha: float =0.005, mode: str='median') -> bool
         return False
 
 
-def grubbs_test(y: np.array, alpha: float =0.005, mode:str='median'):
+def grubbs_test(y: np.ndarray, alpha: float =0.005, mode:str='median'):
     # apply grubbs test iteratively until no more outliers are found
     outliers = []
     while _grubbs_single(y, alpha=alpha):
@@ -522,8 +519,8 @@ def grubbs_test(y: np.array, alpha: float =0.005, mode:str='median'):
     return np.sort(outliers)
 
 
-def detect_outliers(y: np.array, w_size: int = 1000, alpha: float = 0.005):
-    # sliding grubbs test for a np.array
+def detect_outliers(y: np.ndarray, w_size: int = 1000, alpha: float = 0.005):
+    # sliding grubbs test for a np.ndarray
     n_samples = y.shape[0]
     wg = WindowGenerator(n_samples - (n_samples % w_size), w_size, 0)
     dtype = np.dtype((np.float64, w_size))
@@ -544,14 +541,14 @@ def detect_outliers(y: np.array, w_size: int = 1000, alpha: float = 0.005):
     return np.unique(outlier_ix)
 
 
-def remove_nans(y: np.array):
+def remove_nans(y: np.ndarray):
     y = y[~pd.isna(y)]  # nanfilter
     if y.shape[0] == 0:
         warnings.warn('y was all NaN and is now empty')
     return y
 
 
-def fillnan_kde(y: np.array, w: int = 25):
+def fillnan_kde(y: np.ndarray, w: int = 25):
     # fill nans with KDE from edges
     inds = np.where(pd.isna(y))[0]
     if inds.shape[0] > 0:
@@ -560,7 +557,7 @@ def fillnan_kde(y: np.array, w: int = 25):
             ix_stop = np.clip(ix + w, 0, y.shape[0] - 1)
             y_ = y[ix_start:ix_stop]
             y_ = remove_nans(y_)
-            y[ix] = kde(y_).resample(1)[0][0]
+            y[ix] = gaussian_kde(y_).resample(1)[0][0]
 
         return y
     else:
@@ -579,7 +576,7 @@ def remove_outliers(F: pd.Series, w_size: int = 1000, alpha: float = 0.005, w: i
     return pd.Series(y, index=t)
 
 
-def detect_spikes(t: np.array, sd: int = 5):
+def detect_spikes(t: np.ndarray, sd: int = 5):
     dt = np.diff(t)
     bad_inds = dt < np.average(dt) - sd * np.std(dt)
     return np.where(bad_inds)[0]
@@ -624,7 +621,7 @@ def make_sliding_window(
     warning=None,
 ):
     
-    """use np.stride_tricks to make a sliding window view of a 1-d np.array A
+    """use np.stride_tricks to make a sliding window view of a 1-d np.ndarray A
     full overlap, step size 1
     assumes 8 byte numbers (to be exposed? but needs to be tested first)
     pads beginning and end of array with edge values
@@ -664,7 +661,7 @@ def sliding_dFF(F: pd.Series, w_len: float, fs=None, weights=None):
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)
 
-    def _dFF(A: np.array):
+    def _dFF(A: np.ndarray):
         return (A - np.average(A)) / np.average(A)
 
     if weights is not None:

@@ -1,9 +1,9 @@
-# %%
 import numpy as np
 import pandas as pd
 from pathlib import Path
 import warnings
 import pandera
+from typing import Optional
 
 from iblphotometry.neurophotometrics import (
     LIGHT_SOURCE_MAP,
@@ -12,18 +12,18 @@ from iblphotometry.neurophotometrics import (
 
 
 def from_array(
-    times: np.array, data: np.array, channel_names: list[str] = None
+    times: np.ndarray, data: np.ndarray, channel_names: list[str] | None = None
 ) -> pd.DataFrame:
     return pd.DataFrame(data, index=times, columns=channel_names)
 
 
 def from_dataframe(
     raw_df: pd.DataFrame,
-    data_columns: list[str] = None,
-    time_column: str = None,
+    data_columns: list[str] | None = None,
+    time_column: str | None = None,
     channel_column: str = 'name',
-    channel_names: list[str] = None,
-    rename: dict = None,
+    channel_names: list[str] | None = None,
+    rename: dict | None = None,
 ) -> dict:
     """reads in a pandas.DataFrame and converts it into nap.TsdDataframes. Performs the time demultiplexing operation.
 
@@ -49,9 +49,9 @@ def from_dataframe(
 
     # infer name of time column if not provided
     if time_column is None:
-        time_column = [col for col in raw_df.columns if 'time' in col.lower()]
-        assert len(time_column) == 1
-        time_column = time_column[0]
+        time_columns = [col for col in raw_df.columns if 'time' in col.lower()]
+        assert len(time_columns) == 1
+        time_column = time_columns[0]
 
     # infer channel names if they are not explicitly provided
     if channel_names is None:
@@ -76,7 +76,7 @@ def from_dataframe(
 
 def from_pqt(
     signal_pqt_path: str | Path,
-    locations_pqt_path: str | Path = None,
+    locations_pqt_path: Optional[str | Path] = None,
 ):
     """reads in a photometry.signal.pqt files as they are registered in alyx.
 

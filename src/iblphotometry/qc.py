@@ -18,15 +18,16 @@ warnings.filterwarnings('once', category=DeprecationWarning, module='pynapple')
 
 logger = logging.getLogger()
 
+from collections.abc import Callable
 
 # %% # those could be in metrics
 def sliding_metric(
     F: pd.Series,
     w_len: float,
-    fs: float = None,
-    metric: callable = None,
+    metric: Callable,
+    fs: float | None = None,
     n_wins: int = -1,
-    metric_kwargs: dict = None,
+    metric_kwargs: dict | None = None,
 ):
     """applies a metric along time.
 
@@ -59,9 +60,9 @@ def sliding_metric(
 # eval pipleline will be here
 def eval_metric(
     F: pd.Series,
-    metric: callable = None,
-    metric_kwargs: dict = None,
-    sliding_kwargs: dict = None,
+    metric: Callable,
+    metric_kwargs: dict | None = None,
+    sliding_kwargs: dict | None = None,
 ):
     m = metric(F, **metric_kwargs) if metric_kwargs is not None else metric(F)
 

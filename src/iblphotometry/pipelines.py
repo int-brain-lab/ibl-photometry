@@ -10,7 +10,7 @@ logger = logging.getLogger()
 def run_pipeline(
     pipeline,
     F_signal: pd.DataFrame,
-    F_reference: pd.DataFrame = None,
+    F_reference: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     # copy
     Fc = F_signal.copy()
