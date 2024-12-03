@@ -1,13 +1,9 @@
 import numpy as np
 import pandas as pd
 from scipy import stats
-from scipy.stats import ttest_ind
 
-from iblphotometry.helpers import z
+from iblphotometry.processing import z, Regression, ExponDecay, detect_spikes, detect_outliers
 from iblphotometry.behavior import psth
-from iblphotometry.bleach_corrections import Regression, ExponDecay
-from iblphotometry.outlier_detection import detect_spikes, detect_outliers
-
 
 ## this approach works as well
 # from functools import singledispatch
@@ -179,7 +175,7 @@ def has_response_to_event(
     base_ix = np.setdiff1d(np.arange(y.shape[0]), psth_ix.flatten())
     base_samples = y[base_ix]
 
-    res = ttest_ind(sig_samples, base_samples)
+    res = stats.ttest_ind(sig_samples, base_samples)
     return res.pvalue < alpha
 
 

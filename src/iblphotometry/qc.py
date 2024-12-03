@@ -8,7 +8,7 @@ import logging
 
 import gc
 
-from iblphotometry.sliding_operations import make_sliding_window
+from iblphotometry.processing import make_sliding_window
 from pipelines import run_pipeline
 import warnings
 
