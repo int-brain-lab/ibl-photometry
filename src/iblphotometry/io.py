@@ -5,7 +5,7 @@ from pathlib import Path
 import warnings
 import pandera
 
-from ibllib.pipes.neurophotometrics import (
+from iblphotometry.neurophotometrics import (
     LIGHT_SOURCE_MAP,
     LED_STATES,
 )
@@ -214,7 +214,6 @@ def from_raw_neurophotometrics(
     return from_dataframe(df, **read_config)
 
 
-# TODO externalize the validator in iblrig as a seperate function and reuse here
 def _validate_dataframe(
     df: pd.DataFrame,
     data_columns=None,
@@ -233,3 +232,16 @@ def _validate_dataframe(
     )
 
     return schema_raw_data.validate(df)
+
+def _validate_neurophotometrics_digital_inputs(df: pd.DataFrame) -> pd.DataFrame:
+    schema_digital_inputs = pandera.DataFrameSchema(
+        columns=dict(
+            ChannelName=pandera.Column(str, coerce=True),
+            Channel=pandera.Column(pandera.Int8, coerce=True),
+            AlwaysTrue=pandera.Column(bool, coerce=True),
+            SystemTimestamp=pandera.Column(pandera.Float64),
+            ComputerTimestamp=pandera.Column(pandera.Float64),
+        )
+    )
+    return schema_digital_inputs.validate(df)
+
