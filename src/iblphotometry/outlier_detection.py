@@ -7,7 +7,7 @@ from scipy.stats import gaussian_kde as kde
 import warnings
 
 
-def _grubbs_single(y: np.array, alpha: float =0.005, mode: str='median') -> bool:
+def _grubbs_single(y: np.array, alpha: float = 0.005, mode: str = 'median') -> bool:
     # to apply a single pass of grubbs outlier detection
     # see https://en.wikipedia.org/wiki/Grubbs%27s_test
 
@@ -27,7 +27,7 @@ def _grubbs_single(y: np.array, alpha: float =0.005, mode: str='median') -> bool
         return False
 
 
-def grubbs_test(y: np.array, alpha: float =0.005, mode:str='median'):
+def grubbs_test(y: np.array, alpha: float = 0.005, mode: str = 'median'):
     # apply grubbs test iteratively until no more outliers are found
     outliers = []
     while _grubbs_single(y, alpha=alpha):
@@ -87,7 +87,9 @@ def fillnan_kde(y: np.array, w: int = 25):
         return y
 
 
-def remove_outliers(F: pd.Series, w_size: int = 1000, alpha: float = 0.005, w: int = 25):
+def remove_outliers(
+    F: pd.Series, w_size: int = 1000, alpha: float = 0.005, w: int = 25
+):
     y, t = F.values, F.index.values
     y = copy(y)
     outliers = detect_outliers(y, w_size=w_size, alpha=alpha)

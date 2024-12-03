@@ -7,10 +7,10 @@ from iblphotometry.pipelines import (
     isosbestic_correction_pipeline,
 )
 from iblphotometry.synthetic import generate_dataframe
-import tests.base_tests
+from iblphotometry_tests.base_tests import PhotometryDataTestCase
 
 
-class TestPipelines(tests.base_tests.PhotometryDataTestCase):
+class TestPipelines(PhotometryDataTestCase):
     def test_single_band_pipeline(self):
         # on synthetic data
         raw_dfs = generate_dataframe()
@@ -31,5 +31,7 @@ class TestPipelines(tests.base_tests.PhotometryDataTestCase):
 
         # run pipeline
         run_pipeline(
-            isosbestic_correction_pipeline, raw_dfs['raw_calcium'], raw_dfs['raw_isosbestic']
+            isosbestic_correction_pipeline,
+            raw_dfs['raw_calcium'],
+            raw_dfs['raw_isosbestic'],
         )

@@ -11,7 +11,9 @@ from iblphotometry.helpers import filt
 from inspect import signature
 
 
-def correct(signal: pd.Series, reference: pd.Series, mode: str = 'subtract') -> pd.Series:
+def correct(
+    signal: pd.Series, reference: pd.Series, mode: str = 'subtract'
+) -> pd.Series:
     if mode == 'subtract':
         signal_corrected = signal.values - reference.values
     if mode == 'divide':
