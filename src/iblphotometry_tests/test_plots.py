@@ -1,16 +1,14 @@
 import pandas as pd
 from pathlib import Path
 
-# from one.api import ONE
 import numpy as np
+import matplotlib.pyplot as plt
+
 from iblphotometry.behavior import psth, psth_times
 import iblphotometry.plots as plots
 from iblphotometry.synthetic import synthetic101
-import matplotlib.pyplot as plt
-import tests.base_tests
-
-# TODO fix import once processing settled
 import iblphotometry.preprocessing as ffpr
+from iblphotometry_tests.base_tests import PhotometryDataTestCase
 
 # Set the seed
 np.random.seed(seed=0)
@@ -24,7 +22,7 @@ Functions to get test data
 """
 
 
-class TestPlotters(tests.base_tests.PhotometryDataTestCase):
+class TestPlotters(PhotometryDataTestCase):
     def get_synthetic_data(self):
         fs = 50
         df_nph, t_events = synthetic101(fs=50)
