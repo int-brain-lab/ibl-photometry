@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 import warnings
 
 import numpy as np
-import scipy as sp
 from scipy import signal
 import pandas as pd
 
