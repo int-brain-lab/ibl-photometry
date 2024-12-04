@@ -2,11 +2,8 @@
 
 import numpy as np
 import pandas as pd
-from iblphotometry.helpers import z, filt
 
 # from ibldsp.utils import WindowGenerator
-from iblphotometry import sliding_operations
-from iblphotometry import bleach_corrections
 from iblphotometry.outlier_detection import remove_spikes
 from iblphotometry.bleach_corrections import lowpass_bleachcorrect, isosbestic_correct
 from iblphotometry.sliding_operations import sliding_mad
@@ -15,7 +12,6 @@ from iblphotometry.sliding_operations import sliding_mad
 from iblphotometry.helpers import zscore
 
 import logging
-from copy import copy
 
 logger = logging.getLogger()
 
