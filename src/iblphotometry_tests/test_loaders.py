@@ -34,7 +34,7 @@ class TestLoaders(PhotometryDataTestCase):
     # from pqt files as they are returned from ONE by .load_dataset()
     def test_from_ibl_pqt(self):
         fpio.from_ibl_pqt(self.paths['photometry_signal_pqt'])
-        raw_dfs_a = fpio.from_ibl_pqt(
+        fpio.from_ibl_pqt(
             self.paths['photometry_signal_pqt'],
             self.paths['photometryROI_locations_pqt'],
         )
