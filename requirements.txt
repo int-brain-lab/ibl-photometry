@@ -5,4 +5,3 @@ matplotlib
 pytest
 scipy
 pandera
-pynapple

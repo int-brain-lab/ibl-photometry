@@ -1,7 +1,7 @@
 # %%
 import numpy as np
 from scipy.stats import linregress
-import pynapple as nap
+import pandas as pd
 
 from tqdm import tqdm
 import logging
@@ -21,7 +21,7 @@ logger = logging.getLogger()
 
 # %% # those could be in metrics
 def sliding_metric(
-    F: nap.Tsd,
+    F: pd.Series,
     w_len: float,
     fs: float = None,
     metric: callable = None,
@@ -39,7 +39,7 @@ def sliding_metric(
     Returns:
         _type_: _description_
     """
-    y, t = F.values, F.times()
+    y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)
 
@@ -53,12 +53,12 @@ def sliding_metric(
 
     m = metric(yw, **metric_kwargs) if metric_kwargs is not None else metric(yw)
 
-    return nap.Tsd(t=t[inds + int(w_size / 2)], d=m)
+    return pd.Series(m, index=t[inds + int(w_size / 2)])
 
 
 # eval pipleline will be here
 def eval_metric(
-    F: nap.Tsd,
+    F: pd.Series,
     metric: callable = None,
     metric_kwargs: dict = None,
     sliding_kwargs: dict = None,
@@ -77,16 +77,16 @@ def eval_metric(
     return dict(value=m, rval=r, pval=p)
 
 
-def qc_Tsd(
-    F: nap.Tsd,
+def qc_series(
+    F: pd.Series,
     qc_metrics: dict,
     sliding_kwargs=None,  # if present, calculate everything in a sliding manner
     trials=None,  # if present, put trials into params
     eid: str = None,  # FIXME but left as is for now just to keep the logger happy
     brain_region: str = None,  # FIXME but left as is for now just to keep the logger happy
 ) -> dict:
-    if isinstance(F, nap.TsdFrame):
-        raise TypeError('F can not be nap.TsdFrame')
+    if isinstance(F, pd.DataFrame):
+        raise TypeError('F can not be a dataframe')
 
     # should cover all cases
     qc_results = {}
@@ -137,7 +137,7 @@ def run_qc(
         for band in signal_bands:
             raw_tf = raw_tfs[band]
             for region in brain_regions:
-                qc_result = qc_Tsd(
+                qc_result = qc_series(
                     raw_tf[region], qc_metrics['raw'], sliding_kwargs=None, eid=eid
                 )
                 qc_results.append(
@@ -161,7 +161,7 @@ def run_qc(
 
             for region in brain_regions:
                 # sliding qc of the processed data
-                qc_proc = qc_Tsd(
+                qc_proc = qc_series(
                     proc_tf[region],
                     qc_metrics=qc_metrics['processed'],
                     sliding_kwargs=qc_metrics['sliding_kwargs'],
@@ -170,7 +170,7 @@ def run_qc(
                 )
 
                 # qc with metrics that use behavior
-                qc_resp = qc_Tsd(
+                qc_resp = qc_series(
                     proc_tf[region],
                     qc_metrics['response'],
                     trials=trials,

@@ -1,7 +1,7 @@
 """this module holds a collection of processing pipelines for fiber photometry data"""
 
 import numpy as np
-import pynapple as nap
+import pandas as pd
 from iblphotometry.helpers import z
 from iblphotometry.behavior import psth
 from ibldsp.utils import WindowGenerator
@@ -49,8 +49,8 @@ def make_sliding_window(
     return B
 
 
-def sliding_dFF(F: nap.Tsd, w_len: float, fs=None, weights=None):
-    y, t = F.values, F.times()
+def sliding_dFF(F: pd.Series, w_len: float, fs=None, weights=None):
+    y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)
 
@@ -71,10 +71,10 @@ def sliding_dFF(F: nap.Tsd, w_len: float, fs=None, weights=None):
         B = make_sliding_window(y, w_size)
         mus = np.average(B, axis=1)
         d = (y - mus) / mus
-    return nap.Tsd(t=t, d=d)
+    return pd.Series(d, index=t)
 
 
-def sliding_z(F: nap.Tsd, w_len: float, fs=None, weights=None):
+def sliding_z(F: pd.Series, w_len: float, fs=None, weights=None):
     """sliding window z-score of a pynapple time series with data with optional weighting
 
     Args:
@@ -85,7 +85,7 @@ def sliding_z(F: nap.Tsd, w_len: float, fs=None, weights=None):
     Returns:
         _type_: _description_
     """
-    y, t = F.values, F.times()
+    y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)
 
@@ -102,11 +102,11 @@ def sliding_z(F: nap.Tsd, w_len: float, fs=None, weights=None):
         B = make_sliding_window(y, w_size)
         mus, sds = np.average(B, axis=1), np.std(B, axis=1)
         d = (y - mus) / sds
-    return nap.Tsd(t=t, d=d)
+    return pd.Series(d, index=t)
 
 
-def sliding_mad(F: nap.Tsd, w_len: float = None, fs=None, overlap=90):
-    y, t = F.values, F.times()
+def sliding_mad(F: pd.Series, w_len: float = None, fs=None, overlap=90):
+    y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)
 
@@ -117,7 +117,7 @@ def sliding_mad(F: nap.Tsd, w_len: float = None, fs=None, overlap=90):
     rmswin, _ = psth(y, t, t_events=trms, fs=fs, event_window=[0, w_len])
     gain = np.nanmedian(np.abs(y)) / np.nanmedian(np.abs(rmswin), axis=0)
     gain = np.interp(t, trms, gain)
-    return nap.Tsd(t=t, d=y * gain)
+    return pd.Series(y * gain, index=t)
 
 
 # def sliding_mad_new(F: nap.Tsd, w_len: float = None, fs=None, overlap=90):

@@ -1,7 +1,6 @@
 # %%
 import numpy as np
 import pandas as pd
-import pynapple as nap
 from pathlib import Path
 import warnings
 import pandera
@@ -14,8 +13,8 @@ from ibllib.pipes.neurophotometrics import (
 
 def from_array(
     times: np.array, data: np.array, channel_names: list[str] = None
-) -> nap.TsdFrame:
-    return nap.TsdFrame(t=times, d=data, columns=channel_names)
+) -> pd.DataFrame:
+    return pd.DataFrame(data, index=times, columns=channel_names)
 
 
 def from_dataframe(
@@ -62,23 +61,17 @@ def from_dataframe(
     to_drop = ['None', '']
     channel_names = [ch for ch in channel_names if ch not in to_drop]
 
-    raw_tfs = {}
+    raw_dfs = {}
     for channel in channel_names:
-        # TODO include the use of raw_df['include'] to set the time_support of the pynapple object
-        # requires conversion of boolen to nap.IntervalSet (have done this somewhere already. find code)
-
-        # TODO check pynappe PR#343 https://github.com/pynapple-org/pynapple/pull/343 for future
-        # inclusion of locations_df as metadata
-
         # get the data for the band
         df = raw_df.groupby(channel_column).get_group(channel)
         # if rename dict is passed, rename Region0X to the corresponding brain region
         if rename is not None:
             df = df.rename(columns=rename)
             data_columns = rename.values()
-        raw_tfs[channel] = nap.TsdFrame(df.set_index(time_column)[data_columns])
+        raw_dfs[channel] = df.set_index(time_column)[data_columns]
 
-    return raw_tfs
+    return raw_dfs
 
 
 def from_pqt(

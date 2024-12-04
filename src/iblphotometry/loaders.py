@@ -1,4 +1,3 @@
-import pynapple as nap
 import pandas as pd
 from pathlib import Path
 from iblphotometry import io
@@ -28,31 +27,15 @@ class PhotometryLoader:
             data_columns=list(locations_df.index),
             rename=locations_df['brain_region'].to_dict() if rename else None,
         )
-        raw_tfs = io.from_dataframe(raw_photometry_df, **read_config)
+        raw_dfs = io.from_dataframe(raw_photometry_df, **read_config)
 
-        signal_band_names = list(raw_tfs.keys())
-        col_names = list(raw_tfs[signal_band_names[0]].columns)
+        signal_band_names = list(raw_dfs.keys())
+        col_names = list(raw_dfs[signal_band_names[0]].columns)
         if self.verbose:
             print(f'available signal bands: {signal_band_names}')
             print(f'available brain regions: {col_names}')
 
-        return raw_tfs
-        # if return_regions:
-        #     return raw_tfs, cols
-        # else:
-        #     return raw_tfs
-
-    # def _load_data_from_pid(self, pid=None, signal=None) -> nap.Tsd:
-    #     eid, pname = self.one.pid2eid(pid)
-    #     locations = self._load_locations(eid)
-    #     roi_name = dict(zip(locations['fiber'], locations.index))[pname]
-    #     return self._load_data_from_eid(eid, signal=signal)[roi_name]
-
-    # def pid2eid(self, pid: str) -> tuple[str, str]:
-    #     return self.one.pid2eid(pid)
-
-    # def eid2pid(self, eid: str):
-    #     return self.one.eid2pid(eid)
+        return raw_dfs
 
 
 class KceniaLoader(PhotometryLoader):
@@ -69,39 +52,19 @@ class KceniaLoader(PhotometryLoader):
         signal_bands = ['raw_calcium', 'raw_isosbestic']  # HARDCODED but fine
 
         # flipping the data representation
-        raw_tfs = {}
+        raw_dfs = {}
         for band in signal_bands:
             df = pd.DataFrame([raw_dfs[pname][band].values for pname in pnames]).T
             df.columns = pnames
             df.index = raw_dfs[pname][band].index
-            raw_tfs[band] = nap.TsdFrame(df)
+            raw_dfs[band] = df
 
         if self.verbose:
-            print(f'available signal bands: {list(raw_tfs.keys())}')
-            cols = list(raw_tfs[list(raw_tfs.keys())[0]].columns)
+            print(f'available signal bands: {list(raw_dfs.keys())}')
+            cols = list(raw_dfs[list(raw_dfs.keys())[0]].columns)
             print(f'available brain regions: {cols}')
 
-        # if return_regions:
-        #     return raw_tfs, pnames
-        # else:
-        return raw_tfs
-
-    # def _load_data_from_eid(self, eid, signal=None):
-    #     raise NotImplementedError
-
-    # def get_mappable(self, eid):
-    #     raise NotImplementedError
-
-    # def get_mapping(self, eid, key=None, value=None):
-    #     raise NotImplementedError
-
-    # def pid2eid(self, pid: str) -> tuple[str, str]:
-    #     return pid.split('_')
-
-    # def eid2pid(self, eid):
-    #     pnames = self._eid2pnames(eid)
-    #     pids = [f'{eid}_{pname}' for pname in pnames]
-    #     return (pids, pnames)
+        return raw_dfs
 
     def _eid2pnames(self, eid: str):
         session_path = self.one.eid2path(eid)
