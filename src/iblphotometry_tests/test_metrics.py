@@ -3,22 +3,22 @@ import iblphotometry.io as fio
 import iblphotometry.metrics as metrics
 import pandas as pd
 
-import tests.base_tests
+from iblphotometry_tests.base_tests import PhotometryDataTestCase
 
 
-class TestMetrics(tests.base_tests.PhotometryDataTestCase):
+class TestMetrics(PhotometryDataTestCase):
     # think here about the possible use cases
 
     def test_metrics(self):
         # get data
-        raw_tfs = fio.from_pqt(
+        raw_dfs = fio.from_pqt(
             self.paths['photometry_signal_pqt'],
             self.paths['photometryROI_locations_pqt'],
         )
         trials = pd.read_parquet(self.paths['trials_table_pqt'])
 
         # testing metrics with nap.Tsd
-        raw_tsd = raw_tfs['GCaMP']['DMS']
+        raw_tsd = raw_dfs['GCaMP']['DMS']
 
         metrics.bleaching_tau(raw_tsd)
         metrics.n_spikes(raw_tsd)
@@ -43,7 +43,7 @@ class TestMetrics(tests.base_tests.PhotometryDataTestCase):
             metrics.has_responses(raw_tsd, trials, BEHAV_EVENTS)
 
         # testing metrics with np.array
-        raw_array = raw_tfs['GCaMP']['DMS'].d
+        raw_array = raw_dfs['GCaMP']['DMS'].values
         # metrics.bleaching_tau(raw_tsd)
         metrics.n_spikes(raw_array)
         metrics.detect_spikes(raw_array)
