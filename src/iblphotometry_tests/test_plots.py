@@ -79,7 +79,8 @@ class TestPlotters(PhotometryDataTestCase):
         processed_signal = df_nph['signal_processed'].values
         times = df_nph['times'].values
 
-        plotobj = plots.PlotSignal(raw_signal, times, raw_isosbestic, processed_signal)
+        plotobj = plots.PlotSignal()
+        plotobj.set_data(raw_signal, times, raw_isosbestic, processed_signal)
         plotobj.raw_processed_figure()
         plt.close('all')
 
