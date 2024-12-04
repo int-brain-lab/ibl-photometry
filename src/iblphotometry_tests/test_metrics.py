@@ -10,7 +10,7 @@ class TestMetrics(PhotometryDataTestCase):
 
     def test_metrics(self):
         # get data
-        raw_dfs = fio.from_pqt(
+        raw_dfs = fio.from_ibl_pqt(
             self.paths['photometry_signal_pqt'],
             self.paths['photometryROI_locations_pqt'],
         )

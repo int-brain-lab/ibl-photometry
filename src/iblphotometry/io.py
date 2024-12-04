@@ -17,7 +17,7 @@ def from_array(
     return pd.DataFrame(data, index=times, columns=channel_names)
 
 
-def from_dataframe(
+def from_ibl_dataframe(
     raw_df: pd.DataFrame,
     data_columns: list[str] | None = None,
     time_column: str | None = None,
@@ -80,7 +80,7 @@ def from_dataframe(
     return raw_dfs
 
 
-def from_dataframes(raw_df: pd.DataFrame, locations_df: pd.DataFrame):
+def from_ibl_dataframes(raw_df: pd.DataFrame, locations_df: pd.DataFrame):
     data_columns = (list(locations_df.index),)
     rename = locations_df['brain_region'].to_dict()
 
@@ -91,10 +91,10 @@ def from_dataframes(raw_df: pd.DataFrame, locations_df: pd.DataFrame):
         rename=rename,
     )
 
-    return from_dataframe(raw_df, **read_config)
+    return from_ibl_dataframe(raw_df, **read_config)
 
 
-def from_pqt(
+def from_ibl_pqt(
     signal_pqt_path: str | Path,
     locations_pqt_path: Optional[str | Path] = None,
 ):
@@ -111,8 +111,7 @@ def from_pqt(
     raw_df = pd.read_parquet(signal_pqt_path)
     if locations_pqt_path is not None:
         locations_df = pd.read_parquet(locations_pqt_path)
-        data_columns = (list(locations_df.index),)
-        rename = locations_df['brain_region'].to_dict()
+        return from_ibl_dataframes(raw_df, locations_df)
     else:
         warnings.warn(
             'loading a photometry.signal.pqt file without its corresponding photometryROI.locations.pqt'
@@ -127,10 +126,10 @@ def from_pqt(
         rename=rename,
     )
 
-    return from_dataframe(raw_df, **read_config)
+    return from_ibl_dataframe(raw_df, **read_config)
 
 
-def from_raw_neurophotometrics_df(
+def from_raw_neurophotometrics_ibl_df(
     raw_df: pd.DataFrame, rois=None, drop_first=True
 ) -> pd.DataFrame:
     """reads in parses the output of the neurophotometrics FP3002
@@ -145,14 +144,14 @@ def from_raw_neurophotometrics_df(
     if rois is None:
         rois = [col for col in raw_df.columns if col.startswith('G')]
 
-    out_df = raw_df.filter(items=rois, axis=1).sort_index(axis=1)
+    df = raw_df.filter(items=rois, axis=1).sort_index(axis=1)
     timestamp_name = (
         'SystemTimestamp' if 'SystemTimestamp' in raw_df.columns else 'Timestamp'
     )
-    out_df['times'] = raw_df[timestamp_name]
-    out_df['wavelength'] = np.nan
-    out_df['name'] = ''
-    out_df['color'] = ''
+    df['times'] = raw_df[timestamp_name]
+    df['wavelength'] = np.nan
+    df['name'] = ''
+    df['color'] = ''
 
     # TODO the names column in channel_meta_map should actually be user defined (experiment description file?)
     channel_meta_map = pd.DataFrame(LIGHT_SOURCE_MAP)
@@ -172,27 +171,27 @@ def from_raw_neurophotometrics_df(
                     name = '+'.join([channel_meta_map['name'][c] for c in combo])
                     color = '+'.join([channel_meta_map['color'][c] for c in combo])
                     wavelength = np.nan
-                    out_df.loc[states == state, ['name', 'color', 'wavelength']] = (
+                    df.loc[states == state, ['name', 'color', 'wavelength']] = (
                         name,
                         color,
                         wavelength,
                     )
         else:
             for cn in ['name', 'color', 'wavelength']:
-                out_df.loc[states == state, cn] = channel_meta_map.iloc[ic[0]][cn]
+                df.loc[states == state, cn] = channel_meta_map.iloc[ic[0]][cn]
 
     # drop first frame
     if drop_first:
-        out_df = out_df.iloc[1:].reset_index()
+        df = df.iloc[1:].reset_index()
 
-    return out_df
+    return df
 
 
-def from_raw_neurophotometrics_file(
+def from_raw_neurophotometrics_file_to_ibl_df(
     path: str | Path,
     drop_first=True,
     validate=True,
-) -> dict:
+) -> pd.DataFrame:
     """reads a raw neurophotometrics file (in .csv or .pqt format) as they are written by the neurophotometrics software
 
     Args:
@@ -222,24 +221,35 @@ def from_raw_neurophotometrics_file(
         raise NotImplementedError
 
     if validate:
-        raw_df = _validate_dataframe(raw_df)
+        raw_df = _validate_ibl_dataframe(raw_df)
 
-    df = from_raw_neurophotometrics_df(raw_df)
+    df = from_raw_neurophotometrics_ibl_df(raw_df)
 
     # drop first frame
     if drop_first:
         df = df.iloc[1:].reset_index()
 
+    return df
+
+
+def from_raw_neurophotometrics_file(
+    path: str | Path,
+    drop_first=True,
+    validate=True,
+) -> dict:
+    df = from_raw_neurophotometrics_file_to_ibl_df(
+        path, drop_first=drop_first, validate=validate
+    )
     data_columns = [col for col in df.columns if col.startswith('G')]
     read_config = dict(
         data_columns=data_columns,
         time_column='times',
         channel_column='name',
     )
-    return from_dataframe(df, **read_config)
+    return from_ibl_dataframe(df, **read_config)
 
 
-def _validate_dataframe(
+def _validate_ibl_dataframe(
     df: pd.DataFrame,
     data_columns=None,
 ) -> pd.DataFrame:
