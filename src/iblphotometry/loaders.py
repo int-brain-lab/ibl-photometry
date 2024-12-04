@@ -66,7 +66,6 @@ class KceniaLoader(PhotometryLoader):
 
         return raw_dfs
 
-
     def _eid2pnames(self, eid: str):
         session_path = self.one.eid2path(eid)
         pnames = [reg.name for reg in session_path.joinpath('alf').glob('Region*')]

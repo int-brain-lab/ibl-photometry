@@ -14,6 +14,7 @@ from iblphotometry.pipelines import run_pipeline
 
 logger = logging.getLogger()
 
+
 # %% # those could be in metrics
 def sliding_metric(
     F: pd.Series,

@@ -19,7 +19,6 @@ from inspect import signature
 from copy import copy
 
 
-
 # machine resolution
 eps = np.finfo(np.float64).eps
 
@@ -33,6 +32,7 @@ eps = np.finfo(np.float64).eps
 ##       ##     ## ##   ### ##    ##    ##     ##  ##     ## ##   ### ##    ##
 ##        #######  ##    ##  ######     ##    ####  #######  ##    ##  ######
 """
+
 
 def z(A: np.ndarray, mode='classic'):
     """classic z-score. Deviation from sample mean in units of sd
@@ -49,10 +49,11 @@ def z(A: np.ndarray, mode='classic'):
     if mode == 'median':
         return (A - np.median(A)) / np.std(A)
 
+
 def mad(A: np.ndarray):
-    """ the MAD is defined as the median of the absolute deviations from the data's median
+    """the MAD is defined as the median of the absolute deviations from the data's median
     see https://en.wikipedia.org/wiki/Median_absolute_deviation
-    
+
     :param A: _description_
     :type A: np.ndarray
     :return: _description_
@@ -60,10 +61,12 @@ def mad(A: np.ndarray):
     """
     return np.median(np.absolute(A - np.median(A)), axis=-1)
 
+
 def madscore(F: pd.Series):
     # TODO overloading of mad?
     y, t = F.values, F.index.values
     return pd.Series(mad(y), index=t)
+
 
 def zscore(F: pd.Series, mode='classic'):
     y, t = F.values, F.index.values
@@ -72,14 +75,14 @@ def zscore(F: pd.Series, mode='classic'):
 
 
 def filt(F: pd.Series, N: int, Wn: float, fs: float | None = None, btype='low'):
-    """ a wrapper for scipy.signal.butter and sosfiltfilt
-    """
+    """a wrapper for scipy.signal.butter and sosfiltfilt"""
     y, t = F.values, F.index.values
     if fs is None:
         fs = 1 / np.median(np.diff(t))
     sos = signal.butter(N, Wn, btype, fs=fs, output='sos')
     y_filt = signal.sosfiltfilt(sos, y)
     return pd.Series(y_filt, index=t)
+
 
 def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):
     """
@@ -110,6 +113,7 @@ def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):
 ########  #######   ######   ######     ##        #######  ##    ##  ######     ##    ####  #######  ##    ##  ######
 """
 
+
 def mse_loss(p, x, y, fun):
     # mean squared error
     y_hat = fun(x, *p)
@@ -138,6 +142,7 @@ def irls_loss(p, x, y, fun, d=1e-7):
     w = 1 / f
     return np.sum(w * np.abs(a) ** 2) / y.shape[0]
 
+
 """
 ########  ########  ######   ########  ########  ######   ######  ####  #######  ##    ##
 ##     ## ##       ##    ##  ##     ## ##       ##    ## ##    ##  ##  ##     ## ###   ##
@@ -150,6 +155,7 @@ def irls_loss(p, x, y, fun, d=1e-7):
 
 # wrapper class for regressions with different loss functions
 # following a sklearn style of .fit() and .predict()
+
 
 class Regression:
     def __init__(self, model=None, method: str = 'mse', method_params=None):
@@ -220,6 +226,7 @@ class Regression:
         if return_type == 'pandas':
             return pd.Series(y_hat, index=x)
 
+
 """
 ########  ##       ########    ###     ######  ##     ##     ######   #######  ########  ########  ########  ######  ######## ####  #######  ##    ##
 ##     ## ##       ##         ## ##   ##    ## ##     ##    ##    ## ##     ## ##     ## ##     ## ##       ##    ##    ##     ##  ##     ## ###   ##
@@ -230,10 +237,11 @@ class Regression:
 ########  ######## ######## ##     ##  ######  ##     ##     ######   #######  ##     ## ##     ## ########  ######     ##    ####  #######  ##    ##
 """
 
+
 class BleachCorrection:
     def __init__(
         self,
-        model = None, # TODO bring back type checking
+        model=None,  # TODO bring back type checking
         regression_method: str = 'mse',
         regression_params: dict = None,
         correction_method: str = 'subtract',
@@ -262,7 +270,7 @@ class LowpassBleachCorrection:
     def correct(self, F: pd.Series):
         F_filt = filt(F, **self.filter_params)
         return correct(F, F_filt, mode=self.correction_method)
-    
+
 
 class IsosbesticCorrection:
     def __init__(
@@ -293,7 +301,10 @@ class IsosbesticCorrection:
 
         return correct(F_ca, F_iso_fit, mode=self.correction_method)
 
-def correct(signal: pd.Series, reference: pd.Series, mode: str = 'subtract') -> pd.Series:
+
+def correct(
+    signal: pd.Series, reference: pd.Series, mode: str = 'subtract'
+) -> pd.Series:
     """the main function that applies the correction of a signal with a reference. Correcions can be applied in 3 principle ways:
     - The reference can be subtracted from the signal
     - the signal can be divided by the reference
@@ -329,7 +340,6 @@ def correct(signal: pd.Series, reference: pd.Series, mode: str = 'subtract') -> 
 
 
 class AbstractModel(ABC):
-
     @abstractmethod
     def eq():
         # the model equation
@@ -374,7 +384,9 @@ class AbstractModel(ABC):
         aic = self._calc_aic(ll, k)
         return dict(r_sq=r_sq, ll=ll, aic=aic)
 
+
 # the actual models
+
 
 class LinearModel(AbstractModel):
     def eq(self, x, m, b):
@@ -449,6 +461,7 @@ class TripleExponDecay(AbstractModel):
             b_est,
         )
 
+
 """
  ######   #######  ########  ########  ########  ######  ######## ####  #######  ##    ##    ######## ##     ## ##    ##  ######  ######## ####  #######  ##    ##  ######
 ##    ## ##     ## ##     ## ##     ## ##       ##    ##    ##     ##  ##     ## ###   ##    ##       ##     ## ###   ## ##    ##    ##     ##  ##     ## ###   ## ##    ##
@@ -461,14 +474,17 @@ class TripleExponDecay(AbstractModel):
 
 # these are the convenience functions that are called in pipelines
 
+
 def lowpass_bleachcorrect(F: pd.Series, **kwargs):
     bc = LowpassBleachCorrection(**kwargs)
     return bc.correct(F)
+
 
 def exponential_bleachcorrect(F: pd.Series, **kwargs):
     model = DoubleExponDecay()
     ec = BleachCorrection(model, **kwargs)
     return ec.correct(F)
+
 
 def isosbestic_correct(F_sig: pd.DataFrame, F_ref: pd.DataFrame, **kwargs):
     ic = IsosbesticCorrection(**kwargs)
@@ -485,7 +501,8 @@ def isosbestic_correct(F_sig: pd.DataFrame, F_ref: pd.DataFrame, **kwargs):
  #######   #######     ##    ######## #### ######## ##     ##    ########  ########    ##    ########  ######     ##    ####  #######  ##    ##
 """
 
-def _grubbs_single(y: np.ndarray, alpha: float =0.005, mode: str='median') -> bool:
+
+def _grubbs_single(y: np.ndarray, alpha: float = 0.005, mode: str = 'median') -> bool:
     # to apply a single pass of grubbs outlier detection
     # see https://en.wikipedia.org/wiki/Grubbs%27s_test
 
@@ -505,7 +522,7 @@ def _grubbs_single(y: np.ndarray, alpha: float =0.005, mode: str='median') -> bo
         return False
 
 
-def grubbs_test(y: np.ndarray, alpha: float =0.005, mode:str='median'):
+def grubbs_test(y: np.ndarray, alpha: float = 0.005, mode: str = 'median'):
     # apply grubbs test iteratively until no more outliers are found
     outliers = []
     while _grubbs_single(y, alpha=alpha):
@@ -565,7 +582,9 @@ def fillnan_kde(y: np.ndarray, w: int = 25):
         return y
 
 
-def remove_outliers(F: pd.Series, w_size: int = 1000, alpha: float = 0.005, w: int = 25):
+def remove_outliers(
+    F: pd.Series, w_size: int = 1000, alpha: float = 0.005, w: int = 25
+):
     y, t = F.values, F.index.values
     y = copy(y)
     outliers = detect_outliers(y, w_size=w_size, alpha=alpha)
@@ -620,7 +639,6 @@ def make_sliding_window(
     method='stride_tricks',
     warning=None,
 ):
-    
     """use np.stride_tricks to make a sliding window view of a 1-d np.ndarray A
     full overlap, step size 1
     assumes 8 byte numbers (to be exposed? but needs to be tested first)

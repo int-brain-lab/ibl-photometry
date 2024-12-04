@@ -3,8 +3,15 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from iblphotometry.processing import z, Regression, ExponDecay, detect_spikes, detect_outliers
+from iblphotometry.processing import (
+    z,
+    Regression,
+    ExponDecay,
+    detect_spikes,
+    detect_outliers,
+)
 from iblphotometry.behavior import psth
+
 
 def percentile_dist(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
     """the distance between two percentiles in units of z. Captures the magnitude of transients.
@@ -65,7 +72,7 @@ def n_spikes(A: pd.Series | np.ndarray, sd: int = 5):
     """count the number of spike artifacts in the recording."""
     a = A.values if isinstance(A, pd.Series) else A
     return detect_spikes(a, sd=sd).shape[0]
- 
+
 
 def n_outliers(
     A: pd.Series | np.ndarray, w_size: int = 1000, alpha: float = 0.0005

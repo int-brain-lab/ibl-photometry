@@ -47,7 +47,11 @@ def from_dataframe(
     if data_columns is None:
         # this hacky parser currently deals with the inconsistency between carolinas and alejandros extraction
         # https://github.com/int-brain-lab/ibl-photometry/issues/35
-        data_columns = [col for col in raw_df.columns if col.startswith('Region') or col.startswith('G')]
+        data_columns = [
+            col
+            for col in raw_df.columns
+            if col.startswith('Region') or col.startswith('G')
+        ]
 
     # infer name of time column if not provided
     if time_column is None:
@@ -75,10 +79,11 @@ def from_dataframe(
 
     return raw_dfs
 
+
 def from_dataframes(raw_df: pd.DataFrame, locations_df: pd.DataFrame):
     data_columns = (list(locations_df.index),)
     rename = locations_df['brain_region'].to_dict()
-    
+
     read_config = dict(
         data_columns=data_columns,
         time_column='times',
@@ -125,7 +130,9 @@ def from_pqt(
     return from_dataframe(raw_df, **read_config)
 
 
-def from_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None, drop_first=True) -> pd.DataFrame:
+def from_raw_neurophotometrics_df(
+    raw_df: pd.DataFrame, rois=None, drop_first=True
+) -> pd.DataFrame:
     """reads in parses the output of the neurophotometrics FP3002
 
     Args:
@@ -251,6 +258,7 @@ def _validate_dataframe(
 
     return schema_raw_data.validate(df)
 
+
 def _validate_neurophotometrics_digital_inputs(df: pd.DataFrame) -> pd.DataFrame:
     schema_digital_inputs = pandera.DataFrameSchema(
         columns=dict(
@@ -262,4 +270,3 @@ def _validate_neurophotometrics_digital_inputs(df: pd.DataFrame) -> pd.DataFrame
         )
     )
     return schema_digital_inputs.validate(df)
-

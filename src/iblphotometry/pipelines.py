@@ -1,10 +1,17 @@
 import numpy as np
 import pandas as pd
-from iblphotometry.processing import remove_spikes, lowpass_bleachcorrect, isosbestic_correct, sliding_mad, zscore
+from iblphotometry.processing import (
+    remove_spikes,
+    lowpass_bleachcorrect,
+    isosbestic_correct,
+    sliding_mad,
+    zscore,
+)
 
 import logging
 
 logger = logging.getLogger()
+
 
 def run_pipeline(
     pipeline,
