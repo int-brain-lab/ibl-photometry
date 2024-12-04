@@ -231,12 +231,15 @@ def from_raw_neurophotometrics_file_to_ibl_df(
 
     return df
 
+
 def from_raw_neurophotometrics_file(
     path: str | Path,
     drop_first=True,
     validate=True,
 ) -> dict:
-    df = from_raw_neurophotometrics_file_to_ibl_df(path, drop_first=drop_first, validate=validate)
+    df = from_raw_neurophotometrics_file_to_ibl_df(
+        path, drop_first=drop_first, validate=validate
+    )
     data_columns = [col for col in df.columns if col.startswith('G')]
     read_config = dict(
         data_columns=data_columns,

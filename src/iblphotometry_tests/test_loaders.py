@@ -19,17 +19,20 @@ class TestLoaders(PhotometryDataTestCase):
     # for neurophotometrics hardware
     def test_from_raw_neurophotometrics_file(self):
         # the single direct version
-        raw_dfs_a = fpio.from_raw_neurophotometrics_file(self.paths['raw_neurophotometrics_csv'])
-        
+        raw_dfs_a = fpio.from_raw_neurophotometrics_file(
+            self.paths['raw_neurophotometrics_csv']
+        )
+
         # the chained version
-        df = fpio.from_raw_neurophotometrics_file_to_ibl_df(self.paths['raw_neurophotometrics_csv'])
+        df = fpio.from_raw_neurophotometrics_file_to_ibl_df(
+            self.paths['raw_neurophotometrics_csv']
+        )
         raw_dfs_b = fpio.from_ibl_dataframe(df)
 
         # check if they are the same
         assert raw_dfs_a.keys() == raw_dfs_b.keys()
         for key in raw_dfs_a.keys():
             pd.testing.assert_frame_equal(raw_dfs_a[key], raw_dfs_b[key])
-        
 
     # from pqt files as they are returned from ONE by .load_dataset()
     def test_from_ibl_pqt(self):
