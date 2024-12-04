@@ -1,4 +1,4 @@
-ibllib
+ibllib @ git+https://github.com/int-brain-lab/ibllib@develop
 numpy
 matplotlib
 pytest

@@ -1,4 +1,3 @@
-import unittest
 import iblphotometry.io as fio
 import numpy as np
 from iblphotometry_tests.base_tests import PhotometryDataTestCase

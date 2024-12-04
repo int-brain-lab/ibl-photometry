@@ -1,4 +1,3 @@
-import unittest
 from pathlib import Path
 import iblphotometry.io as fio
 from iblphotometry.pipelines import (
