@@ -1,29 +1,29 @@
-# %%
 import numpy as np
 import pandas as pd
 from pathlib import Path
 import warnings
 import pandera
+from typing import Optional
 
-from ibllib.pipes.neurophotometrics import (
+from iblphotometry.neurophotometrics import (
     LIGHT_SOURCE_MAP,
     LED_STATES,
 )
 
 
 def from_array(
-    times: np.array, data: np.array, channel_names: list[str] = None
+    times: np.ndarray, data: np.ndarray, channel_names: list[str] | None = None
 ) -> pd.DataFrame:
     return pd.DataFrame(data, index=times, columns=channel_names)
 
 
 def from_dataframe(
     raw_df: pd.DataFrame,
-    data_columns: list[str] = None,
-    time_column: str = None,
+    data_columns: list[str] | None = None,
+    time_column: str | None = None,
     channel_column: str = 'name',
-    channel_names: list[str] = None,
-    rename: dict = None,
+    channel_names: list[str] | None = None,
+    rename: dict | None = None,
 ) -> dict:
     """reads in a pandas.DataFrame and converts it into nap.TsdDataframes. Performs the time demultiplexing operation.
 
@@ -45,13 +45,19 @@ def from_dataframe(
 
     # infer if not explicitly provided: defaults to everything that starts with 'Region'
     if data_columns is None:
-        data_columns = [col for col in raw_df.columns if col.startswith('Region')]
+        # this hacky parser currently deals with the inconsistency between carolinas and alejandros extraction
+        # https://github.com/int-brain-lab/ibl-photometry/issues/35
+        data_columns = [
+            col
+            for col in raw_df.columns
+            if col.startswith('Region') or col.startswith('G')
+        ]
 
     # infer name of time column if not provided
     if time_column is None:
-        time_column = [col for col in raw_df.columns if 'time' in col.lower()]
-        assert len(time_column) == 1
-        time_column = time_column[0]
+        time_columns = [col for col in raw_df.columns if 'time' in col.lower()]
+        assert len(time_columns) == 1
+        time_column = time_columns[0]
 
     # infer channel names if they are not explicitly provided
     if channel_names is None:
@@ -74,9 +80,23 @@ def from_dataframe(
     return raw_dfs
 
 
+def from_dataframes(raw_df: pd.DataFrame, locations_df: pd.DataFrame):
+    data_columns = (list(locations_df.index),)
+    rename = locations_df['brain_region'].to_dict()
+
+    read_config = dict(
+        data_columns=data_columns,
+        time_column='times',
+        channel_column='name',
+        rename=rename,
+    )
+
+    return from_dataframe(raw_df, **read_config)
+
+
 def from_pqt(
     signal_pqt_path: str | Path,
-    locations_pqt_path: str | Path = None,
+    locations_pqt_path: Optional[str | Path] = None,
 ):
     """reads in a photometry.signal.pqt files as they are registered in alyx.
 
@@ -110,7 +130,9 @@ def from_pqt(
     return from_dataframe(raw_df, **read_config)
 
 
-def _read_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None) -> pd.DataFrame:
+def from_raw_neurophotometrics_df(
+    raw_df: pd.DataFrame, rois=None, drop_first=True
+) -> pd.DataFrame:
     """reads in parses the output of the neurophotometrics FP3002
 
     Args:
@@ -159,10 +181,14 @@ def _read_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None) -> pd.DataFr
             for cn in ['name', 'color', 'wavelength']:
                 out_df.loc[states == state, cn] = channel_meta_map.iloc[ic[0]][cn]
 
+    # drop first frame
+    if drop_first:
+        out_df = out_df.iloc[1:].reset_index()
+
     return out_df
 
 
-def from_raw_neurophotometrics(
+def from_raw_neurophotometrics_file(
     path: str | Path,
     drop_first=True,
     validate=True,
@@ -181,8 +207,7 @@ def from_raw_neurophotometrics(
         nap.TsdFrame: _description_ # FIXME
     """
     warnings.warn(
-        'loading a photometry from raw neurophotometrics output. The data will _not_ be synced and\
-            is being split into channels by LedState (converted to LED wavelength in nm)'
+        'loading photometry from raw neurophotometrics output. The data will _not_ be synced and is being split into channels by LedState (converted to LED wavelength in nm)'
     )
     if isinstance(path, str):
         path = Path(path)
@@ -199,11 +224,11 @@ def from_raw_neurophotometrics(
     if validate:
         raw_df = _validate_dataframe(raw_df)
 
-    df = _read_raw_neurophotometrics_df(raw_df)
+    df = from_raw_neurophotometrics_df(raw_df)
 
     # drop first frame
     if drop_first:
-        df = df.iloc[1:]
+        df = df.iloc[1:].reset_index()
 
     data_columns = [col for col in df.columns if col.startswith('G')]
     read_config = dict(
@@ -214,7 +239,6 @@ def from_raw_neurophotometrics(
     return from_dataframe(df, **read_config)
 
 
-# TODO externalize the validator in iblrig as a seperate function and reuse here
 def _validate_dataframe(
     df: pd.DataFrame,
     data_columns=None,
@@ -233,3 +257,16 @@ def _validate_dataframe(
     )
 
     return schema_raw_data.validate(df)
+
+
+def _validate_neurophotometrics_digital_inputs(df: pd.DataFrame) -> pd.DataFrame:
+    schema_digital_inputs = pandera.DataFrameSchema(
+        columns=dict(
+            ChannelName=pandera.Column(str, coerce=True),
+            Channel=pandera.Column(pandera.Int8, coerce=True),
+            AlwaysTrue=pandera.Column(bool, coerce=True),
+            SystemTimestamp=pandera.Column(pandera.Float64),
+            ComputerTimestamp=pandera.Column(pandera.Float64),
+        )
+    )
+    return schema_digital_inputs.validate(df)

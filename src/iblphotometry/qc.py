@@ -1,20 +1,16 @@
 # %%
-import numpy as np
-from scipy.stats import linregress
-import pandas as pd
-
+import gc
+from collections.abc import Callable
 from tqdm import tqdm
 import logging
 
-import gc
+import numpy as np
+import pandas as pd
+from scipy.stats import linregress
 
-from iblphotometry.sliding_operations import make_sliding_window
-from pipelines import run_pipeline
-import warnings
-
+from iblphotometry.processing import make_sliding_window
+from iblphotometry.pipelines import run_pipeline
 from brainbox.io.one import SessionLoader
-
-warnings.filterwarnings('once', category=DeprecationWarning, module='pynapple')
 
 logger = logging.getLogger()
 
@@ -23,10 +19,10 @@ logger = logging.getLogger()
 def sliding_metric(
     F: pd.Series,
     w_len: float,
-    fs: float = None,
-    metric: callable = None,
+    metric: Callable,
+    fs: float | None = None,
     n_wins: int = -1,
-    metric_kwargs: dict = None,
+    metric_kwargs: dict | None = None,
 ):
     """applies a metric along time.
 
@@ -59,9 +55,9 @@ def sliding_metric(
 # eval pipleline will be here
 def eval_metric(
     F: pd.Series,
-    metric: callable = None,
-    metric_kwargs: dict = None,
-    sliding_kwargs: dict = None,
+    metric: Callable,
+    metric_kwargs: dict | None = None,
+    sliding_kwargs: dict | None = None,
 ):
     m = metric(F, **metric_kwargs) if metric_kwargs is not None else metric(F)
 
@@ -118,9 +114,9 @@ def run_qc(
     for eid in tqdm(eids):
         print(eid)
         # get photometry data
-        raw_tfs = data_loader.load_photometry_data(eid=eid)
-        signal_bands = list(raw_tfs.keys())
-        brain_regions = raw_tfs[signal_bands[0]]
+        raw_dfs = data_loader.load_photometry_data(eid=eid)
+        signal_bands = list(raw_dfs.keys())
+        brain_regions = raw_dfs[signal_bands[0]]
 
         # get behavioral data
         # TODO this should be provided
@@ -135,7 +131,7 @@ def run_qc(
         # trials = data_loader.one.load_dataset(eid, '*trials.table.pqt')
 
         for band in signal_bands:
-            raw_tf = raw_tfs[band]
+            raw_tf = raw_dfs[band]
             for region in brain_regions:
                 qc_result = qc_series(
                     raw_tf[region], qc_metrics['raw'], sliding_kwargs=None, eid=eid
@@ -150,14 +146,14 @@ def run_qc(
             if 'reference' in sigref_mapping:  # this is for isosbestic pipelines
                 proc_tf = run_pipeline(
                     pipeline,
-                    raw_tfs[sigref_mapping['signal']],
-                    raw_tfs[sigref_mapping['reference']],
+                    raw_dfs[sigref_mapping['signal']],
+                    raw_dfs[sigref_mapping['reference']],
                 )
             else:
                 # FIXME this fails for true-multiband
                 # this hack works for single-band
                 # possible fix could be that signal could be a list
-                proc_tf = run_pipeline(pipeline, raw_tfs[sigref_mapping['signal']])
+                proc_tf = run_pipeline(pipeline, raw_dfs[sigref_mapping['signal']])
 
             for region in brain_regions:
                 # sliding qc of the processed data

@@ -1,15 +1,12 @@
-"""this module holds a collection of processing pipelines for fiber photometry data"""
-
 import numpy as np
 import pandas as pd
-
-# from ibldsp.utils import WindowGenerator
-from iblphotometry.outlier_detection import remove_spikes
-from iblphotometry.bleach_corrections import lowpass_bleachcorrect, isosbestic_correct
-from iblphotometry.sliding_operations import sliding_mad
-
-# TODO this will probably be refactored to to processing
-from iblphotometry.helpers import zscore
+from iblphotometry.processing import (
+    remove_spikes,
+    lowpass_bleachcorrect,
+    isosbestic_correct,
+    sliding_mad,
+    zscore,
+)
 
 import logging
 
@@ -19,7 +16,7 @@ logger = logging.getLogger()
 def run_pipeline(
     pipeline,
     F_signal: pd.DataFrame,
-    F_reference: pd.DataFrame = None,
+    F_reference: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     # copy
     Fc = F_signal.copy()

@@ -1,29 +1,16 @@
+from typing import Optional
 import numpy as np
 import pandas as pd
 from scipy import stats
-from scipy.stats import ttest_ind
 
-from iblphotometry.helpers import z
+from iblphotometry.processing import (
+    z,
+    Regression,
+    ExponDecay,
+    detect_spikes,
+    detect_outliers,
+)
 from iblphotometry.behavior import psth
-from iblphotometry.bleach_corrections import Regression, ExponDecay
-from iblphotometry.outlier_detection import detect_spikes, detect_outliers
-
-
-## this approach works as well
-# from functools import singledispatch
-# @singledispatch
-# def percentile_dist(A: nap.Tsd, pc: tuple = (50, 95), axis: None = None) -> float:
-#     """the distance between two percentiles in units of z
-#     should be proportional to SNR, assuming the signal is
-#     in the positive 5th percentile
-#     """
-#     P = np.percentile(z(A.values), pc)
-#     return P[1] - P[0]
-
-# @percentile_dist.register
-# def _(A: np.ndarray, pc: tuple = (50, 95), axis: int = -1) -> float:
-#     P = np.percentile(z(A), pc, axis=axis)
-#     return P[1] - P[0]
 
 
 def percentile_dist(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
@@ -77,22 +64,14 @@ def signal_skew(A: pd.Series | np.ndarray, axis=-1) -> float:
 
 def n_unique_samples(A: pd.Series | np.ndarray) -> int:
     """number of unique samples in the signal. Low values indicate that the signal during acquisition was not within the range of the digitizer."""
-    if isinstance(A, pd.Series):
-        return np.unique(A.values).shape[0]
-    elif isinstance(A, np.ndarray):
-        return A.shape[0]
-    else:
-        raise TypeError('A must be pd.Series or np.ndarray.')
+    a = A.values if isinstance(A, pd.Series) else A
+    return np.unique(a).shape[0]
 
 
 def n_spikes(A: pd.Series | np.ndarray, sd: int = 5):
     """count the number of spike artifacts in the recording."""
-    if isinstance(A, pd.Series):
-        return detect_spikes(A.values, sd=sd).shape[0]
-    elif isinstance(A, np.ndarray):
-        return detect_spikes(A, sd=sd).shape[0]
-    else:
-        raise TypeError('A must be pd.Series or np.ndarray.')
+    a = A.values if isinstance(A, pd.Series) else A
+    return detect_spikes(a, sd=sd).shape[0]
 
 
 def n_outliers(
@@ -101,12 +80,8 @@ def n_outliers(
     """counts the number of outliers as detected by grubbs test for outliers.
     int: _description_
     """
-    if isinstance(A, pd.Series):
-        return detect_outliers(A.values, w_size=w_size, alpha=alpha).shape[0]
-    elif isinstance(A, np.ndarray):
-        return detect_outliers(A, w_size=w_size, alpha=alpha).shape[0]
-    else:
-        raise TypeError('A must be pd.Series or np.ndarray.')
+    a = A.values if isinstance(A, pd.Series) else A
+    return detect_outliers(a, w_size=w_size, alpha=alpha).shape[0]
 
 
 def bleaching_tau(A: pd.Series) -> float:
@@ -155,8 +130,8 @@ def ttest_pre_post(
 
 def has_response_to_event(
     A: pd.Series,
-    event_times: np.array,
-    fs: float = None,
+    event_times: np.ndarray,
+    fs: Optional[float] = None,
     window: tuple = (-1, 1),
     alpha: float = 0.005,
     mode='peak',
@@ -179,15 +154,15 @@ def has_response_to_event(
     base_ix = np.setdiff1d(np.arange(y.shape[0]), psth_ix.flatten())
     base_samples = y[base_ix]
 
-    res = ttest_ind(sig_samples, base_samples)
+    res = stats.ttest_ind(sig_samples, base_samples)
     return res.pvalue < alpha
 
 
 def has_responses(
     A: pd.Series,
     trials: pd.DataFrame,
-    event_names: list = None,
-    fs: float = None,
+    event_names: list,
+    fs: Optional[float] = None,
     window: tuple = (-1, 1),
     alpha: float = 0.005,
 ) -> bool:
