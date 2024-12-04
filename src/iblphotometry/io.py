@@ -45,7 +45,9 @@ def from_dataframe(
 
     # infer if not explicitly provided: defaults to everything that starts with 'Region'
     if data_columns is None:
-        data_columns = [col for col in raw_df.columns if col.startswith('Region')]
+        # this hacky parser currently deals with the inconsistency between carolinas and alejandros extraction
+        # https://github.com/int-brain-lab/ibl-photometry/issues/35
+        data_columns = [col for col in raw_df.columns if col.startswith('Region') or col.startswith('G')]
 
     # infer name of time column if not provided
     if time_column is None:
@@ -72,6 +74,19 @@ def from_dataframe(
         raw_dfs[channel] = df.set_index(time_column)[data_columns]
 
     return raw_dfs
+
+def from_dataframes(raw_df: pd.DataFrame, locations_df: pd.DataFrame):
+    data_columns = (list(locations_df.index),)
+    rename = locations_df['brain_region'].to_dict()
+    
+    read_config = dict(
+        data_columns=data_columns,
+        time_column='times',
+        channel_column='name',
+        rename=rename,
+    )
+
+    return from_dataframe(raw_df, **read_config)
 
 
 def from_pqt(
@@ -110,7 +125,7 @@ def from_pqt(
     return from_dataframe(raw_df, **read_config)
 
 
-def _read_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None) -> pd.DataFrame:
+def from_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None, drop_first=True) -> pd.DataFrame:
     """reads in parses the output of the neurophotometrics FP3002
 
     Args:
@@ -159,10 +174,14 @@ def _read_raw_neurophotometrics_df(raw_df: pd.DataFrame, rois=None) -> pd.DataFr
             for cn in ['name', 'color', 'wavelength']:
                 out_df.loc[states == state, cn] = channel_meta_map.iloc[ic[0]][cn]
 
+    # drop first frame
+    if drop_first:
+        out_df = out_df.iloc[1:].reset_index()
+
     return out_df
 
 
-def from_raw_neurophotometrics(
+def from_raw_neurophotometrics_file(
     path: str | Path,
     drop_first=True,
     validate=True,
@@ -181,8 +200,7 @@ def from_raw_neurophotometrics(
         nap.TsdFrame: _description_ # FIXME
     """
     warnings.warn(
-        'loading a photometry from raw neurophotometrics output. The data will _not_ be synced and\
-            is being split into channels by LedState (converted to LED wavelength in nm)'
+        'loading photometry from raw neurophotometrics output. The data will _not_ be synced and is being split into channels by LedState (converted to LED wavelength in nm)'
     )
     if isinstance(path, str):
         path = Path(path)
@@ -199,11 +217,11 @@ def from_raw_neurophotometrics(
     if validate:
         raw_df = _validate_dataframe(raw_df)
 
-    df = _read_raw_neurophotometrics_df(raw_df)
+    df = from_raw_neurophotometrics_df(raw_df)
 
     # drop first frame
     if drop_first:
-        df = df.iloc[1:]
+        df = df.iloc[1:].reset_index()
 
     data_columns = [col for col in df.columns if col.startswith('G')]
     read_config = dict(
