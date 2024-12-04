@@ -108,20 +108,20 @@ class DataFrameVisualizerApp(QWidget):
                     or file_path.endswith('.pqt')
                     or file_path.endswith('.parquet')
                 ):
-                    self.td = from_raw_neurophotometrics_file(file_path)
+                    self.dfs = from_raw_neurophotometrics_file(file_path)
                 else:
                     raise ValueError('Unsupported file format')
 
-                if 'GCaMP' in self.td.keys():
-                    self.df = self.td['GCaMP'].as_dataframe()
-                    self.times = self.td['GCaMP'].t
+                if 'GCaMP' in self.dfs.keys():
+                    self.df = self.dfs['GCaMP']
+                    self.times = self.dfs['GCaMP'].index.values
                     self.plot_time_index = np.arange(0, len(self.times))
                     self.filtered_df = None
                 else:
                     raise ValueError('No GCaMP found')
 
-                if 'Isosbestic' in self.td.keys():
-                    self.dfiso = self.td['Isosbestic'].as_dataframe()
+                if 'Isosbestic' in self.dfs.keys():
+                    self.dfiso = self.dfs['Isosbestic']
 
                 # Display the dataframe in the table
                 # self.display_dataframe()
@@ -129,7 +129,7 @@ class DataFrameVisualizerApp(QWidget):
                 self.update_column_selector()
 
                 # Load into Pynapple dataframe
-                self.td = from_raw_neurophotometrics_file(file_path)
+                self.dfs = from_raw_neurophotometrics_file(file_path)
 
                 # Set filter combo box
                 self.filter_selector.setCurrentIndex(0)  # Reset to "Select Filter"

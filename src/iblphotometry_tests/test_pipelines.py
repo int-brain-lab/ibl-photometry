@@ -17,7 +17,7 @@ class TestPipelines(PhotometryDataTestCase):
 
         Path(__file__).parent.joinpath()
         # on real data
-        raw_dfs = fio.from_pqt(
+        raw_dfs = fio.from_ibl_pqt(
             self.paths['photometry_signal_pqt'],
             self.paths['photometryROI_locations_pqt'],
         )
