@@ -17,8 +17,8 @@ class TestLoaders(tests.base_tests.PhotometryDataTestCase):
         fio.from_array(times, data, names)
 
     # for neurophotometrics hardware
-    def test_from_raw_neurophotometrics_output(self):
-        fio.from_raw_neurophotometrics(self.paths['raw_neurophotometrics_csv'])
+    def test_from_raw_neurophotometrics_file(self):
+        fio.from_raw_neurophotometrics_file(self.paths['raw_neurophotometrics_csv'])
 
     # from pqt files as they are returned from ONE by .load_dataset()
     def test_from_pqt(self):
