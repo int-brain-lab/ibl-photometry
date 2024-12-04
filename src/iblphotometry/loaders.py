@@ -12,7 +12,7 @@ class PhotometryLoader:
         self.one = one
         self.verbose = verbose
 
-    def load_photometry_data(self, eid=None, pid=None, rename=True) -> nap.TsdFrame:
+    def load_photometry_data(self, eid=None, pid=None, rename=True) -> pd.DataFrame:
         if pid is not None:
             raise NotImplementedError
             # return self._load_data_from_pid(pid)
@@ -20,7 +20,7 @@ class PhotometryLoader:
         if eid is not None:
             return self._load_data_from_eid(eid, rename=rename)
 
-    def _load_data_from_eid(self, eid, rename=True) -> nap.TsdFrame:
+    def _load_data_from_eid(self, eid, rename=True) -> pd.DataFrame:
         raw_photometry_df = self.one.load_dataset(eid, 'photometry.signal.pqt')
         locations_df = self.one.load_dataset(eid, 'photometryROI.locations.pqt')
         read_config = dict(

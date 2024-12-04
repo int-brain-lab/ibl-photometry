@@ -1,10 +1,9 @@
-import unittest
 import iblphotometry.io as fio
 import numpy as np
-import tests.base_tests
+from iblphotometry_tests.base_tests import PhotometryDataTestCase
 
 
-class TestLoaders(tests.base_tests.PhotometryDataTestCase):
+class TestLoaders(PhotometryDataTestCase):
     # think here about the possible use cases
 
     # to read from a .csv from disk

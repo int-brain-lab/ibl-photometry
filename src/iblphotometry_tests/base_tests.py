@@ -17,6 +17,8 @@ def get_fixtures() -> dict:
         / session_folder
         / Path('raw_photometry_data/_neurophotometrics_fpData.raw.pqt'),
         'raw_neurophotometrics_csv': data_folder / 'raw_photometry.csv',
+        'raw_kcenia_pqt': data_folder / 'raw_photometry.pqt',
+        'trials_table_kcenia_pqt': data_folder / '_ibl_trials.table.pqt',
         'trials_table_pqt': data_folder / session_folder / 'alf/_ibl_trials.table.pqt',
     }
 

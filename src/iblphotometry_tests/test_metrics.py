@@ -1,12 +1,11 @@
-import unittest
 import iblphotometry.io as fio
 import iblphotometry.metrics as metrics
 import pandas as pd
 
-import tests.base_tests
+from iblphotometry_tests.base_tests import PhotometryDataTestCase
 
 
-class TestMetrics(tests.base_tests.PhotometryDataTestCase):
+class TestMetrics(PhotometryDataTestCase):
     # think here about the possible use cases
 
     def test_metrics(self):

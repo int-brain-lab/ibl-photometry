@@ -3,7 +3,6 @@ import pandas as pd
 from iblphotometry.processing import remove_spikes, lowpass_bleachcorrect, isosbestic_correct, sliding_mad, zscore
 
 import logging
-from copy import copy
 
 logger = logging.getLogger()
 

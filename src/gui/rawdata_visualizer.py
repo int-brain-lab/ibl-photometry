@@ -1,19 +1,23 @@
 import sys
-import pandas as pd
-import matplotlib.pyplot as plt
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QTableWidget, \
-    QTableWidgetItem, QComboBox, QGridLayout, QLineEdit
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (
+    QApplication,
+    QWidget,
+    QVBoxLayout,
+    QHBoxLayout,
+    QPushButton,
+    QFileDialog,
+    QComboBox,
+    QGridLayout,
+    QLineEdit,
+)
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
-from pydantic.v1 import NoneStr
 
 from iblphotometry.io import from_raw_neurophotometrics
 import iblphotometry.plots as plots
 
 import iblphotometry.preprocessing as ffpr
 import numpy as np
-from matplotlib.colorbar import Colorbar
 
 
 class DataFrameVisualizerApp(QWidget):
@@ -74,7 +78,6 @@ class DataFrameVisualizerApp(QWidget):
         self.apply_button.clicked.connect(self.apply_time_range)
         main_layout.addLayout(time_layout)
         main_layout.addWidget(self.apply_button)
-
 
         # Set up plots layout
         self.plot_layout = QGridLayout()
@@ -159,20 +162,21 @@ class DataFrameVisualizerApp(QWidget):
                 start_time = float(start_time_str)
 
             if end_time_str == '':
-                end_time = self.times[len(self.times)-1]
+                end_time = self.times[len(self.times) - 1]
             else:
                 end_time = float(end_time_str)
             # Filter dataframe based on user input
             indx_time = (self.times >= start_time) & (self.times <= end_time)
 
-
             if len(indx_time) == 0:
-                print("No data in the specified range.")
+                print('No data in the specified range.')
             else:
                 self.plot_time_index = indx_time
                 self.update_plots()
         except ValueError:
-            print("Invalid time format. Please enter a valid time point in the format of a float.")
+            print(
+                'Invalid time format. Please enter a valid time point in the format of a float.'
+            )
 
     def update_column_selector(self):
         if self.df is not None:
@@ -185,11 +189,12 @@ class DataFrameVisualizerApp(QWidget):
         selected_column = self.column_selector.currentText()
 
         if selected_column and self.df is not None:
-
             raw_signal = self.df[selected_column].values[self.plot_time_index]
             times = self.times[self.plot_time_index]
             if self.dfiso is not None:
-                raw_isosbestic = self.dfiso[selected_column].values[self.plot_time_index]
+                raw_isosbestic = self.dfiso[selected_column].values[
+                    self.plot_time_index
+                ]
             else:
                 raw_isosbestic = None
 
@@ -199,12 +204,16 @@ class DataFrameVisualizerApp(QWidget):
             if self.filtered_df is None:
                 processed_signal = None
             else:
-                processed_signal = self.filtered_df[selected_column].values[self.plot_time_index]
+                processed_signal = self.filtered_df[selected_column].values[
+                    self.plot_time_index
+                ]
 
-            self.plotobj.set_data(raw_signal=raw_signal,
-                                  times=times,
-                                  raw_isosbestic=raw_isosbestic,
-                                  processed_signal=processed_signal)
+            self.plotobj.set_data(
+                raw_signal=raw_signal,
+                times=times,
+                raw_isosbestic=raw_isosbestic,
+                processed_signal=processed_signal,
+            )
             self.plotobj.raw_processed_figure2(self.axes)
 
             # Redraw the canvas
@@ -230,11 +239,10 @@ class DataFrameVisualizerApp(QWidget):
         # Get the selected filter option from the filter dropdown
         filter_option = self.filter_selector.currentText()
 
-        if filter_option == "Select Filter":
+        if filter_option == 'Select Filter':
             self.filtered_df = None
             # After applying the filter, update the plots
             self.update_plots()
-
 
         # Apply the appropriate filter to the dataframe and get the modified data
         if filter_option == 'Filter MAD':
