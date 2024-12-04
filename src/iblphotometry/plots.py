@@ -41,8 +41,8 @@ Loader objects for plotting
 
 
 class PlotSignal:
-    def __init__(self, *args, **kwargs):
-        self.set_data(*args, **kwargs)
+    # def __init__(self, *args, **kwargs):
+    #     self.set_data(*args, **kwargs)
 
     def set_data(
         self, raw_signal, times, raw_isosbestic=None, processed_signal=None, fs=None
