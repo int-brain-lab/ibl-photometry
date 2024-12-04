@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 
-from iblphotometry.io import from_raw_neurophotometrics
+from iblphotometry.io import from_raw_neurophotometrics_file
 import iblphotometry.plots as plots
 
 import iblphotometry.preprocessing as ffpr
@@ -108,7 +108,7 @@ class DataFrameVisualizerApp(QWidget):
                     or file_path.endswith('.pqt')
                     or file_path.endswith('.parquet')
                 ):
-                    self.td = from_raw_neurophotometrics(file_path)
+                    self.td = from_raw_neurophotometrics_file(file_path)
                 else:
                     raise ValueError('Unsupported file format')
 
@@ -129,7 +129,7 @@ class DataFrameVisualizerApp(QWidget):
                 self.update_column_selector()
 
                 # Load into Pynapple dataframe
-                self.td = from_raw_neurophotometrics(file_path)
+                self.td = from_raw_neurophotometrics_file(file_path)
 
                 # Set filter combo box
                 self.filter_selector.setCurrentIndex(0)  # Reset to "Select Filter"
