@@ -11,147 +11,37 @@ from iblphotometry.neurophotometrics import (
 )
 
 
-def from_array(
-    times: np.ndarray, data: np.ndarray, channel_names: list[str] | None = None
+def from_raw_neurophotometrics_file_to_raw_df(
+    path: str | Path,
+    validate=True,
 ) -> pd.DataFrame:
-    return pd.DataFrame(data, index=times, columns=channel_names)
+    path = Path(path) if isinstance(path, str) else path
+    match path.suffix:
+        case '.csv':
+            raw_df = pd.read_csv(path)
+        case '.pqt':
+            raw_df = pd.read_parquet(path)
+
+    if validate:
+        raw_df = _validate_neurophotometrics_df(raw_df)
+
+    return raw_df
 
 
-def from_ibl_dataframe(
-    raw_df: pd.DataFrame,
-    data_columns: list[str] | None = None,
-    time_column: str | None = None,
-    channel_column: str = 'name',
-    channel_names: list[str] | None = None,
-    rename: dict | None = None,
-) -> dict:
-    """reads in a pandas.DataFrame and converts it into nap.TsdDataframes. Performs the time demultiplexing operation.
-
-
-    Args:
-        raw_df (pd.DataFrame): the dataframe, as stored in the photometry.signal.pqt
-        data_columns (list[str], optional): The names of the columns in the dataframe that contain the signals of different fibers. By default, they are named RegionXX. If None is provided, All columns that start with `Region` are treated as data columns. Defaults to None.
-        time_column (str, optional): The name of the column that contains the timestamps. If None is provided, it is assumed that `time` is in the name. Defaults to None.
-        channel_column (str, optional): The name of the column that contains. Defaults to 'name'.
-        channel_names (list[str], optional): The names of the acquisition channel / frequency bands that are acquired. Defaults to None.
-        rename (dict, optional): a renaming map that maps the names of the columns to brain areas. Example: {'RegionXX':'DMS'}. Defaults to None.
-
-    Returns:
-        dict: A dict with the keys being the names of the acquisition channels, the values being nap.TsdFrames with the columns containing the data of the different fibers
-    """
-    # from a raw dataframe as it is stored in ONE (signal.pqt)
-    # data_columns is a list of str that specifies the names of the column that hold the actual data, like 'RegionXX'
-    # channel_column is the column that specifies the temporally multiplexed acquisition channels
-
-    # infer if not explicitly provided: defaults to everything that starts with 'Region'
-    if data_columns is None:
-        # this hacky parser currently deals with the inconsistency between carolinas and alejandros extraction
-        # https://github.com/int-brain-lab/ibl-photometry/issues/35
-        data_columns = [
-            col
-            for col in raw_df.columns
-            if col.startswith('Region') or col.startswith('G')
-        ]
-
-    # infer name of time column if not provided
-    if time_column is None:
-        time_columns = [col for col in raw_df.columns if 'time' in col.lower()]
-        assert len(time_columns) == 1
-        time_column = time_columns[0]
-
-    # infer channel names if they are not explicitly provided
-    if channel_names is None:
-        channel_names = raw_df[channel_column].unique()
-
-    # drop empty acquisition channels
-    to_drop = ['None', '']
-    channel_names = [ch for ch in channel_names if ch not in to_drop]
-
-    raw_dfs = {}
-    for channel in channel_names:
-        # get the data for the band
-        df = raw_df.groupby(channel_column).get_group(channel)
-        # if rename dict is passed, rename Region0X to the corresponding brain region
-        if rename is not None:
-            df = df.rename(columns=rename)
-            data_columns = rename.values()
-        raw_dfs[channel] = df.set_index(time_column)[data_columns]
-
-    return raw_dfs
-
-
-def from_ibl_dataframes(raw_df: pd.DataFrame, locations_df: pd.DataFrame):
-    data_columns = (list(locations_df.index),)
-    rename = locations_df['brain_region'].to_dict()
-
-    read_config = dict(
-        data_columns=data_columns,
-        time_column='times',
-        channel_column='name',
-        rename=rename,
-    )
-
-    return from_ibl_dataframe(raw_df, **read_config)
-
-
-def from_ibl_pqt(
-    signal_pqt_path: str | Path,
-    locations_pqt_path: Optional[str | Path] = None,
-):
-    """reads in a photometry.signal.pqt files as they are registered in alyx.
-
-    Args:
-        signal_pqt_path (str | Path): _description_
-        locations_pqt_path (str | Path, optional): _description_. Defaults to None.
-
-    Returns:
-        _type_: _description_
-    """
-
-    raw_df = pd.read_parquet(signal_pqt_path)
-    if locations_pqt_path is not None:
-        locations_df = pd.read_parquet(locations_pqt_path)
-        return from_ibl_dataframes(raw_df, locations_df)
-    else:
-        warnings.warn(
-            'loading a photometry.signal.pqt file without its corresponding photometryROI.locations.pqt'
-        )
-        data_columns = None
-        rename = None
-
-    read_config = dict(
-        data_columns=data_columns,
-        time_column='times',
-        channel_column='name',
-        rename=rename,
-    )
-
-    return from_ibl_dataframe(raw_df, **read_config)
-
-
-def from_raw_neurophotometrics_ibl_df(
+def from_raw_neurophotometrics_df_to_ibl_df(
     raw_df: pd.DataFrame, rois=None, drop_first=True
 ) -> pd.DataFrame:
-    """reads in parses the output of the neurophotometrics FP3002
-
-    Args:
-        raw_df (pd.DataFrame): _description_
-        rois (_type_, optional): _description_. Defaults to None.
-
-    Returns:
-        pd.DataFrame: a dataframe in the same format as stored in alyx as pqt.
-    """
     if rois is None:
-        rois = [col for col in raw_df.columns if col.startswith('G')]
+        rois = infer_data_columns(raw_df)
 
-    df = raw_df.filter(items=rois, axis=1).sort_index(axis=1)
+    ibl_df = raw_df.filter(items=rois, axis=1).sort_index(axis=1)
     timestamp_name = (
         'SystemTimestamp' if 'SystemTimestamp' in raw_df.columns else 'Timestamp'
     )
-    df['times'] = raw_df[timestamp_name]
-    df['wavelength'] = np.nan
-    df['name'] = ''
-    df['color'] = ''
+    ibl_df['times'] = raw_df[timestamp_name]
+    ibl_df['wavelength'] = np.nan
+    ibl_df['name'] = ''
+    ibl_df['color'] = ''
 
     # TODO the names column in channel_meta_map should actually be user defined (experiment description file?)
     channel_meta_map = pd.DataFrame(LIGHT_SOURCE_MAP)
@@ -171,20 +61,20 @@ def from_raw_neurophotometrics_ibl_df(
                     name = '+'.join([channel_meta_map['name'][c] for c in combo])
                     color = '+'.join([channel_meta_map['color'][c] for c in combo])
                     wavelength = np.nan
-                    df.loc[states == state, ['name', 'color', 'wavelength']] = (
+                    ibl_df.loc[states == state, ['name', 'color', 'wavelength']] = (
                         name,
                         color,
                         wavelength,
                     )
         else:
             for cn in ['name', 'color', 'wavelength']:
-                df.loc[states == state, cn] = channel_meta_map.iloc[ic[0]][cn]
+                ibl_df.loc[states == state, cn] = channel_meta_map.iloc[ic[0]][cn]
 
     # drop first frame
     if drop_first:
-        df = df.iloc[1:].reset_index()
+        ibl_df = ibl_df.iloc[1:].reset_index()
 
-    return df
+    return ibl_df
 
 
 def from_raw_neurophotometrics_file_to_ibl_df(
@@ -192,44 +82,115 @@ def from_raw_neurophotometrics_file_to_ibl_df(
     drop_first=True,
     validate=True,
 ) -> pd.DataFrame:
-    """reads a raw neurophotometrics file (in .csv or .pqt format) as they are written by the neurophotometrics software
+    raw_df = from_raw_neurophotometrics_file_to_raw_df(path, validate=validate)
+    ibl_df = from_raw_neurophotometrics_df_to_ibl_df(raw_df, drop_first=drop_first)
+
+    return ibl_df
+
+
+def from_ibl_pqt_to_ibl_df(path: str | Path, validate=False):
+    if validate is True:
+        # TODO
+        raise NotImplementedError
+    return pd.read_parquet(path)
+
+
+def from_ibl_dataframe(
+    ibl_df: pd.DataFrame,
+    data_columns: list[str] | None = None,
+    time_column: str | None = None,
+    channel_column: str = 'name',
+    channel_names: list[str] | None = None,
+    rename: dict | None = None,
+) -> dict:
+    """main function to convert to analysis ready format
+
 
     Args:
-        path (str | Path): path to either the .csv file as written by the neurophotometrics bonsai workflow, or a path to a .pqt file as stored in alyx
-        drop_first (bool, optional): The first frame is all LEDs on. If true, this frame is dropped. Defaults to True.
-        validate (bool, optional): if true, enforces pydantic validation of the datatypes. Defaults to TRue
-
-    Raises:
-        NotImplementedError: _description_
+        ibl_df (pd.DataFrame): the dataframe, as stored in the photometry.signal.pqt
+        data_columns (list[str], optional): The names of the columns in the dataframe that contain the signals of different fibers. By default, they are named RegionXX. If None is provided, All columns that start with `Region` are treated as data columns. Defaults to None.
+        time_column (str, optional): The name of the column that contains the timestamps. If None is provided, it is assumed that `time` is in the name. Defaults to None.
+        channel_column (str, optional): The name of the column that contains. Defaults to 'name'.
+        channel_names (list[str], optional): The names of the acquisition channel / frequency bands that are acquired. Defaults to None.
+        rename (dict, optional): a renaming map that maps the names of the columns to brain areas. Example: {'RegionXX':'DMS'}. Defaults to None.
 
     Returns:
-        nap.TsdFrame: _description_ # FIXME
+        dict: A dict with the keys being the names of the acquisition channels, the values being nap.TsdFrames with the columns containing the data of the different fibers
     """
-    warnings.warn(
-        'loading photometry from raw neurophotometrics output. The data will _not_ be synced and is being split into channels by LedState (converted to LED wavelength in nm)'
-    )
-    if isinstance(path, str):
-        path = Path(path)
-    if path.suffix == '.csv':
-        # really raw as it comes out of the device
-        # todo figure out the header
-        raw_df = pd.read_csv(path)
-    elif path.suffix == '.pqt':
-        # as it is stored
-        raw_df = pd.read_parquet(path)
+    # from a raw dataframe as it is stored in ONE (signal.pqt)
+    # data_columns is a list of str that specifies the names of the column that hold the actual data, like 'RegionXX'
+    # channel_column is the column that specifies the temporally multiplexed acquisition channels
+
+    data_columns = infer_data_columns(ibl_df) if data_columns is None else data_columns
+
+    # infer name of time column if not provided
+    if time_column is None:
+        time_columns = [col for col in ibl_df.columns if 'time' in col.lower()]
+        assert len(time_columns) == 1
+        time_column = time_columns[0]
+
+    # infer channel names if they are not explicitly provided
+    if channel_names is None:
+        channel_names = ibl_df[channel_column].unique()
+
+    # drop empty acquisition channels
+    to_drop = ['None', '']
+    channel_names = [ch for ch in channel_names if ch not in to_drop]
+
+    dfs = {}
+    for channel in channel_names:
+        # get the data for the band
+        df = ibl_df.groupby(channel_column).get_group(channel)
+        # if rename dict is passed, rename Region0X to the corresponding brain region
+        if rename is not None:
+            df = df.rename(columns=rename)
+            data_columns = rename.values()
+        dfs[channel] = df.set_index(time_column)[data_columns]
+
+    return dfs
+
+
+def from_ibl_pqt(
+    signal_pqt_path: str | Path,
+    locations_pqt_path: Optional[str | Path] = None,
+):
+    # read from a single pqt
+    # if both are provided, do both
+
+    ibl_df = pd.read_parquet(signal_pqt_path)
+    if locations_pqt_path is not None:
+        locations_df = pd.read_parquet(locations_pqt_path)
+        return from_ibl_dataframes(ibl_df, locations_df)
     else:
-        raise NotImplementedError
+        warnings.warn(
+            'loading a photometry.signal.pqt file without its corresponding photometryROI.locations.pqt'
+        )
+        data_columns = None
+        rename = None
 
-    if validate:
-        raw_df = _validate_ibl_dataframe(raw_df)
+    read_config = dict(
+        data_columns=data_columns,
+        time_column='times',
+        channel_column='name',
+        rename=rename,
+    )
 
-    df = from_raw_neurophotometrics_ibl_df(raw_df)
+    return from_ibl_dataframe(ibl_df, **read_config)
 
-    # drop first frame
-    if drop_first:
-        df = df.iloc[1:].reset_index()
 
-    return df
+def from_ibl_dataframes(ibl_df: pd.DataFrame, locations_df: pd.DataFrame):
+    # if locations are present
+    data_columns = (list(locations_df.index),)
+    rename = locations_df['brain_region'].to_dict()
+
+    read_config = dict(
+        data_columns=data_columns,
+        time_column='times',
+        channel_column='name',
+        rename=rename,
+    )
+
+    return from_ibl_dataframe(ibl_df, **read_config)
 
 
 def from_raw_neurophotometrics_file(
@@ -237,24 +198,38 @@ def from_raw_neurophotometrics_file(
     drop_first=True,
     validate=True,
 ) -> dict:
-    df = from_raw_neurophotometrics_file_to_ibl_df(
+    # this one bypasses everything
+    ibl_df = from_raw_neurophotometrics_file_to_ibl_df(
         path, drop_first=drop_first, validate=validate
     )
-    data_columns = [col for col in df.columns if col.startswith('G')]
+    # data_columns = infer_data_columns(ibl_df) if data_columns is None else data_columns
     read_config = dict(
-        data_columns=data_columns,
+        # data_columns=data_columns,
         time_column='times',
         channel_column='name',
     )
-    return from_ibl_dataframe(df, **read_config)
+    return from_ibl_dataframe(ibl_df, **read_config)
 
 
-def _validate_ibl_dataframe(
+"""
+##     ##    ###    ##       #### ########     ###    ######## ####  #######  ##    ##
+##     ##   ## ##   ##        ##  ##     ##   ## ##      ##     ##  ##     ## ###   ##
+##     ##  ##   ##  ##        ##  ##     ##  ##   ##     ##     ##  ##     ## ####  ##
+##     ## ##     ## ##        ##  ##     ## ##     ##    ##     ##  ##     ## ## ## ##
+ ##   ##  ######### ##        ##  ##     ## #########    ##     ##  ##     ## ##  ####
+  ## ##   ##     ## ##        ##  ##     ## ##     ##    ##     ##  ##     ## ##   ###
+   ###    ##     ## ######## #### ########  ##     ##    ##    ####  #######  ##    ##
+"""
+
+
+def validate_ibl_dataframe(df: pd.DataFrame) -> pd.DataFrame: ...
+
+
+def _validate_neurophotometrics_df(
     df: pd.DataFrame,
     data_columns=None,
 ) -> pd.DataFrame:
-    if data_columns is None:
-        data_columns = [col for col in df.columns if col.startswith('G')]
+    data_columns = infer_data_columns(df) if data_columns is None else data_columns
 
     schema_raw_data = pandera.DataFrameSchema(
         columns=dict(
@@ -280,3 +255,12 @@ def _validate_neurophotometrics_digital_inputs(df: pd.DataFrame) -> pd.DataFrame
         )
     )
     return schema_digital_inputs.validate(df)
+
+
+def infer_data_columns(df: pd.DataFrame) -> list[str]:
+    # this hacky parser currently deals with the inconsistency between carolinas and alejandros extraction
+    # https://github.com/int-brain-lab/ibl-photometry/issues/35
+    data_columns = [
+        col for col in df.columns if col.startswith('Region') or col.startswith('G')
+    ]
+    return data_columns
