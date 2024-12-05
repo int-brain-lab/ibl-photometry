@@ -36,6 +36,7 @@ class TestPlotters(PhotometryDataTestCase):
         """
         This is a throw-away loader function to help testing the plotting functions
         """
+        self.set_paths('kcenia')
         # --- Use real data for test ---
         event = 'feedback_times'
         # eid = '77a6741c-81cc-475f-9454-a9b997be02a4'  # Good response to feedback times
