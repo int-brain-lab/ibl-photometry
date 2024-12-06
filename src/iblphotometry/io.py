@@ -12,8 +12,7 @@ from iblphotometry.neurophotometrics import (
 
 
 def from_raw_neurophotometrics_file_to_raw_df(
-    path: str | Path,
-    validate=True,
+    path: str | Path, validate=True, version='new'
 ) -> pd.DataFrame:
     path = Path(path) if isinstance(path, str) else path
     match path.suffix:
@@ -23,7 +22,7 @@ def from_raw_neurophotometrics_file_to_raw_df(
             raw_df = pd.read_parquet(path)
 
     if validate:
-        raw_df = validate_neurophotometrics_df(raw_df)
+        raw_df = validate_neurophotometrics_df(raw_df, version=version)
 
     return raw_df
 
@@ -78,11 +77,11 @@ def from_raw_neurophotometrics_df_to_ibl_df(
 
 
 def from_raw_neurophotometrics_file_to_ibl_df(
-    path: str | Path,
-    drop_first=True,
-    validate=True,
+    path: str | Path, drop_first=True, validate=True, version='new'
 ) -> pd.DataFrame:
-    raw_df = from_raw_neurophotometrics_file_to_raw_df(path, validate=validate)
+    raw_df = from_raw_neurophotometrics_file_to_raw_df(
+        path, validate=validate, version=version
+    )
     ibl_df = from_raw_neurophotometrics_df_to_ibl_df(raw_df, drop_first=drop_first)
 
     return ibl_df
@@ -194,13 +193,11 @@ def from_ibl_dataframes(ibl_df: pd.DataFrame, locations_df: pd.DataFrame):
 
 
 def from_raw_neurophotometrics_file(
-    path: str | Path,
-    drop_first=True,
-    validate=True,
+    path: str | Path, drop_first=True, validate=True, version='new'
 ) -> dict:
     # this one bypasses everything
     ibl_df = from_raw_neurophotometrics_file_to_ibl_df(
-        path, drop_first=drop_first, validate=validate
+        path, drop_first=drop_first, validate=validate, version=version
     )
     # data_columns = infer_data_columns(ibl_df) if data_columns is None else data_columns
     read_config = dict(
@@ -242,18 +239,30 @@ def validate_ibl_dataframe(df: pd.DataFrame) -> pd.DataFrame: ...
 def validate_neurophotometrics_df(
     df: pd.DataFrame,
     data_columns=None,
+    version='new',  # or 'old' - TODO to be replaced
 ) -> pd.DataFrame:
     data_columns = infer_data_columns(df) if data_columns is None else data_columns
 
-    schema_raw_data = pandera.DataFrameSchema(
-        columns=dict(
-            FrameCounter=pandera.Column(pandera.Int64),
-            SystemTimestamp=pandera.Column(pandera.Float64),
-            LedState=pandera.Column(pandera.Int16, coerce=True),
-            ComputerTimestamp=pandera.Column(pandera.Float64),
-            **{k: pandera.Column(pandera.Float64) for k in data_columns},
-        )
-    )
+    match version:
+        case 'new':  # kcenia, carolina
+            schema_raw_data = pandera.DataFrameSchema(
+                columns=dict(
+                    FrameCounter=pandera.Column(pandera.Int64),
+                    SystemTimestamp=pandera.Column(pandera.Float64),
+                    LedState=pandera.Column(pandera.Int16, coerce=True),
+                    ComputerTimestamp=pandera.Column(pandera.Float64),
+                    **{k: pandera.Column(pandera.Float64) for k in data_columns},
+                )
+            )
+        case 'old':  # alejandro
+            schema_raw_data = pandera.DataFrameSchema(
+                columns=dict(
+                    FrameCounter=pandera.Column(pandera.Int64),
+                    Timestamp=pandera.Column(pandera.Float64),
+                    LedState=pandera.Column(pandera.Int16, coerce=True),
+                    **{k: pandera.Column(pandera.Float64) for k in data_columns},
+                )
+            )
 
     return schema_raw_data.validate(df)
 
