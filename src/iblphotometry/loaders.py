@@ -27,7 +27,7 @@ class PhotometryLoader:
             data_columns=list(locations_df.index),
             rename=locations_df['brain_region'].to_dict() if rename else None,
         )
-        raw_dfs = io.from_dataframe(raw_photometry_df, **read_config)
+        raw_dfs = io.from_ibl_dataframe(raw_photometry_df, **read_config)
 
         signal_band_names = list(raw_dfs.keys())
         col_names = list(raw_dfs[signal_band_names[0]].columns)
@@ -44,19 +44,19 @@ class KceniaLoader(PhotometryLoader):
         session_path = self.one.eid2path(eid)
         pnames = self._eid2pnames(eid)
 
-        raw_dfs = {}
+        _raw_dfs = {}
         for pname in pnames:
             pqt_path = session_path / 'alf' / pname / 'raw_photometry.pqt'
-            raw_dfs[pname] = pd.read_parquet(pqt_path).set_index('times')
+            _raw_dfs[pname] = pd.read_parquet(pqt_path).set_index('times')
 
         signal_bands = ['raw_calcium', 'raw_isosbestic']  # HARDCODED but fine
 
         # flipping the data representation
         raw_dfs = {}
         for band in signal_bands:
-            df = pd.DataFrame([raw_dfs[pname][band].values for pname in pnames]).T
+            df = pd.DataFrame([_raw_dfs[pname][band].values for pname in pnames]).T
             df.columns = pnames
-            df.index = raw_dfs[pname][band].index
+            df.index = _raw_dfs[pname][band].index
             raw_dfs[band] = df
 
         if self.verbose:
