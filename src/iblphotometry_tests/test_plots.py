@@ -1,3 +1,4 @@
+import unittest
 import pandas as pd
 from pathlib import Path
 
@@ -186,3 +187,10 @@ class TestPlotters(PhotometryDataTestCase):
         df_nph, t_events, fs = self.get_synthetic_data()
         plots.plot_event_tick(t_events)
         plt.close('all')
+
+
+if __name__ == '__main__':
+    suite = unittest.TestSuite()
+    suite.addTest(TestPlotters("test_class_plotsignalresponse"))
+    runner = unittest.TextTestRunner()
+    runner.run(suite)

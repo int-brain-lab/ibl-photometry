@@ -40,7 +40,7 @@ class DataFrameVisualizerApp(QWidget):
         # Layout for file loading and selection
         file_layout = QHBoxLayout()
         self.load_button = QPushButton('Load File', self)
-        self.load_button.clicked.connect(self.load_file)
+        self.load_button.clicked.connect(self.open_dialog)
         file_layout.addWidget(self.load_button)
 
         self.column_selector = QComboBox(self)
@@ -95,47 +95,50 @@ class DataFrameVisualizerApp(QWidget):
         self.setWindowTitle('DataFrame Plotter')
         self.setGeometry(300, 100, 800, 600)
 
-    def load_file(self):
+    def load_file(self, file_path):
+        try:
+            if (
+                file_path.endswith('.csv')
+                or file_path.endswith('.pqt')
+                or file_path.endswith('.parquet')
+            ):
+                self.dfs = from_raw_neurophotometrics_file(file_path)
+            else:
+                raise ValueError('Unsupported file format')
+
+            if 'GCaMP' in self.dfs.keys():
+                self.df = self.dfs['GCaMP']
+                self.times = self.dfs['GCaMP'].index.values
+                self.plot_time_index = np.arange(0, len(self.times))
+                self.filtered_df = None
+            else:
+                raise ValueError('No GCaMP found')
+
+            if 'Isosbestic' in self.dfs.keys():
+                self.dfiso = self.dfs['Isosbestic']
+
+            # Display the dataframe in the table
+            # self.display_dataframe()
+            # Update the column selector
+            self.update_column_selector()
+
+            # Load into Pynapple dataframe
+            self.dfs = from_raw_neurophotometrics_file(file_path)
+
+            # Set filter combo box
+            self.filter_selector.setCurrentIndex(0)  # Reset to "Select Filter"
+
+        except Exception as e:
+            print(f'Error loading file: {e}')
+
+    def open_dialog(self):
         # Open a file dialog to choose the CSV or PQT file
         file_path, _ = QFileDialog.getOpenFileName(
             self, 'Open File', '', 'CSV and PQT Files (*.csv *.pqt);;All Files (*)'
         )
         if file_path:
             # Load the file into a DataFrame based on its extension
-            try:
-                if (
-                    file_path.endswith('.csv')
-                    or file_path.endswith('.pqt')
-                    or file_path.endswith('.parquet')
-                ):
-                    self.dfs = from_raw_neurophotometrics_file(file_path)
-                else:
-                    raise ValueError('Unsupported file format')
-
-                if 'GCaMP' in self.dfs.keys():
-                    self.df = self.dfs['GCaMP']
-                    self.times = self.dfs['GCaMP'].index.values
-                    self.plot_time_index = np.arange(0, len(self.times))
-                    self.filtered_df = None
-                else:
-                    raise ValueError('No GCaMP found')
-
-                if 'Isosbestic' in self.dfs.keys():
-                    self.dfiso = self.dfs['Isosbestic']
-
-                # Display the dataframe in the table
-                # self.display_dataframe()
-                # Update the column selector
-                self.update_column_selector()
-
-                # Load into Pynapple dataframe
-                self.dfs = from_raw_neurophotometrics_file(file_path)
-
-                # Set filter combo box
-                self.filter_selector.setCurrentIndex(0)  # Reset to "Select Filter"
-
-            except Exception as e:
-                print(f'Error loading file: {e}')
+            self.load_file(file_path)
 
     # TODO this does not work with pynapple as format, convert back to pandas DF
     # def display_dataframe(self):
@@ -286,5 +289,7 @@ class DataFrameVisualizerApp(QWidget):
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     window = DataFrameVisualizerApp()
+    if len(sys.argv) >= 2:
+        window.load_file(sys.argv[1])
     window.show()
     sys.exit(app.exec_())
