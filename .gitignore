@@ -167,4 +167,3 @@ cython_debug/
 # local scripts
 src/local
 src/analysis
-src/examples
