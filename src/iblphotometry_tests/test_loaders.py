@@ -50,9 +50,13 @@ class TestLoaders(PhotometryDataTestCase):
                 pd.testing.assert_frame_equal(dfs_a[key], dfs_b[key])
 
     # from pqt files as they are returned from ONE by .load_dataset()
-    # def test_from_ibl_pqt(self):
-    #     fpio.from_ibl_pqt(self.paths['photometry_signal_pqt'])
-    #     fpio.from_ibl_pqt(
-    #         self.paths['photometry_signal_pqt'],
-    #         self.paths['photometryROI_locations_pqt'],
-    #     )
+    def test_from_ibl_pqt(self):
+        datasets = ['carolina', 'alejandro']
+
+        for dataset in datasets:
+            self.set_paths(dataset)
+            fpio.from_ibl_pqt(self.paths['photometry_signal_pqt'])
+            fpio.from_ibl_pqt(
+                self.paths['photometry_signal_pqt'],
+                self.paths['photometryROI_locations_pqt'],
+            )
