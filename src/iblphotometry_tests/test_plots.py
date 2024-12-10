@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 from iblphotometry.behavior import psth, psth_times
 import iblphotometry.plots as plots
-from gui.rawdata_visualizer import DataFrameVisualizerApp, BehaviorVisualizerGUI
+from gui.rawdata_visualizer import BehaviorVisualizerGUI
 from iblphotometry.synthetic import synthetic101
 import iblphotometry.preprocessing as ffpr
 from iblphotometry_tests.base_tests import PhotometryDataTestCase
@@ -201,7 +201,7 @@ class TestPlotters(PhotometryDataTestCase):
         trials = pd.read_parquet(self.paths['trials_table_kcenia_pqt'])
 
         from PyQt5.QtWidgets import QApplication
-        app = QApplication(sys.argv)
+        app = QApplication(sys.argv)  # noqa
         window = BehaviorVisualizerGUI()
         window.set_data(processed_signal, times)
         window.load_trials(trials)
