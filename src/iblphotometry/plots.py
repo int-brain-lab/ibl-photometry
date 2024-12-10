@@ -41,9 +41,6 @@ Loader objects for plotting
 
 
 class PlotSignal:
-    # def __init__(self, *args, **kwargs):
-    #     self.set_data(*args, **kwargs)
-
     def set_data(
         self, raw_signal, times, raw_isosbestic=None, processed_signal=None, fs=None
     ):
@@ -143,7 +140,10 @@ class PlotSignal:
 
 
 class PlotSignalResponse:
-    def __init__(
+    def __init__(self):
+        self.psth_dict = {}
+
+    def set_data(
         self, trials, processed_signal, times, fs=None, event_window=np.array([-1, 2])
     ):
         self.trials = trials
@@ -187,10 +187,20 @@ class PlotSignalResponse:
         except KeyError:
             warnings.warn(f'Event {event} not found in trials table.')
 
-    def plot_trialsort_psth(self):
-        fig, axs = plt.subplots(2, len(self.psth_dict.keys()) - 1)
+    def set_fig_layout(self, figure=None):
+        n = max(1, len(self.psth_dict.keys()) - 1)
+        if figure is None:
+            figure, axs = plt.subplots(2, n, squeeze=False)
+        else:
+            axs = figure.subplots(2, n, squeeze=False)
+        figure.tight_layout()
+        return figure, axs
 
+    def plot_trialsort_psth(self, axs):
         signal_keys = [k for k in self.psth_dict.keys() if k != 'times']
+        if axs.shape[1] < len(signal_keys):
+            raise ValueError("Error, skipping PSTH plotting")
+
         for iaxs, event in enumerate(signal_keys):
             axs_plt = [axs[0, iaxs], axs[1, iaxs]]
             plot_psth(self.psth_dict[event], self.psth_dict['times'], axs=axs_plt)
@@ -206,17 +216,12 @@ class PlotSignalResponse:
             if iaxs > 0:
                 axs[0, iaxs].axis('off')
                 axs[1, iaxs].set_yticks([])
-        fig.tight_layout()
-        return fig, axs
 
-    def plot_processed_trialtick(self, event_key='stimOn_times'):
-        fig, ax = plt.subplots(1, 1)
-        plt.figure(figsize=(10, 6))
+    def plot_processed_trialtick(self, ax, event_key='stimOn_times'):
         events = self.trials[event_key]
         ax.set_ylim([-0.2, 0.1])
         plot_event_tick(events, ax=ax, color='#FFC0CB', ls='-')
         plot_processed_signal(self.processed_signal, self.times, ax=ax)
-        return fig, ax
 
 
 """

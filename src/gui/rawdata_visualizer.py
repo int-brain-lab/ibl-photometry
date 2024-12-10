@@ -18,6 +18,7 @@ import iblphotometry.plots as plots
 
 import iblphotometry.preprocessing as ffpr
 import numpy as np
+import pandas as pd
 
 
 class DataFrameVisualizerApp(QWidget):
@@ -29,6 +30,8 @@ class DataFrameVisualizerApp(QWidget):
         self.dfiso = None  # Isosbestic Dataframe
 
         self.plot_time_index = None
+
+        self.behavior_gui = None
 
         self.filtered_df = None  # Filtered DataFrame used for plotting only
         self.init_ui()
@@ -55,6 +58,10 @@ class DataFrameVisualizerApp(QWidget):
         # self.filter_selector.addItem("Filter JOVE")
         self.filter_selector.currentIndexChanged.connect(self.apply_filter)
         file_layout.addWidget(self.filter_selector)
+
+        self.behavior_button = QPushButton('Open behavior GUI', self)
+        self.behavior_button.clicked.connect(self.open_behavior_gui)
+        file_layout.addWidget(self.behavior_button)
 
         # # Table widget to display DataFrame
         # self.table = QTableWidget(self)
@@ -238,9 +245,9 @@ class DataFrameVisualizerApp(QWidget):
         # Update the plots based on the selected column
         self.update_plots()
 
-    def apply_filter(self):
+    def apply_filter(self, filter_idx, filter_option=None):
         # Get the selected filter option from the filter dropdown
-        filter_option = self.filter_selector.currentText()
+        filter_option = filter_option or self.filter_selector.currentText()
 
         if filter_option == 'Select Filter':
             self.filtered_df = None
@@ -284,6 +291,98 @@ class DataFrameVisualizerApp(QWidget):
     #         # Set values greater than 100 to NaN (this is just an example logic for "JOVE")
     #         filtered_df[col] = filtered_df[col].apply(lambda x: x if x <= 100 else None)
     #     return filtered_df
+
+    def open_behavior_gui(self):
+        signal = self.plotobj.processed_signal
+
+        if self.behavior_gui is None:
+            self.behavior_gui = BehaviorVisualizerGUI()
+        assert self.behavior_gui is not None
+
+        if signal is None:
+            print("Apply a filter before opening the Behavior GUI")
+        else:
+            print("Opening Behavior GUI")
+            self.behavior_gui.set_data(signal, self.times)
+            self.behavior_gui.show()
+
+
+class BehaviorVisualizerGUI(QWidget):
+    def __init__(self, ):
+        super().__init__()
+        self.trials = None
+        self.init_ui()
+
+    def set_data(self, processed_signal, times):
+        assert processed_signal is not None
+        assert times is not None
+        self.processed_signal = processed_signal
+        self.times = times
+
+    def init_ui(self):
+        # Create layout
+        main_layout = QVBoxLayout()
+
+        # Layout for file loading and selection
+        file_layout = QHBoxLayout()
+        self.load_button = QPushButton('Load File', self)
+        self.load_button.clicked.connect(self.open_dialog)
+        file_layout.addWidget(self.load_button)
+
+        main_layout.addLayout(file_layout)
+
+        # Set up plots layout
+        self.plot_layout = QGridLayout()
+        self.plotobj = plots.PlotSignalResponse()
+        self.figure, self.axes = self.plotobj.set_fig_layout()
+        self.canvas = FigureCanvas(self.figure)
+        self.plot_layout.addWidget(self.canvas, 0, 0, 1, 3)
+
+        # Create a NavigationToolbar
+        self.toolbar = NavigationToolbar(self.canvas, self)
+
+        main_layout.addLayout(self.plot_layout)
+        self.setLayout(main_layout)
+
+        self.setWindowTitle('Behavior Visualizer')
+        self.setGeometry(300, 100, 800, 600)
+
+    def load_trials(self, trials):
+        assert trials is not None
+        self.trials = trials
+        self.update_plots()
+
+    def load_file(self, file_path):
+        # load a trial file
+        try:
+            if (
+                file_path.endswith('.pqt')
+                or file_path.endswith('.parquet')
+            ):
+                self.load_trials(pd.read_parquet(file_path))
+            else:
+                raise ValueError('Unsupported file format')
+        except Exception as e:
+            print(f'Error loading file: {e}')
+
+    def open_dialog(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, 'Open File', '', 'CSV and PQT Files (*.csv *.pqt);;All Files (*)'
+        )
+        if file_path:
+            self.load_file(file_path)
+
+    def update_plots(self):
+        self.figure.clear()
+
+        self.plotobj.set_data(
+            self.trials, self.processed_signal, self.times,
+        )
+        # NOTE: we need to update the layout as it depends on the data
+        self.figure, self.axes = self.plotobj.set_fig_layout(figure=self.figure)
+        self.plotobj.plot_trialsort_psth(self.axes)
+
+        self.canvas.draw()
 
 
 if __name__ == '__main__':
