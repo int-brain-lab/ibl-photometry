@@ -1,5 +1,4 @@
-# import sys
-# import unittest
+import unittest
 import pandas as pd
 from pathlib import Path
 
@@ -99,11 +98,11 @@ class TestPlotters(PhotometryDataTestCase):
         trials = pd.read_parquet(self.paths['trials_table_kcenia_pqt'])
         plotobj = plots.PlotSignalResponse()
         plotobj.set_data(trials, processed_signal, times)
-        fig, axs = plotobj.set_fig_layout()
-        plotobj.plot_trialsort_psth(fig, axs)
-        fig, ax = plt.subplots(1, 1)
+        _, axs = plotobj.set_fig_layout()
+        plotobj.plot_trialsort_psth(axs)
+        _, ax = plt.subplots(1, 1)
         plotobj.plot_processed_trialtick(ax)
-        plt.show()
+        # plt.show()
         plt.close('all')
 
     """
@@ -210,8 +209,9 @@ class TestPlotters(PhotometryDataTestCase):
     #     app.exec_()
 
 
-# if __name__ == '__main__':
-#     suite = unittest.TestSuite()
-#     suite.addTest(TestPlotters("test_gui"))
-#     runner = unittest.TextTestRunner()
-#     runner.run(suite)
+if __name__ == '__main__':
+    unittest.main()
+    # suite = unittest.TestSuite()
+    # suite.addTest(TestPlotters())
+    # runner = unittest.TextTestRunner()
+    # runner.run(suite)
