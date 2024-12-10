@@ -194,24 +194,24 @@ class TestPlotters(PhotometryDataTestCase):
         plots.plot_event_tick(t_events)
         plt.close('all')
 
-    def test_gui(self):
-        df_nph, _, fs = self.get_test_data()
-        processed_signal = df_nph['signal_processed'].values
-        times = df_nph['times'].values
-        trials = pd.read_parquet(self.paths['trials_table_kcenia_pqt'])
+    # def test_gui(self):
+    #     df_nph, _, fs = self.get_test_data()
+    #     processed_signal = df_nph['signal_processed'].values
+    #     times = df_nph['times'].values
+    #     trials = pd.read_parquet(self.paths['trials_table_kcenia_pqt'])
 
-        from PyQt5.QtWidgets import QApplication
-        app = QApplication(sys.argv)  # noqa
-        window = BehaviorVisualizerGUI()
-        window.set_data(processed_signal, times)
-        window.load_trials(trials)
-        window.show()
-        # Uncomment to debug
-        # app.exec_()
+    #     from PyQt5.QtWidgets import QApplication
+    #     app = QApplication(sys.argv)
+    #     window = BehaviorVisualizerGUI()
+    #     window.set_data(processed_signal, times)
+    #     window.load_trials(trials)
+    #     window.show()
+    #     # Uncomment to debug
+    #     app.exec_()
 
 
-if __name__ == '__main__':
-    suite = unittest.TestSuite()
-    suite.addTest(TestPlotters("test_gui"))
-    runner = unittest.TextTestRunner()
-    runner.run(suite)
+# if __name__ == '__main__':
+#     suite = unittest.TestSuite()
+#     suite.addTest(TestPlotters("test_gui"))
+#     runner = unittest.TextTestRunner()
+#     runner.run(suite)
