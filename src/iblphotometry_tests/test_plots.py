@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 
 from iblphotometry.behavior import psth, psth_times
 import iblphotometry.plots as plots
+
 # from gui.rawdata_visualizer import BehaviorVisualizerGUI
 from iblphotometry.synthetic import synthetic101
 import iblphotometry.preprocessing as ffpr

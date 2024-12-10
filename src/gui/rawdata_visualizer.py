@@ -300,15 +300,17 @@ class DataFrameVisualizerApp(QWidget):
         assert self.behavior_gui is not None
 
         if signal is None:
-            print("Apply a filter before opening the Behavior GUI")
+            print('Apply a filter before opening the Behavior GUI')
         else:
-            print("Opening Behavior GUI")
+            print('Opening Behavior GUI')
             self.behavior_gui.set_data(signal, self.times)
             self.behavior_gui.show()
 
 
 class BehaviorVisualizerGUI(QWidget):
-    def __init__(self, ):
+    def __init__(
+        self,
+    ):
         super().__init__()
         self.trials = None
         self.init_ui()
@@ -355,10 +357,7 @@ class BehaviorVisualizerGUI(QWidget):
     def load_file(self, file_path):
         # load a trial file
         try:
-            if (
-                file_path.endswith('.pqt')
-                or file_path.endswith('.parquet')
-            ):
+            if file_path.endswith('.pqt') or file_path.endswith('.parquet'):
                 self.load_trials(pd.read_parquet(file_path))
             else:
                 raise ValueError('Unsupported file format')
@@ -376,7 +375,9 @@ class BehaviorVisualizerGUI(QWidget):
         self.figure.clear()
 
         self.plotobj.set_data(
-            self.trials, self.processed_signal, self.times,
+            self.trials,
+            self.processed_signal,
+            self.times,
         )
         # NOTE: we need to update the layout as it depends on the data
         self.figure, self.axes = self.plotobj.set_fig_layout(figure=self.figure)

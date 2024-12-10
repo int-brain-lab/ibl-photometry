@@ -199,7 +199,7 @@ class PlotSignalResponse:
     def plot_trialsort_psth(self, axs):
         signal_keys = [k for k in self.psth_dict.keys() if k != 'times']
         if axs.shape[1] < len(signal_keys):
-            raise ValueError("Error, skipping PSTH plotting")
+            raise ValueError('Error, skipping PSTH plotting')
 
         for iaxs, event in enumerate(signal_keys):
             axs_plt = [axs[0, iaxs], axs[1, iaxs]]
