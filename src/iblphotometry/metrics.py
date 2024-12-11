@@ -177,3 +177,31 @@ def has_responses(
         )
 
     return np.any(res)
+
+def low_freq_power_ratio(
+    A: pd.Series,
+    f_cutoff: float = 3.18
+) -> float:
+    """
+    Fraction of the total signal power contained below a given cutoff frequency.
+
+    Parameters
+    ----------
+    A :
+        the signal time series with signal values in the columns and sample
+        times in the index
+    f_cutoff :
+        cutoff frequency, default value of 3.18 esitmated using the formula
+        1 / (2 * pi * tau) and an approximate tau_rise for GCaMP6f of 0.05s.
+    """
+    signal = A.copy()
+    assert signal.ndim == 1  # only 1D for now
+    # Get frequency bins
+    tpts = signal.index.values
+    dt = np.median(np.diff(tpts))
+    n_pts = len(signal)
+    freqs = np.fft.rfftfreq(n_pts, dt)
+    # Compute power spectral density
+    psd = np.abs(np.fft.rfft(signal - signal.mean())) ** 2
+    # Return the ratio of power contained in low freqs
+    return psd[freqs <= f_cutoff].sum() / psd.sum()
