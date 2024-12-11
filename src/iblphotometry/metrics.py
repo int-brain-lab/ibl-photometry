@@ -252,3 +252,31 @@ def ar_score(A: pd.Series) -> float:
     y = signal[1:]
     res = stats.linregress(X, y)
     return res.rvalue ** 2
+
+def noise_simulation(
+    A: pd.Series,
+    metric: callable,
+    noise_sd: np.ndarray = np.logspace(-2, 1)
+) -> np.ndarray:
+    """
+    See how a quality metric changes when adding Gaussian noise to a signal.
+    The signal will be z-scored before noise is added, so noise_sd should be
+    scaled appropriately.
+
+    Parameters
+    ----------
+    A :
+        a signal time series with signal values in the columns and sample
+        times in the index
+    metric :
+        a function that computes a metric on the signal
+    noise_sd :
+        array of noise levels to add to the z-scored signal before computing the
+        metric
+    """
+    A_z = z(A)
+    scores = np.full(len(noise_sd), np.nan)
+    for i, sd in enumerate(noise_sd):
+        signal = A_z + np.random.normal(scale=sd, size=len(A))
+        scores[i] = metric(signal)
+    return scores
