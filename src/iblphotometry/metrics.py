@@ -205,3 +205,31 @@ def low_freq_power_ratio(
     psd = np.abs(np.fft.rfft(signal - signal.mean())) ** 2
     # Return the ratio of power contained in low freqs
     return psd[freqs <= f_cutoff].sum() / psd.sum()
+
+def spectral_entropy(A: pd.Series, eps: float = np.finfo('float').eps) -> float:
+    """
+    Compute the normalized entropy of the signal power spectral density and
+    return a metric (1 - entropy) that is low (0) if all frequency components
+    have equal power, as for noise, and high (1) if all the power is
+    concentrated in a single component.
+
+    Parameters
+    ----------
+    A :
+        the signal time series with signal values in the columns and sample
+        times in the index
+    eps :
+        small number added to the PSD for numerical stability
+    """
+    signal = A.copy()
+    assert signal.ndim == 1  # only 1D for now
+    # Compute power spectral density
+    psd = np.abs(np.fft.rfft(signal - signal.mean())) ** 2
+    psd_norm = psd / np.sum(psd)
+    # Compute spectral entropy in bits
+    spectral_entropy = -1 * np.sum(psd_norm * np.log2(psd_norm + eps))
+    # Normalize by the maximum entropy (bits)
+    n_bins = len(psd)
+    max_entropy = np.log2(n_bins)
+    norm_entropy = spectral_entropy / max_entropy
+    return 1 - norm_entropy
