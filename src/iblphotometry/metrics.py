@@ -233,3 +233,22 @@ def spectral_entropy(A: pd.Series, eps: float = np.finfo('float').eps) -> float:
     max_entropy = np.log2(n_bins)
     norm_entropy = spectral_entropy / max_entropy
     return 1 - norm_entropy
+
+def ar_score(A: pd.Series) -> float:
+    """
+    R-squared from an AR(1) model fit to the signal as a measure of the temporal
+    structure present in the signal.
+
+    Parameters
+    ----------
+    A :
+        the signal time series with signal values in the columns and sample
+        times in the index
+    """
+    # Pull signal out of pandas series
+    signal = A.values
+    assert signal.ndim == 1  # only 1D for now
+    X = signal[:-1]
+    y = signal[1:]
+    res = stats.linregress(X, y)
+    return res.rvalue ** 2
