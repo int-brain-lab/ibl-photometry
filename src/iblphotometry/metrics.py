@@ -178,10 +178,8 @@ def has_responses(
 
     return np.any(res)
 
-def low_freq_power_ratio(
-    A: pd.Series,
-    f_cutoff: float = 3.18
-) -> float:
+
+def low_freq_power_ratio(A: pd.Series, f_cutoff: float = 3.18) -> float:
     """
     Fraction of the total signal power contained below a given cutoff frequency.
 
@@ -205,6 +203,7 @@ def low_freq_power_ratio(
     psd = np.abs(np.fft.rfft(signal - signal.mean())) ** 2
     # Return the ratio of power contained in low freqs
     return psd[freqs <= f_cutoff].sum() / psd.sum()
+
 
 def spectral_entropy(A: pd.Series, eps: float = np.finfo('float').eps) -> float:
     """
@@ -234,6 +233,7 @@ def spectral_entropy(A: pd.Series, eps: float = np.finfo('float').eps) -> float:
     norm_entropy = spectral_entropy / max_entropy
     return 1 - norm_entropy
 
+
 def ar_score(A: pd.Series) -> float:
     """
     R-squared from an AR(1) model fit to the signal as a measure of the temporal
@@ -251,12 +251,11 @@ def ar_score(A: pd.Series) -> float:
     X = signal[:-1]
     y = signal[1:]
     res = stats.linregress(X, y)
-    return res.rvalue ** 2
+    return res.rvalue**2
+
 
 def noise_simulation(
-    A: pd.Series,
-    metric: callable,
-    noise_sd: np.ndarray = np.logspace(-2, 1)
+    A: pd.Series, metric: callable, noise_sd: np.ndarray = np.logspace(-2, 1)
 ) -> np.ndarray:
     """
     See how a quality metric changes when adding Gaussian noise to a signal.
