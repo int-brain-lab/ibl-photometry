@@ -177,3 +177,105 @@ def has_responses(
         )
 
     return np.any(res)
+
+
+def low_freq_power_ratio(A: pd.Series, f_cutoff: float = 3.18) -> float:
+    """
+    Fraction of the total signal power contained below a given cutoff frequency.
+
+    Parameters
+    ----------
+    A :
+        the signal time series with signal values in the columns and sample
+        times in the index
+    f_cutoff :
+        cutoff frequency, default value of 3.18 esitmated using the formula
+        1 / (2 * pi * tau) and an approximate tau_rise for GCaMP6f of 0.05s.
+    """
+    signal = A.copy()
+    assert signal.ndim == 1  # only 1D for now
+    # Get frequency bins
+    tpts = signal.index.values
+    dt = np.median(np.diff(tpts))
+    n_pts = len(signal)
+    freqs = np.fft.rfftfreq(n_pts, dt)
+    # Compute power spectral density
+    psd = np.abs(np.fft.rfft(signal - signal.mean())) ** 2
+    # Return the ratio of power contained in low freqs
+    return psd[freqs <= f_cutoff].sum() / psd.sum()
+
+
+def spectral_entropy(A: pd.Series, eps: float = np.finfo('float').eps) -> float:
+    """
+    Compute the normalized entropy of the signal power spectral density and
+    return a metric (1 - entropy) that is low (0) if all frequency components
+    have equal power, as for noise, and high (1) if all the power is
+    concentrated in a single component.
+
+    Parameters
+    ----------
+    A :
+        the signal time series with signal values in the columns and sample
+        times in the index
+    eps :
+        small number added to the PSD for numerical stability
+    """
+    signal = A.copy()
+    assert signal.ndim == 1  # only 1D for now
+    # Compute power spectral density
+    psd = np.abs(np.fft.rfft(signal - signal.mean())) ** 2
+    psd_norm = psd / np.sum(psd)
+    # Compute spectral entropy in bits
+    spectral_entropy = -1 * np.sum(psd_norm * np.log2(psd_norm + eps))
+    # Normalize by the maximum entropy (bits)
+    n_bins = len(psd)
+    max_entropy = np.log2(n_bins)
+    norm_entropy = spectral_entropy / max_entropy
+    return 1 - norm_entropy
+
+
+def ar_score(A: pd.Series) -> float:
+    """
+    R-squared from an AR(1) model fit to the signal as a measure of the temporal
+    structure present in the signal.
+
+    Parameters
+    ----------
+    A :
+        the signal time series with signal values in the columns and sample
+        times in the index
+    """
+    # Pull signal out of pandas series
+    signal = A.values
+    assert signal.ndim == 1  # only 1D for now
+    X = signal[:-1]
+    y = signal[1:]
+    res = stats.linregress(X, y)
+    return res.rvalue**2
+
+
+def noise_simulation(
+    A: pd.Series, metric: callable, noise_sd: np.ndarray = np.logspace(-2, 1)
+) -> np.ndarray:
+    """
+    See how a quality metric changes when adding Gaussian noise to a signal.
+    The signal will be z-scored before noise is added, so noise_sd should be
+    scaled appropriately.
+
+    Parameters
+    ----------
+    A :
+        a signal time series with signal values in the columns and sample
+        times in the index
+    metric :
+        a function that computes a metric on the signal
+    noise_sd :
+        array of noise levels to add to the z-scored signal before computing the
+        metric
+    """
+    A_z = z(A)
+    scores = np.full(len(noise_sd), np.nan)
+    for i, sd in enumerate(noise_sd):
+        signal = A_z + np.random.normal(scale=sd, size=len(A))
+        scores[i] = metric(signal)
+    return scores
