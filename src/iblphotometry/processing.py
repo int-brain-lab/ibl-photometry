@@ -582,15 +582,29 @@ def fillnan_kde(y: np.ndarray, w: int = 25):
 
 
 def remove_outliers(
-    F: pd.Series, w_size: int = 1000, alpha: float = 0.005, w: int = 25
+    F: pd.Series,
+    w_len: float = 60,
+    alpha: float = 0.005,
+    w: int = 25,
+    fs=None,
+    max_it=100,
 ):
     y, t = F.values, F.index.values
+    fs = 1 / np.median(np.diff(t)) if fs is None else fs
+    w_size = int(w_len * fs)
+
     y = copy(y)
     outliers = detect_outliers(y, w_size=w_size, alpha=alpha)
+    j = 0
     while len(outliers) > 0:
         y[outliers] = np.nan
         y = fillnan_kde(y, w=w)
         outliers = detect_outliers(y, w_size=w_size, alpha=alpha)
+        if j > max_it:
+            break
+        else:
+            j += 1
+
     return pd.Series(y, index=t)
 
 
