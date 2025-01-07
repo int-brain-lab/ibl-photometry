@@ -65,7 +65,7 @@ def eval_metric(
         S = sliding_metric(
             F, metric=metric, **sliding_kwargs, metric_kwargs=metric_kwargs
         )
-        r, p = linregress(S.times(), S.values)[2:4]
+        r, p = linregress(S.index.values, S.values)[2:4]
     else:
         r = np.nan
         p = np.nan
@@ -121,15 +121,15 @@ def run_qc(
 
             # get behavioral data
             # TODO this should be provided
-            sl = SessionLoader(eid=eid, one=data_loader.one)
+            # sl = SessionLoader(eid=eid, one=data_loader.one)
             # for caroline
             # trials = sl.load_trials(
             #     collection='alf/task_00'
             # )  # this is necessary fo caroline
-            trials = sl.load_trials()  # should be good for all others
+            # trials = sl.load_trials()  # should be good for all others
 
             # the old way
-            # trials = data_loader.one.load_dataset(eid, '*trials.table.pqt')
+            trials = data_loader.one.load_dataset(eid, '*trials.table.pqt')
 
             for band in signal_bands:
                 raw_tf = raw_dfs[band]
