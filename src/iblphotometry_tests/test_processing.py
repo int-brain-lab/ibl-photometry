@@ -15,7 +15,7 @@ class TestProcessing(PhotometryDataTestCase):
             self.paths['photometry_signal_pqt'],
             self.paths['photometryROI_locations_pqt'],
         )
-        trials = pd.read_parquet(self.paths['trials_table_pqt'])
+        # trials = pd.read_parquet(self.paths['trials_table_pqt'])
         raw_df = raw_dfs['GCaMP']['DMS']
 
         # bleach corrections

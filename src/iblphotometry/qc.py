@@ -10,7 +10,6 @@ from scipy.stats import linregress
 
 from iblphotometry.processing import make_sliding_window
 from iblphotometry.pipelines import run_pipeline
-from brainbox.io.one import SessionLoader
 
 logger = logging.getLogger()
 
