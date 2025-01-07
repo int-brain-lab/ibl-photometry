@@ -1,6 +1,6 @@
 import iblphotometry.io as fio
 import iblphotometry.processing as processing
-import pandas as pd
+# import pandas as pd
 
 from iblphotometry_tests.base_tests import PhotometryDataTestCase
 
