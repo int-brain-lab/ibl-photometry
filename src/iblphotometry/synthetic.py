@@ -4,6 +4,7 @@ This module is useful to create synthetic data for testing and benchmarking purp
 
 import numpy as np
 import pandas as pd
+
 # import scipy.signal
 import pywt
 
@@ -20,8 +21,7 @@ def synthetic101(fs=30, rl=1000, event_rate=0.2):
     photobleach = np.exp(-(tscale + 1) / 200)
     # ric = scipy.signal.ricker(int(fs * 4), 8) # previous code
     wavelet = pywt.ContinuousWavelet(name='mexh')
-    ric = wavelet.wavefun(length = int(fs*4))[0] / 2.5 # approximately
-
+    ric = wavelet.wavefun(length=int(fs * 4))[0] / 2.5  # approximately
 
     event_times = np.cumsum(-np.log(np.random.rand(int(rl * event_rate))) / event_rate)
     event_times = event_times[: np.searchsorted(event_times, rl - 10)]
