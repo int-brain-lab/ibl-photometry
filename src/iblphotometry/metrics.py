@@ -278,6 +278,8 @@ def ar_score(A: pd.Series | np.ndarray) -> float:
     # Pull signal out of pandas series
     signal = A.values if isinstance(A, pd.Series) else A
     assert signal.ndim == 1  # only 1D for now
+    if len(np.unique(signal)) == 1:
+        return np.nan
     X = signal[:-1]
     y = signal[1:]
     res = stats.linregress(X, y)
