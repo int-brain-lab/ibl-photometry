@@ -230,7 +230,7 @@ def low_freq_power_ratio(A: pd.Series, f_cutoff: float = 3.18) -> float:
     return psd[freqs <= f_cutoff].sum() / psd.sum()
 
 
-def spectral_entropy(A: pd.Series, eps: float = np.finfo('float').eps) -> float:
+def spectral_entropy(A: pd.Series | np.ndarray, eps: float = np.finfo('float').eps) -> float:
     """
     Compute the normalized entropy of the signal power spectral density and
     return a metric (1 - entropy) that is low (0) if all frequency components
@@ -245,7 +245,7 @@ def spectral_entropy(A: pd.Series, eps: float = np.finfo('float').eps) -> float:
     eps :
         small number added to the PSD for numerical stability
     """
-    signal = A.copy()
+    signal = A.values if isinstance(A, pd.Series) else A
     assert signal.ndim == 1  # only 1D for now
     # Compute power spectral density
     psd = np.abs(np.fft.rfft(signal - signal.mean())) ** 2
@@ -259,7 +259,7 @@ def spectral_entropy(A: pd.Series, eps: float = np.finfo('float').eps) -> float:
     return 1 - norm_entropy
 
 
-def ar_score(A: pd.Series) -> float:
+def ar_score(A: pd.Series | np.ndarray) -> float:
     """
     R-squared from an AR(1) model fit to the signal as a measure of the temporal
     structure present in the signal.
@@ -271,7 +271,7 @@ def ar_score(A: pd.Series) -> float:
         times in the index
     """
     # Pull signal out of pandas series
-    signal = A.values
+    signal = A.values if isinstance(A, pd.Series) else A
     assert signal.ndim == 1  # only 1D for now
     X = signal[:-1]
     y = signal[1:]
