@@ -69,7 +69,7 @@ def n_unique_samples(A: pd.Series | np.ndarray) -> int:
     the range of the digitizer during acquisition.
     """
     a = A.values if isinstance(A, pd.Series) else A
-    return np.unique(a).shape[0]
+    return np.unique(a).shape[0] / a.shape[0]
 
 
 def n_spikes(A: pd.Series | np.ndarray, sd: int = 5):
