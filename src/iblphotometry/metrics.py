@@ -63,7 +63,11 @@ def signal_skew(A: pd.Series | np.ndarray, axis=-1) -> float:
 
 
 def n_unique_samples(A: pd.Series | np.ndarray) -> int:
-    """number of unique samples in the signal. Low values indicate that the signal during acquisition was not within the range of the digitizer."""
+    """
+    Number of unique samples in the signal, expressed as a fraction of the
+    total number of samples. Low values indicate that the signal was not within
+    the range of the digitizer during acquisition.
+    """
     a = A.values if isinstance(A, pd.Series) else A
     return np.unique(a).shape[0]
 
