@@ -32,6 +32,9 @@ def from_raw_neurophotometrics_file_to_raw_df(
             raw_df = pd.read_parquet(path)
 
     if validate:
+        if version == 'old':
+            if 'Flags' in raw_df.columns:
+                raw_df = raw_df.rename(columns={'Flags': 'LedState'})
         raw_df = validate_neurophotometrics_df(raw_df, version=version)
 
     return raw_df
