@@ -69,6 +69,10 @@ def from_raw_neurophotometrics_df_to_ibl_df(
     # TODO the names column in channel_meta_map should actually be user defined (experiment description file?)
     channel_meta_map = pd.DataFrame(LIGHT_SOURCE_MAP)
     led_states = pd.DataFrame(LED_STATES).set_index('Condition')
+
+    # downward compatibility fix for older than old format
+    if 'Flags' in raw_df.columns:
+        raw_df = raw_df.rename(columns={'Flags': 'LedState'})
     states = raw_df['LedState']
 
     for state in states.unique():
