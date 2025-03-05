@@ -269,6 +269,16 @@ def from_raw_neurophotometrics_file(
     return from_ibl_dataframe(ibl_df, **read_config)
 
 
+def read_digital_inputs_file(path: str | Path, validate=True) -> pd.DataFrame:
+    if path.suffix == '.csv':
+        return read_digital_inputs_csv(path, validate=validate)
+    if path.suffix == '.pqt':
+        df_digital_inputs = pd.read_parquet(path)
+    if validate:
+        df_digital_inputs = validate_neurophotometrics_digital_inputs(df_digital_inputs)
+    return df_digital_inputs
+
+
 def read_digital_inputs_csv(path: str | Path, validate=True) -> pd.DataFrame:
     df_digital_inputs = pd.read_csv(path, header=None)
     df_digital_inputs.columns = [
