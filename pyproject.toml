@@ -16,8 +16,8 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-
-dynamic = ["dependencies", "version"]
+version = "0.1.1"
+dynamic = ["dependencies"]
 
 [project.scripts]
 run_qc = "iblphotometry.run_qc:main"
@@ -39,7 +39,3 @@ known-first-party = [ "ibl*", "one*", "pybpod*" ]
 
 [tool.ruff.format]
 quote-style = "single"
-
-[tool.pdm.version]
-source = "file"
-path = 'src/iblphotometry/__init__.py'
