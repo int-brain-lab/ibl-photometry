@@ -22,17 +22,14 @@ dynamic = ["dependencies"]
 [project.scripts]
 run_qc = "iblphotometry.run_qc:main"
 
-
 [project.urls]
-"Homepage" = "https://github.com/int-brain-lab/iblphotometry"
-
+"Homepage" = "https://github.com/int-brain-lab/ibl-photometry"
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools]
 include-package-data = true
-
 
 [options.packages.find]
 where = "src"
