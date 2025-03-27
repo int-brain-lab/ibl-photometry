@@ -182,7 +182,10 @@ def has_responses(
 
     return np.any(res)
 
-def response_variability_ratio(A: pd.Series, events: np.ndarray, window: tuple = (0, 1)):
+
+def response_variability_ratio(
+    A: pd.Series, events: np.ndarray, window: tuple = (0, 1)
+):
     signal = A.values.squeeze()
     assert signal.ndim == 1
     tpts = A.index.values
@@ -194,6 +197,7 @@ def response_variability_ratio(A: pd.Series, events: np.ndarray, window: tuple =
     responses = np.row_stack([signal[i0:i1] for i0, i1 in zip(i0s, i1s)])
     responses = (responses.T - signal[event_inds]).T
     return (responses).mean(axis=0).var() / (responses).var(axis=0).mean()
+
 
 def response_magnitude(A: pd.Series, events: np.ndarray, window: tuple = (0, 1)):
     signal = A.values.squeeze()
@@ -207,6 +211,7 @@ def response_magnitude(A: pd.Series, events: np.ndarray, window: tuple = (0, 1))
     responses = np.row_stack([signal[i0:i1] for i0, i1 in zip(i0s, i1s)])
     responses = (responses.T - signal[event_inds]).T
     return np.abs(responses.mean(axis=0)).sum()
+
 
 def low_freq_power_ratio(A: pd.Series, f_cutoff: float = 3.18) -> float:
     """
@@ -234,7 +239,9 @@ def low_freq_power_ratio(A: pd.Series, f_cutoff: float = 3.18) -> float:
     return psd[freqs <= f_cutoff].sum() / psd.sum()
 
 
-def spectral_entropy(A: pd.Series | np.ndarray, eps: float = np.finfo('float').eps) -> float:
+def spectral_entropy(
+    A: pd.Series | np.ndarray, eps: float = np.finfo('float').eps
+) -> float:
     """
     Compute the normalized entropy of the signal power spectral density and
     return a metric (1 - entropy) that is low (0) if all frequency components
@@ -284,14 +291,14 @@ def ar_score(A: pd.Series | np.ndarray, order: int = 2) -> float:
     """
     # Pull signal out of pandas Series if needed
     signal = A.values if isinstance(A, pd.Series) else A
-    assert signal.ndim == 1, "Signal must be 1-dimensional."
+    assert signal.ndim == 1, 'Signal must be 1-dimensional.'
 
     # Handle constant signal case
     if len(np.unique(signal)) == 1:
         return np.nan
 
     # Create design matrix X and target vector y based on AR order
-    X = np.column_stack([signal[i:len(signal) - order + i] for i in range(order)])
+    X = np.column_stack([signal[i : len(signal) - order + i] for i in range(order)])
     y = signal[order:]
 
     # Fit linear regression using least squares
