@@ -36,9 +36,11 @@ def _fill_missing_channel_names(A: pd.Series) -> pd.Series:
     missing_inds = np.where(a['name'] == '')[0]
     missing_idxs = a.iloc[missing_inds].index
     prev_idxs = a.iloc[missing_inds - 1].index
-    name_alternator = {'GCaMP':'Isosbestic', 'Isosbestic':'GCaMP', '':''}
+    name_alternator = {'GCaMP': 'Isosbestic', 'Isosbestic': 'GCaMP', '': ''}
     while len(a[a['name'] == '']) > 0:
-        a.loc[missing_idxs, 'name'] = [name_alternator[prev] for prev in a.loc[prev_idxs, 'name']]
+        a.loc[missing_idxs, 'name'] = [
+            name_alternator[prev] for prev in a.loc[prev_idxs, 'name']
+        ]
     return a
 
 

@@ -617,6 +617,7 @@ def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25):
 
     return pd.Series(y, index=t)
 
+
 ## TODO: consider this simple interpolation method that uses the local median
 # def remove_spikes(F: pd.Series, sd: int = 5, w: int = 5):
 #     f = F.copy()
