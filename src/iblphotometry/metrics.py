@@ -111,15 +111,22 @@ def signal_skew(A: pd.Series | np.ndarray, axis=-1) -> float:
 
 def n_unique_samples(A: pd.Series | np.ndarray) -> int:
     """
-    Number of unique samples in the signal, expressed as a fraction of the
-    total number of samples. Low values indicate that the signal was not within
-    the range of the digitizer during acquisition.
+    Number of unique samples in the signal. Low values indicate that the signal
+    was not within the range of the digitizer during acquisition.
     """
     a = A.values if isinstance(A, pd.Series) else A
-    return np.unique(a).shape[0] / a.shape[0]
+    return np.unique(a).shape[0]
 
 
 def n_spikes(A: pd.Series | np.ndarray, sd: int = 5):
+def f_unique_samples(A: pd.Series | np.ndarray) -> int:
+    """
+    Wrapper that converts n_unique_samples to a fraction of the total number
+    of samples.
+    """
+    return n_unique_samples(A) / len(A)
+
+
     """count the number of spike artifacts in the recording."""
     a = A.values if isinstance(A, pd.Series) else A
     return detect_spikes(a, sd=sd).shape[0]
