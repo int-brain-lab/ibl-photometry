@@ -603,7 +603,7 @@ def detect_spikes(t: np.ndarray, sd: int = 5):
 def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25):
     y, t = F.values, F.index.values
     y = copy(y)
-    outliers = detect_spikes(y, sd=sd)
+    outliers = detect_spikes(t, sd=sd)
     y[outliers] = np.nan
     try:
         y = fillnan_kde(y, w=w)
