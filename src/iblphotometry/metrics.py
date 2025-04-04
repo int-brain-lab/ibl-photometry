@@ -30,6 +30,26 @@ def dt_violations(A: pd.DataFrame | pd.Series, atol: float = 1e-3) -> str:
     return n_violations
 
 
+def _fill_missing_channel_names(A: pd.Series) -> pd.Series:
+    a = A.copy()
+    missing_inds = np.where(a['name'] == '')[0]
+    missing_idxs = a.iloc[missing_inds].index
+    prev_idxs = a.iloc[missing_inds - 1].index
+    name_alternator = {'GCaMP':'Isosbestic', 'Isosbestic':'GCaMP', '':''}
+    while len(a[a['name'] == '']) > 0:
+        a.loc[missing_idxs, 'name'] = [name_alternator[prev] for prev in a.loc[prev_idxs, 'name']]
+    return a
+
+
+def interleaved_acquisition(A: pd.DataFrame | pd.Series) -> float:
+    if sum(A['name'] == '') > 0:
+        A = _fill_missing_channel_names(A)
+    a = A['name'].values if isinstance(A, pd.DataFrame) else A.values
+    even_check = np.all(a[::2] == a[0])
+    odd_check = np.all(a[1::2] == a[1])
+    return bool(even_check & odd_check)
+
+
 def percentile_dist(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
     """the distance between two percentiles in units of z. Captures the magnitude of transients.
 
