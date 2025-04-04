@@ -2,6 +2,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 from scipy import stats
+from scipy.signal import medfilt
 
 from iblphotometry.processing import (
     z,
@@ -68,6 +69,15 @@ def percentile_dist(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) ->
     else:
         raise TypeError('A must be pd.Series or np.ndarray.')
     return P[1] - P[0]
+
+
+def sliding_deviance(
+    A: pd.Series | np.ndarray,
+    w_len: int = 151,
+) -> float:
+    a = A.values if isinstance(A, pd.Series) else A
+    running_median = medfilt(a, kernel_size=w_len)
+    return np.median(np.abs(a - running_median) / running_median)
 
 
 def signal_asymmetry(A: pd.Series | np.ndarray, pc_comp: int = 95, axis=-1) -> float:
