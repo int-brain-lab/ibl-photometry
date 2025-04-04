@@ -617,6 +617,17 @@ def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25):
 
     return pd.Series(y, index=t)
 
+## TODO: consider this simple interpolation method that uses the local median
+# def remove_spikes(F: pd.Series, sd: int = 5, w: int = 5):
+#     f = F.copy()
+#     y, t = f.values, f.index.values
+#     outliers = detect_spikes(y, sd=sd)
+#     outliers = np.unique(np.concatenate([outliers - 1, outliers]))
+#     i0s = (outliers - w).clip(0)
+#     i1s = outliers + w
+#     y[outliers] = [np.nanmedian(y[i0:i1]) for i0, i1 in zip(i0s, i1s)]
+#     return pd.Series(y, index=t)
+
 
 """
  ######  ##       #### ########  #### ##    ##  ######       #######  ########  ######## ########     ###    ######## ####  #######  ##    ##  ######
