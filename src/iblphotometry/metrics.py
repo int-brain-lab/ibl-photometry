@@ -13,6 +13,23 @@ from iblphotometry.processing import (
 from iblphotometry.behavior import psth
 
 
+def dt_violations(A: pd.DataFrame | pd.Series, atol: float = 1e-3) -> str:
+    t = A.index.values
+    dts = np.diff(t)
+    n_violations = np.sum((dts - np.median(dts)) > atol)
+    ## TODO: make ibllib wrapper to convert metrics to QC vals
+    # if n_violations == 0:
+    #     outcome = QC.PASS
+    # elif n_violations <= 3:
+    #     outcome = QC.WARNING
+    # elif n_violations <= 10:
+    #     outcome = QC.CRITICAL
+    # else:
+    #     outcome = QC.FAIL
+    # return outcome, n_violations
+    return n_violations
+
+
 def percentile_dist(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
     """the distance between two percentiles in units of z. Captures the magnitude of transients.
 
