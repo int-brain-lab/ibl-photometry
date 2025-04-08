@@ -158,12 +158,12 @@ def _expected_max_gauss(x):
 
 
 ## TODO: this doesn't need to be sliding, qc.run_qc takes care of it
-def sliding_expmax_violation(
-    A: pd.Series,
-    w: int = 151,
-) -> float:
-    exp_max = A.rolling(window=w).apply(expected_max_gauss)
-    return sum(A[A > exp_max] - exp_max[A > exp_max]) / sum(A > exp_max)
+def sliding_expmax_violation(A: pd.Series, w: int = 151) -> float:
+    exp_max = A.rolling(window=w).apply(_expected_max_gauss)
+    if sum(A > exp_max) == 0:
+        return 0
+    else:
+        return sum(A[A > exp_max] - exp_max[A > exp_max]) / sum(A > exp_max)
 
 
 def bleaching_tau(A: pd.Series) -> float:
