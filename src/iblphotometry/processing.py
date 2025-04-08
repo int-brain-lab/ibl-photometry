@@ -610,7 +610,6 @@ def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25):
     except np.linalg.LinAlgError:
         y[outliers] = np.nanmedian(y)
         warnings.warn('KDE fillnan failed, using global median')  # TODO logger
-
     return pd.Series(y, index=t)
 
 

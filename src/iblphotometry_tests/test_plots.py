@@ -1,3 +1,4 @@
+import unittest
 import pandas as pd
 from pathlib import Path
 
@@ -6,6 +7,8 @@ import matplotlib.pyplot as plt
 
 from iblphotometry.behavior import psth, psth_times
 import iblphotometry.plots as plots
+
+# from gui.rawdata_visualizer import BehaviorVisualizerGUI
 from iblphotometry.synthetic import synthetic101
 import iblphotometry.preprocessing as ffpr
 from iblphotometry_tests.base_tests import PhotometryDataTestCase
@@ -94,9 +97,13 @@ class TestPlotters(PhotometryDataTestCase):
         # eid = '77a6741c-81cc-475f-9454-a9b997be02a4'
         # trials = one.load_object(eid, 'trials')
         trials = pd.read_parquet(self.paths['trials_table_kcenia_pqt'])
-        plotobj = plots.PlotSignalResponse(trials, processed_signal, times)
-        plotobj.plot_trialsort_psth()
-        plotobj.plot_processed_trialtick()
+        plotobj = plots.PlotSignalResponse()
+        plotobj.set_data(trials, processed_signal, times)
+        _, axs = plotobj.set_fig_layout()
+        plotobj.plot_trialsort_psth(axs)
+        _, ax = plt.subplots(1, 1)
+        plotobj.plot_processed_trialtick(ax)
+        # plt.show()
         plt.close('all')
 
     """
@@ -186,3 +193,26 @@ class TestPlotters(PhotometryDataTestCase):
         df_nph, t_events, fs = self.get_synthetic_data()
         plots.plot_event_tick(t_events)
         plt.close('all')
+
+    # def test_gui(self):
+    #     df_nph, _, fs = self.get_test_data()
+    #     processed_signal = df_nph['signal_processed'].values
+    #     times = df_nph['times'].values
+    #     trials = pd.read_parquet(self.paths['trials_table_kcenia_pqt'])
+
+    #     from PyQt5.QtWidgets import QApplication
+    #     app = QApplication(sys.argv)
+    #     window = BehaviorVisualizerGUI()
+    #     window.set_data(processed_signal, times)
+    #     window.load_trials(trials)
+    #     window.show()
+    #     # Uncomment to debug
+    #     app.exec_()
+
+
+if __name__ == '__main__':
+    unittest.main()
+    # suite = unittest.TestSuite()
+    # suite.addTest(TestPlotters())
+    # runner = unittest.TextTestRunner()
+    # runner.run(suite)

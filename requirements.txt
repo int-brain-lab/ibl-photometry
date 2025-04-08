@@ -1,6 +1,8 @@
-ibllib @ git+https://github.com/int-brain-lab/ibllib@develop
+ibllib
 numpy
 matplotlib
 pytest
 scipy
 pandera
+pywavelets
+pandas
