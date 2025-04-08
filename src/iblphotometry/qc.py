@@ -58,19 +58,27 @@ def eval_metric(
     metric: Callable,
     metric_kwargs: dict | None = None,
     sliding_kwargs: dict | None = None,
+    full_output=False,
 ):
+    result = {}
     m = metric(F, **metric_kwargs) if metric_kwargs is not None else metric(F)
-
+    result['value'] = m
     if sliding_kwargs is not None:
         S = sliding_metric(
             F, metric=metric, **sliding_kwargs, metric_kwargs=metric_kwargs
         )
-        r, p = linregress(S.times(), S.values)[2:4]
+        r, p = linregress(S.index.values, S.values)[2:4]
+        if full_output:
+            result['sliding_values'] = S.values
+            result['sliding_timepoints'] = S.index.values
+
     else:
         r = np.nan
         p = np.nan
 
-    return dict(value=m, rval=r, pval=p)
+    result['r'] = r
+    result['p'] = p
+    return result
 
 
 def qc_series(
