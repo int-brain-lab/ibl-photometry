@@ -130,7 +130,7 @@ def f_unique_samples(A: pd.Series | np.ndarray) -> int:
 
 def n_spikes_dt(A: pd.Series | np.ndarray, sd: int = 5):
     """count the number of spike artifacts in the recording."""
-    t = A.times if isinstance(A, pd.Series) else A
+    t = A.index.values if isinstance(A, pd.Series) else A
     return detect_spikes(t, sd=sd).shape[0]
 
 
