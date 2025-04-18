@@ -191,15 +191,19 @@ def bleaching_tau(A: pd.Series) -> float:
     return reg.popt[1]
 
 
-def bleaching_amp(A: pd.Series) -> float:
+def bleaching_amp(A: pd.Series | np.ndarray) -> float:
     """overall amplitude of bleaching."""
-    # y, t = A.values, A.index.values
-    # reg = Regression(model=ExponDecay())
-    # reg.fit(y, t)
-    # return reg.popt[0]
-    rolling_mean = A.rolling(window=1000).mean().dropna()
-    ## TODO: mean rolling std, not across whole signal
-    return (rolling_mean.iloc[0] - rolling_mean.iloc[-1]) / A.std()
+    y = A.values if isinstance(A, pd.Series) else A
+    reg = Regression(model=LinearModel())
+    try:
+        reg.fit(np.arange(len(a)), y)
+        slope = reg.popt[0]
+    except:
+        slope = np.nan
+    return slope
+    # rolling_mean = A.rolling(window=1000).mean().dropna()
+    # ## TODO: mean rolling std, not across whole signal
+    # return (rolling_mean.iloc[0] - rolling_mean.iloc[-1]) / A.std()
 
 
 def ttest_pre_post(
