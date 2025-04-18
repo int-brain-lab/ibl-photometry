@@ -187,7 +187,7 @@ def bleaching_tau(A: pd.Series) -> float:
     """overall tau of bleaching."""
     y, t = A.values, A.index.values
     reg = Regression(model=ExponDecay())
-    reg.fit(y, t)
+    reg.fit(t, y)
     return reg.popt[1]
 
 
