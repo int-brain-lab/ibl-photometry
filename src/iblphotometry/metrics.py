@@ -17,8 +17,9 @@ from iblphotometry.behavior import psth
 def dt_violations(A: pd.DataFrame | pd.Series, atol: float = 1e-3) -> str:
     t = A.index.values
     dts = np.diff(t)
-    n_violations = np.sum((dts - np.median(dts)) > atol)
-    ## TODO: make ibllib wrapper to convert metrics to QC vals
+    dt = np.median(dts)
+    n_violations = np.sum(np.abs(dts - dt) > atol)
+    ## TODO: make ibllib wrappers to convert metrics to QC vals
     # if n_violations == 0:
     #     outcome = QC.PASS
     # elif n_violations <= 3:
@@ -128,10 +129,10 @@ def f_unique_samples(A: pd.Series | np.ndarray) -> int:
     return n_unique_samples(A) / len(A)
 
 
-def n_spikes_dt(A: pd.Series | np.ndarray, sd: int = 5):
-    """count the number of spike artifacts in the recording."""
-    t = A.index.values if isinstance(A, pd.Series) else A
-    return detect_spikes(t, sd=sd).shape[0]
+# def n_spikes_dt(A: pd.Series | np.ndarray, sd: int = 5):
+#     """count the number of spike artifacts in the recording."""
+#     t = A.index.values if isinstance(A, pd.Series) else A
+#     return detect_spikes(t, sd=sd).shape[0]
 
 
 def n_spikes_dy(A: pd.Series | np.ndarray, sd: int = 5):
@@ -157,11 +158,6 @@ def _expected_max_gauss(x):
     return np.mean(x) + np.std(x) * np.sqrt(2 * np.log10(len(x)))
 
 
-## TODO: this doesn't need to be sliding, qc.run_qc takes care of it
-def sliding_expmax_violation(A: pd.Series, w: int = 151) -> float:
-    exp_max = A.rolling(window=w).apply(_expected_max_gauss)
-    if sum(A > exp_max) == 0:
-        return 0
     else:
         return sum(A[A > exp_max] - exp_max[A > exp_max]) / sum(A > exp_max)
 
