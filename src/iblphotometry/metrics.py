@@ -323,7 +323,11 @@ def response_magnitude(A: pd.Series, events: np.ndarray, window: tuple = (0, 1))
     return np.abs(responses.mean(axis=0)).sum()
 
 
-def low_freq_power_ratio(A: pd.Series, f_cutoff: float = 3.18) -> float:
+def low_freq_power_ratio(
+    A: pd.Series | np.ndarray,
+    dt: float | None = None,
+    f_cutoff: float = 3.18
+) -> float:
     """
     Fraction of the total signal power contained below a given cutoff frequency.
 
@@ -336,16 +340,18 @@ def low_freq_power_ratio(A: pd.Series, f_cutoff: float = 3.18) -> float:
         cutoff frequency, default value of 3.18 esitmated using the formula
         1 / (2 * pi * tau) and an approximate tau_rise for GCaMP6f of 0.05s.
     """
-    signal = A.copy()
+    if isinstance(A, pd.Series):
+        signal = A.values
+        dt = np.median(np.diff(A.index))
+    else:
+        assert dt is not None
+        signal = A
     assert signal.ndim == 1  # only 1D for now
     # Get frequency bins
-    tpts = signal.index.values
-    dt = np.median(np.diff(tpts))
-    n_pts = len(signal)
-    freqs = np.fft.rfftfreq(n_pts, dt)
+    freqs = np.fft.rfftfreq(len(signal), dt)
     # Compute power spectral density
     psd = np.abs(np.fft.rfft(signal - signal.mean())) ** 2
-    # Return the ratio of power contained in low freqs
+    # Return proportion of total power in low freqs
     return psd[freqs <= f_cutoff].sum() / psd.sum()
 
 
