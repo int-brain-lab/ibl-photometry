@@ -7,6 +7,7 @@ import pandas as pd
 
 from iblutil.numerical import rcoeff
 from ibldsp.utils import WindowGenerator
+from numpy.lib.stride_tricks import as_strided
 
 from scipy.optimize import minimize
 from scipy.stats.distributions import norm
@@ -582,54 +583,124 @@ def fillnan_kde(y: np.ndarray, w: int = 25):
 
 
 def remove_outliers(
-    F: pd.Series,
-    w_len: float = 60,
-    alpha: float = 0.005,
-    w: int = 25,
-    fs=None,
-    max_it=100,
+    F: pd.Series, w_size: int = 1000, alpha: float = 0.005, w: int = 25
 ):
     y, t = F.values, F.index.values
-    fs = 1 / np.median(np.diff(t)) if fs is None else fs
-    w_size = int(w_len * fs)
-
     y = copy(y)
     outliers = detect_outliers(y, w_size=w_size, alpha=alpha)
-    j = 0
     while len(outliers) > 0:
         y[outliers] = np.nan
         y = fillnan_kde(y, w=w)
         outliers = detect_outliers(y, w_size=w_size, alpha=alpha)
-        if j > max_it:
-            break
-        else:
-            j += 1
-
     return pd.Series(y, index=t)
 
 
-def detect_spikes(t: np.ndarray, sd: int = 5):
-    dt = np.diff(t)
-    bad_inds = dt < np.average(dt) - sd * np.std(dt)
-    return np.where(bad_inds)[0]
+def detect_spikes_dt(t: np.ndarray, atol: float = 0.001):
+    dts = np.diff(t)
+    dt = np.median(dts)
+    # bad_inds = dt < np.average(dt) - sd * np.std(dt)
+    # return np.where(bad_inds)[0]
+    return np.where(np.abs(dts - dt) > atol)[0]
 
 
-def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25):
+def detect_spikes_dy(y: np.ndarray, sd: float = 5.0):
+    dy = np.abs(np.diff(y))
+    # bad_inds = dt < np.average(dt) - sd * np.std(dt)
+    return np.where(dy > np.average(dy) + sd * np.std(dy))[0]
+
+
+def remove_spikes(F: pd.Series, delta: str = 't', sd: int = 5, w: int = 25):
     y, t = F.values, F.index.values
     y = copy(y)
-    outliers = detect_spikes(y, sd=sd)
+    if delta == 't':
+        outliers = detect_spikes_dt(t, atol=0.001)
+    elif delta == 'y':
+        outliers = detect_spikes_dy(y, sd=sd)
+    else:
+        raise ValueError('delta must be "t" or "y"')
     y[outliers] = np.nan
     try:
         y = fillnan_kde(y, w=w)
-    except np.linalg.LinAlgError:
-        if np.all(pd.isna(y[outliers])):  # all are NaN!
-            y[:] = 0
-            warnings.warn('all values NaN, setting to zeros')  # TODO logger
-        else:
-            y[outliers] = np.nanmedian(y)
-            warnings.warn('KDE fillnan failed, using global median')  # TODO logger
-
+    # except np.linalg.LinAlgError:
+    except:
+        i0s = (outliers - w).clip(0)
+        i1s = outliers + w
+        y[outliers] = [np.nanmedian(y[i0:i1]) for i0, i1 in zip(i0s, i1s)]
+        warnings.warn('KDE fillnan failed, using local median')  # TODO logger
     return pd.Series(y, index=t)
+
+
+## TODO: consider this simple interpolation method that uses the local median
+# def remove_spikes(F: pd.Series, sd: int = 5, w: int = 5):
+#     f = F.copy()
+#     y, t = f.values, f.index.values
+#     outliers = detect_spikes(y, sd=sd)
+#     outliers = np.unique(np.concatenate([outliers - 1, outliers]))
+#     i0s = (outliers - w).clip(0)
+#     i1s = outliers + w
+#     y[outliers] = [np.nanmedian(y[i0:i1]) for i0, i1 in zip(i0s, i1s)]
+#     return pd.Series(y, index=t)
+
+
+def find_early_samples(
+    A: pd.DataFrame | pd.Series, dt_tol: float = 0.001
+) -> np.ndarray:
+    dt = np.median(np.diff(A.index))
+    return dt - A.index.diff() > dt_tol
+
+
+def _fill_missing_channel_names(A: np.ndarray) -> np.ndarray:
+    missing_inds = np.where(A == '')[0]
+    name_alternator = {'GCaMP': 'Isosbestic', 'Isosbestic': 'GCaMP', '': ''}
+    for i in missing_inds:
+        if i == 0:
+            A[i] = name_alternator[A[i + 1]]
+        else:
+            A[i] = name_alternator[A[i - 1]]
+    return A
+
+
+def find_repeated_samples(
+    A: pd.DataFrame,
+    dt_tol: float = 0.001,
+) -> int:
+    if any(A['name'] == ''):
+        A['name'] = _fill_missing_channel_names(A['name'].values)
+    else:
+        A
+    repeated_sample_mask = A['name'].iloc[1:].values == A['name'].iloc[:-1].values
+    repeated_samples = A.iloc[1:][repeated_sample_mask]
+    dt = np.median(np.diff(A.index))
+    early_samples = A[find_early_samples(A, dt_tol=dt_tol)]
+    if not all([idx in early_samples.index for idx in repeated_samples.index]):
+        print('WARNING: repeated samples found without early sampling')
+    return repeated_sample_mask
+
+
+def fix_repeated_sampling(
+    A: pd.DataFrame, dt_tol: float = 0.001, w_size: int = 10, roi: str | None = None
+) -> int:
+    ## TODO: avoid this by explicitly handling multiple channels
+    assert roi is not None
+    # Drop first samples if channel labels are missing
+    A.loc[A['name'].replace({'': np.nan}).first_valid_index() :]
+    # Fix remaining missing channel labels
+    if any(A['name'] == ''):
+        A['name'] = _fill_missing_channel_names(A['name'].values)
+    repeated_sample_mask = find_repeated_samples(A, dt_tol=dt_tol)
+    name_alternator = {'GCaMP': 'Isosbestic', 'Isosbestic': 'GCaMP'}
+    for i in np.where(repeated_sample_mask)[0] + 1:
+        name = A.iloc[i]['name']
+        value = A.iloc[i][roi]
+        i0, i1 = A.index[i - w_size], A.index[i]
+        same = A.loc[i0:i1].query('name == @name')[roi].mean()
+        other_name = name_alternator[name]
+        other = A.loc[i0:i1].query('name == @other_name')[roi].mean()
+        assert np.abs(value - same) > np.abs(value - other)
+        A.loc[A.index[i] :, 'name'] = [
+            name_alternator[name] for name in A.loc[A.index[i] :, 'name']
+        ]
+    return A
 
 
 """
@@ -743,7 +814,7 @@ def sliding_z(F: pd.Series, w_len: float, fs=None, weights=None):
     return pd.Series(d, index=t)
 
 
-def sliding_mad(F: pd.Series, w_len: float = None, fs=None, overlap=90):
+def sliding_mad(F: pd.DataFrame, w_len: float = None, fs=None, overlap=90):
     y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)
@@ -756,3 +827,144 @@ def sliding_mad(F: pd.Series, w_len: float = None, fs=None, overlap=90):
     gain = np.nanmedian(np.abs(y)) / np.nanmedian(np.abs(rmswin), axis=0)
     gain = np.interp(t, trms, gain)
     return pd.Series(y * gain, index=t)
+
+
+def sliding_robust_zscore(F: pd.Series, w_len: float, scale: bool = True) -> pd.Series:
+    """
+    Compute a robust z-score for each data point in a pandas Series using a sliding window.
+
+    For each data point at which a full window (centered around that point)
+    is available, compute the robust z-score:
+
+         z = (x - median(window)) / MAD(window)
+
+    where MAD is the median absolute deviation of the window. If scale=True,
+    the MAD is multiplied by 1.4826 to approximate the standard deviation under normality.
+
+    Parameters
+    ----------
+    F : pd.Series
+        Input time-series with a numeric index (time) and signal values.
+    w_len : float
+        Window length in seconds.
+    scale : bool, optional
+        Whether to scale the MAD by 1.4826. Default is True.
+
+    Returns
+    -------
+    pd.Series
+        A new Series of the same length as F containing the robust z-scores.
+        Data points near the boundaries without a full window are NaN.
+    """
+    # Ensure the index is numeric (time in seconds)
+    times = F.index.values.astype(float)
+    dt = np.median(np.diff(times))
+
+    # Number of samples corresponding to w_len in seconds.
+    w_size = int(w_len // dt)
+    # Make window size odd so that a window can be centered
+    if w_size % 2 == 0:
+        w_size += 1
+    half_win = w_size // 2
+
+    a = F.values  # Underlying data
+    n = len(a)
+
+    # We can only compute a full (centered) window where there's enough data on both sides.
+    # Valid center positions are indices half_win to n - half_win - 1.
+    n_valid = n - 2 * half_win
+    if n_valid <= 0:
+        raise ValueError('Window length is too long for the given series.')
+
+    # Using step size of 1: each valid index gets its own window.
+    # Create a 2D view of the signal:
+    # windows shape: (n_valid, w_size)
+    windows = as_strided(
+        a[half_win : n - half_win],
+        shape=(n_valid, w_size),
+        strides=(a.strides[0], a.strides[0]),
+    )
+    # However, the above would take contiguous blocks from a[half_win: n - half_win] only.
+    # To get a sliding window centered at each valid index, we need a trick:
+    # We'll use as_strided on the full array, starting at index 0, then select the valid windows:
+    windows_full = as_strided(
+        a, shape=(n - w_size + 1, w_size), strides=(a.strides[0], a.strides[0])
+    )
+    # The center of the k-th window in windows_full is at index k + half_win.
+    # We want windows centered at indices half_win, half_win+1, ..., n - half_win - 1.
+    # Thus, we select:
+    windows = windows_full[0 + 0 : 0 + n_valid]  # shape (n_valid, w_size)
+
+    # Compute the median for each window (row-wise).
+    medians = np.median(windows, axis=1)
+    # Compute the MAD for each window.
+    mads = np.median(np.abs(windows - medians[:, None]), axis=1)
+    if scale:
+        mads *= 1.4826  # Scale MAD to approximate standard deviation under a normal distribution.
+
+    # Avoid division by zero: if MAD is zero, set those z-scores to 0.
+    safe_mads = np.where(mads == 0, np.nan, mads)
+
+    # Compute robust z-scores for the center value of each window.
+    # The center value for the k-th window is at index: k + half_win in the original array.
+    centers = a[half_win : n - half_win]
+    z_scores_valid = (centers - medians) / safe_mads
+
+    # Pre-allocate result (all values NaN)
+    robust_z = np.full(n, np.nan)
+    # Fill in the computed z-scores at valid indices.
+    valid_idx = np.arange(half_win, n - half_win)
+    robust_z[valid_idx] = z_scores_valid
+
+    # Return as a Series with the original index
+    return pd.Series(robust_z, index=F.index)
+
+
+def sliding_robust_zscore_rolling(
+    F: pd.Series, w_len: float, scale: bool = True
+) -> pd.Series:
+    """
+    Compute a robust z-score for each data point using a sliding window via pandas’ rolling().
+
+    For each point where a full, centered window is available, compute:
+          z = (x_center - median(window)) / MAD(window)
+    where MAD is the median absolute deviation and, if scale=True, MAD is scaled by 1.4826.
+
+    Parameters
+    ----------
+    F : pd.Series
+        Input time-series with a numeric index (time in seconds) and signal values.
+    w_len : float
+        The window length in seconds.
+    scale : bool, optional
+        If True, multiply MAD by 1.4826 (default is True).
+
+    Returns
+    -------
+    pd.Series
+        A Series containing the robust z-scores at the center of each window.
+        Points for which a full window cannot be computed will be NaN.
+    """
+    # Get the sample interval from the index
+    times = F.index.values.astype(float)
+    dt = np.median(np.diff(times))
+    # Compute window size in samples and ensure it is odd (so there's a unique center)
+    w_size = int(w_len / dt)
+    if w_size % 2 == 0:
+        w_size += 1
+
+    def robust_zscore(window):
+        # window is passed as a NumPy array (raw=True)
+        center = window[len(window) // 2]
+        med = np.median(window)
+        mad = np.median(np.abs(window - med))
+        if mad == 0:
+            return np.nan
+        if scale:
+            mad *= 1.4826
+        return (center - med) / mad
+
+    # Use rolling window with center=True so that the result corresponds to the window center.
+    F_proc = F.rolling(window=w_size, center=True).apply(robust_zscore, raw=True)
+    # Return only valid (non-NaN) portions of the transformed signal
+    return F_proc.loc[F_proc.first_valid_index() : F_proc.last_valid_index()]
