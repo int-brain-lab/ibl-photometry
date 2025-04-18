@@ -75,6 +75,14 @@ def percentile_dist(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) ->
     return P[1] - P[0]
 
 
+def deviance(
+    A: pd.Series | np.ndarray,
+    w_len: int = 151,
+) -> float:
+    a = A.values if isinstance(A, pd.Series) else A
+    return np.median(np.abs(a - np.median(a)) / np.median(a))
+
+
 def sliding_deviance(
     A: pd.Series | np.ndarray,
     w_len: int = 151,
