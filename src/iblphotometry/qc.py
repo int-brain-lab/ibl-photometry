@@ -67,9 +67,15 @@ def _eval_metric_sliding(
     if n_windows <= 2:
         return
     a = F.values
-    windows = as_strided(a, shape=(n_windows, w_size), strides=(step_size * a.strides[0], a.strides[0]))
-    S_values = np.apply_along_axis(lambda w: metric(w, **metric_kwargs), axis=1, arr=windows)
-    S_times = F.index.values[np.linspace(step_size, n_windows * step_size, n_windows).astype(int)]
+    windows = as_strided(
+        a, shape=(n_windows, w_size), strides=(step_size * a.strides[0], a.strides[0])
+    )
+    S_values = np.apply_along_axis(
+        lambda w: metric(w, **metric_kwargs), axis=1, arr=windows
+    )
+    S_times = F.index.values[
+        np.linspace(step_size, n_windows * step_size, n_windows).astype(int)
+    ]
     return pd.Series(S_values, index=S_times)
 
 
@@ -82,9 +88,11 @@ def eval_metric(
     full_output=True,
 ):
     results_vals = ['value', 'sliding_values', 'sliding_timepoints', 'r', 'p']
-    result = {k:np.nan for k in results_vals}
+    result = {k: np.nan for k in results_vals}
     metric_func = getattr(metrics, metric)
-    result['value'] = metric_func(F) if metric_kwargs is None else metric_func(F, **metric_kwargs)
+    result['value'] = (
+        metric_func(F) if metric_kwargs is None else metric_func(F, **metric_kwargs)
+    )
     sliding_kwargs = {} if sliding_kwargs is None else sliding_kwargs
     if sliding_kwargs:
         S = _eval_metric_sliding(F, metric_func, sliding_kwargs['w_len'], metric_kwargs)
@@ -133,7 +141,9 @@ def qc_series(
         # try:
         if trials is not None:  # if trials are passed
             params['trials'] = trials
-        res = eval_metric(F, metric, metric_kwargs=params, sliding_kwargs=sliding_kwargs[metric])
+        res = eval_metric(
+            F, metric, metric_kwargs=params, sliding_kwargs=sliding_kwargs[metric]
+        )
         qc_results[f'{metric}'] = res['value']
         if sliding_kwargs[metric]:
             qc_results[f'_{metric}_values'] = res['sliding_values']

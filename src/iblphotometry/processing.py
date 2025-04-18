@@ -602,10 +602,12 @@ def detect_spikes_dt(t: np.ndarray, atol: float = 0.001):
     # return np.where(bad_inds)[0]
     return np.where(np.abs(dts - dt) > atol)[0]
 
-def detect_spikes_dy(y: np.ndarray, sd: float = 5.):
+
+def detect_spikes_dy(y: np.ndarray, sd: float = 5.0):
     dy = np.abs(np.diff(y))
     # bad_inds = dt < np.average(dt) - sd * np.std(dt)
     return np.where(dy > np.average(dy) + sd * np.std(dy))[0]
+
 
 def remove_spikes(F: pd.Series, delta: str = 't', sd: int = 5, w: int = 25):
     y, t = F.values, F.index.values
@@ -640,7 +642,9 @@ def remove_spikes(F: pd.Series, delta: str = 't', sd: int = 5, w: int = 25):
 #     return pd.Series(y, index=t)
 
 
-def find_early_samples(A: pd.DataFrame | pd.Series, dt_tol: float = 0.001) -> np.ndarray:
+def find_early_samples(
+    A: pd.DataFrame | pd.Series, dt_tol: float = 0.001
+) -> np.ndarray:
     dt = np.median(np.diff(A.index))
     return dt - A.index.diff() > dt_tol
 
@@ -669,25 +673,23 @@ def find_repeated_samples(
     dt = np.median(np.diff(A.index))
     early_samples = A[find_early_samples(A, dt_tol=dt_tol)]
     if not all([idx in early_samples.index for idx in repeated_samples.index]):
-        print("WARNING: repeated samples found without early sampling")
+        print('WARNING: repeated samples found without early sampling')
     return repeated_sample_mask
 
+
 def fix_repeated_sampling(
-    A: pd.DataFrame,
-    dt_tol: float = 0.001,
-    w_size: int = 10,
-    roi: str | None = None
+    A: pd.DataFrame, dt_tol: float = 0.001, w_size: int = 10, roi: str | None = None
 ) -> int:
     ## TODO: avoid this by explicitly handling multiple channels
     assert roi is not None
     # Drop first samples if channel labels are missing
-    A.loc[A['name'].replace({'':np.nan}).first_valid_index():]
+    A.loc[A['name'].replace({'': np.nan}).first_valid_index() :]
     # Fix remaining missing channel labels
     if any(A['name'] == ''):
         A['name'] = _fill_missing_channel_names(A['name'].values)
     repeated_sample_mask = find_repeated_samples(A, dt_tol=dt_tol)
-    name_alternator = {'GCaMP':'Isosbestic', 'Isosbestic': 'GCaMP'}
-    for i in (np.where(repeated_sample_mask)[0] + 1):
+    name_alternator = {'GCaMP': 'Isosbestic', 'Isosbestic': 'GCaMP'}
+    for i in np.where(repeated_sample_mask)[0] + 1:
         name = A.iloc[i]['name']
         value = A.iloc[i][roi]
         i0, i1 = A.index[i - w_size], A.index[i]
@@ -695,7 +697,9 @@ def fix_repeated_sampling(
         other_name = name_alternator[name]
         other = A.loc[i0:i1].query('name == @other_name')[roi].mean()
         assert np.abs(value - same) > np.abs(value - other)
-        A.loc[A.index[i]:, 'name'] = [name_alternator[name] for name in A.loc[A.index[i]:, 'name']]
+        A.loc[A.index[i] :, 'name'] = [
+            name_alternator[name] for name in A.loc[A.index[i] :, 'name']
+        ]
     return A
 
 
@@ -870,23 +874,21 @@ def sliding_robust_zscore(F: pd.Series, w_len: float, scale: bool = True) -> pd.
     # Valid center positions are indices half_win to n - half_win - 1.
     n_valid = n - 2 * half_win
     if n_valid <= 0:
-        raise ValueError("Window length is too long for the given series.")
+        raise ValueError('Window length is too long for the given series.')
 
     # Using step size of 1: each valid index gets its own window.
     # Create a 2D view of the signal:
     # windows shape: (n_valid, w_size)
     windows = as_strided(
-        a[half_win:n - half_win],
+        a[half_win : n - half_win],
         shape=(n_valid, w_size),
-        strides=(a.strides[0], a.strides[0])
+        strides=(a.strides[0], a.strides[0]),
     )
     # However, the above would take contiguous blocks from a[half_win: n - half_win] only.
     # To get a sliding window centered at each valid index, we need a trick:
     # We'll use as_strided on the full array, starting at index 0, then select the valid windows:
     windows_full = as_strided(
-        a,
-        shape=(n - w_size + 1, w_size),
-        strides=(a.strides[0], a.strides[0])
+        a, shape=(n - w_size + 1, w_size), strides=(a.strides[0], a.strides[0])
     )
     # The center of the k-th window in windows_full is at index k + half_win.
     # We want windows centered at indices half_win, half_win+1, ..., n - half_win - 1.
@@ -905,7 +907,7 @@ def sliding_robust_zscore(F: pd.Series, w_len: float, scale: bool = True) -> pd.
 
     # Compute robust z-scores for the center value of each window.
     # The center value for the k-th window is at index: k + half_win in the original array.
-    centers = a[half_win: n - half_win]
+    centers = a[half_win : n - half_win]
     z_scores_valid = (centers - medians) / safe_mads
 
     # Pre-allocate result (all values NaN)
@@ -917,7 +919,10 @@ def sliding_robust_zscore(F: pd.Series, w_len: float, scale: bool = True) -> pd.
     # Return as a Series with the original index
     return pd.Series(robust_z, index=F.index)
 
-def sliding_robust_zscore_rolling(F: pd.Series, w_len: float, scale: bool = True) -> pd.Series:
+
+def sliding_robust_zscore_rolling(
+    F: pd.Series, w_len: float, scale: bool = True
+) -> pd.Series:
     """
     Compute a robust z-score for each data point using a sliding window via pandas’ rolling().
 
@@ -962,4 +967,4 @@ def sliding_robust_zscore_rolling(F: pd.Series, w_len: float, scale: bool = True
     # Use rolling window with center=True so that the result corresponds to the window center.
     F_proc = F.rolling(window=w_size, center=True).apply(robust_zscore, raw=True)
     # Return only valid (non-NaN) portions of the transformed signal
-    return F_proc.loc[F_proc.first_valid_index():F_proc.last_valid_index()]
+    return F_proc.loc[F_proc.first_valid_index() : F_proc.last_valid_index()]

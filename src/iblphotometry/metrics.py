@@ -12,7 +12,7 @@ from iblphotometry.processing import (
     detect_spikes_dy,
     detect_outliers,
     find_early_samples,
-    find_repeated_samples
+    find_repeated_samples,
 )
 from iblphotometry.behavior import psth
 
@@ -178,7 +178,7 @@ def expmax_violation(A: pd.Series | np.ndarray) -> float:
     exp_max = _expected_max_gauss(a)
     n_violations = sum(np.abs(a) > exp_max)
     if n_violations == 0:
-        return 0.
+        return 0.0
     else:
         return np.sum(np.abs(a[np.abs(a) > exp_max]) - exp_max) / n_violations
 
@@ -324,9 +324,7 @@ def response_magnitude(A: pd.Series, events: np.ndarray, window: tuple = (0, 1))
 
 
 def low_freq_power_ratio(
-    A: pd.Series | np.ndarray,
-    dt: float | None = None,
-    f_cutoff: float = 3.18
+    A: pd.Series | np.ndarray, dt: float | None = None, f_cutoff: float = 3.18
 ) -> float:
     """
     Fraction of the total signal power contained below a given cutoff frequency.
