@@ -639,6 +639,65 @@ def remove_spikes(F: pd.Series, delta: str = 't', sd: int = 5, w: int = 25):
 #     return pd.Series(y, index=t)
 
 
+def find_early_samples(A: pd.DataFrame | pd.Series, dt_tol: float = 0.001) -> np.ndarray:
+    dt = np.median(np.diff(A.index))
+    return dt - A.index.diff() > dt_tol
+
+
+def _fill_missing_channel_names(A: np.ndarray) -> np.ndarray:
+    missing_inds = np.where(A == '')[0]
+    name_alternator = {'GCaMP': 'Isosbestic', 'Isosbestic': 'GCaMP', '': ''}
+    for i in missing_inds:
+        if i == 0:
+            A[i] = name_alternator[A[i + 1]]
+        else:
+            A[i] = name_alternator[A[i - 1]]
+    return A
+
+
+def find_repeated_samples(
+    A: pd.DataFrame,
+    dt_tol: float = 0.001,
+) -> int:
+    if any(A['name'] == ''):
+        A['name'] = _fill_missing_channel_names(A['name'].values)
+    else:
+        A
+    repeated_sample_mask = A['name'].iloc[1:].values == A['name'].iloc[:-1].values
+    repeated_samples = A.iloc[1:][repeated_sample_mask]
+    dt = np.median(np.diff(A.index))
+    early_samples = A[find_early_samples(A, dt_tol=dt_tol)]
+    if not all([idx in early_samples.index for idx in repeated_samples.index]):
+        print("WARNING: repeated samples found without early sampling")
+    return repeated_sample_mask
+
+def fix_repeated_sampling(
+    A: pd.DataFrame,
+    dt_tol: float = 0.001,
+    w_size: int = 10,
+    roi: str | None = None
+) -> int:
+    ## TODO: avoid this by explicitly handling multiple channels
+    assert roi is not None
+    # Drop first samples if channel labels are missing
+    A.loc[A['name'].replace({'':np.nan}).first_valid_index():]
+    # Fix remaining missing channel labels
+    if any(A['name'] == ''):
+        A['name'] = _fill_missing_channel_names(A['name'].values)
+    repeated_sample_mask = find_repeated_samples(A, dt_tol=dt_tol)
+    name_alternator = {'GCaMP':'Isosbestic', 'Isosbestic': 'GCaMP'}
+    for i in (np.where(repeated_sample_mask)[0] + 1):
+        name = A.iloc[i]['name']
+        value = A.iloc[i][roi]
+        i0, i1 = A.index[i - w_size], A.index[i]
+        same = A.loc[i0:i1].query('name == @name')[roi].mean()
+        other_name = name_alternator[name]
+        other = A.loc[i0:i1].query('name == @other_name')[roi].mean()
+        assert np.abs(value - same) > np.abs(value - other)
+        A.loc[A.index[i]:, 'name'] = [name_alternator[name] for name in A.loc[A.index[i]:, 'name']]
+    return A
+
+
 """
  ######  ##       #### ########  #### ##    ##  ######       #######  ########  ######## ########     ###    ######## ####  #######  ##    ##  ######
 ##    ## ##        ##  ##     ##  ##  ###   ## ##    ##     ##     ## ##     ## ##       ##     ##   ## ##      ##     ##  ##     ## ###   ## ##    ##
