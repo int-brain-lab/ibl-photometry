@@ -594,16 +594,27 @@ def remove_outliers(
     return pd.Series(y, index=t)
 
 
-def detect_spikes(t: np.ndarray, sd: int = 5):
-    dt = np.diff(t)
-    bad_inds = dt < np.average(dt) - sd * np.std(dt)
-    return np.where(bad_inds)[0]
+def detect_spikes_dt(t: np.ndarray, atol: float = 0.001):
+    dts = np.diff(t)
+    dt = np.median(dts)
+    # bad_inds = dt < np.average(dt) - sd * np.std(dt)
+    # return np.where(bad_inds)[0]
+    return np.where(np.abs(dts - dt) > atol)[0]
 
+def detect_spikes_dy(y: np.ndarray, sd: float = 5.):
+    dy = np.abs(np.diff(y))
+    # bad_inds = dt < np.average(dt) - sd * np.std(dt)
+    return np.where(dy > np.average(dy) + sd * np.std(dy))[0]
 
-def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25):
+def remove_spikes(F: pd.Series, delta: str = 't', sd: int = 5, w: int = 25):
     y, t = F.values, F.index.values
     y = copy(y)
-    outliers = detect_spikes(t, sd=sd)
+    if delta == 't':
+        outliers = detect_spikes_dt(t, atol=0.001)
+    elif delta == 'y':
+        outliers = detect_spikes_dy(y, sd=sd)
+    else:
+        raise ValueError('delta must be "t" or "y"')
     y[outliers] = np.nan
     try:
         y = fillnan_kde(y, w=w)
