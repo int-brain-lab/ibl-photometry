@@ -417,13 +417,19 @@ def ar_score(A: pd.Series | np.ndarray, order: int = 2) -> float:
     X = np.column_stack([signal[i : len(signal) - order + i] for i in range(order)])
     y = signal[order:]
 
-    # Fit linear regression using least squares
-    _, residual, _, _ = np.linalg.lstsq(X, y)
+    try:
+        # Fit linear regression using least squares
+        _, residual, _, _ = np.linalg.lstsq(X, y)
+    except np.linalg.LinAlgError:
+        return np.nan
 
-    # Calculate R-squared using residuals
-    ss_residual = residual[0]
-    ss_total = np.sum((y - np.mean(y)) ** 2)
-    r_squared = 1 - (ss_residual / ss_total)
+    if residual:
+        # Calculate R-squared using residuals
+        ss_residual = residual[0]
+        ss_total = np.sum((y - np.mean(y)) ** 2)
+        r_squared = 1 - (ss_residual / ss_total)
+    else:
+        r_squared = np.nan
 
     return r_squared
 
