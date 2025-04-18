@@ -7,6 +7,7 @@ import pandas as pd
 
 from iblutil.numerical import rcoeff
 from ibldsp.utils import WindowGenerator
+from numpy.lib.stride_tricks import as_strided
 
 from scipy.optimize import minimize
 from scipy.stats.distributions import norm
@@ -809,7 +810,7 @@ def sliding_z(F: pd.Series, w_len: float, fs=None, weights=None):
     return pd.Series(d, index=t)
 
 
-def sliding_mad(F: pd.Series, w_len: float = None, fs=None, overlap=90):
+def sliding_mad(F: pd.DataFrame, w_len: float = None, fs=None, overlap=90):
     y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)
@@ -822,3 +823,143 @@ def sliding_mad(F: pd.Series, w_len: float = None, fs=None, overlap=90):
     gain = np.nanmedian(np.abs(y)) / np.nanmedian(np.abs(rmswin), axis=0)
     gain = np.interp(t, trms, gain)
     return pd.Series(y * gain, index=t)
+
+
+def sliding_robust_zscore(F: pd.Series, w_len: float, scale: bool = True) -> pd.Series:
+    """
+    Compute a robust z-score for each data point in a pandas Series using a sliding window.
+
+    For each data point at which a full window (centered around that point)
+    is available, compute the robust z-score:
+
+         z = (x - median(window)) / MAD(window)
+
+    where MAD is the median absolute deviation of the window. If scale=True,
+    the MAD is multiplied by 1.4826 to approximate the standard deviation under normality.
+
+    Parameters
+    ----------
+    F : pd.Series
+        Input time-series with a numeric index (time) and signal values.
+    w_len : float
+        Window length in seconds.
+    scale : bool, optional
+        Whether to scale the MAD by 1.4826. Default is True.
+
+    Returns
+    -------
+    pd.Series
+        A new Series of the same length as F containing the robust z-scores.
+        Data points near the boundaries without a full window are NaN.
+    """
+    # Ensure the index is numeric (time in seconds)
+    times = F.index.values.astype(float)
+    dt = np.median(np.diff(times))
+
+    # Number of samples corresponding to w_len in seconds.
+    w_size = int(w_len // dt)
+    # Make window size odd so that a window can be centered
+    if w_size % 2 == 0:
+        w_size += 1
+    half_win = w_size // 2
+
+    a = F.values  # Underlying data
+    n = len(a)
+
+    # We can only compute a full (centered) window where there's enough data on both sides.
+    # Valid center positions are indices half_win to n - half_win - 1.
+    n_valid = n - 2 * half_win
+    if n_valid <= 0:
+        raise ValueError("Window length is too long for the given series.")
+
+    # Using step size of 1: each valid index gets its own window.
+    # Create a 2D view of the signal:
+    # windows shape: (n_valid, w_size)
+    windows = as_strided(
+        a[half_win:n - half_win],
+        shape=(n_valid, w_size),
+        strides=(a.strides[0], a.strides[0])
+    )
+    # However, the above would take contiguous blocks from a[half_win: n - half_win] only.
+    # To get a sliding window centered at each valid index, we need a trick:
+    # We'll use as_strided on the full array, starting at index 0, then select the valid windows:
+    windows_full = as_strided(
+        a,
+        shape=(n - w_size + 1, w_size),
+        strides=(a.strides[0], a.strides[0])
+    )
+    # The center of the k-th window in windows_full is at index k + half_win.
+    # We want windows centered at indices half_win, half_win+1, ..., n - half_win - 1.
+    # Thus, we select:
+    windows = windows_full[0 + 0 : 0 + n_valid]  # shape (n_valid, w_size)
+
+    # Compute the median for each window (row-wise).
+    medians = np.median(windows, axis=1)
+    # Compute the MAD for each window.
+    mads = np.median(np.abs(windows - medians[:, None]), axis=1)
+    if scale:
+        mads *= 1.4826  # Scale MAD to approximate standard deviation under a normal distribution.
+
+    # Avoid division by zero: if MAD is zero, set those z-scores to 0.
+    safe_mads = np.where(mads == 0, np.nan, mads)
+
+    # Compute robust z-scores for the center value of each window.
+    # The center value for the k-th window is at index: k + half_win in the original array.
+    centers = a[half_win: n - half_win]
+    z_scores_valid = (centers - medians) / safe_mads
+
+    # Pre-allocate result (all values NaN)
+    robust_z = np.full(n, np.nan)
+    # Fill in the computed z-scores at valid indices.
+    valid_idx = np.arange(half_win, n - half_win)
+    robust_z[valid_idx] = z_scores_valid
+
+    # Return as a Series with the original index
+    return pd.Series(robust_z, index=F.index)
+
+def sliding_robust_zscore_rolling(F: pd.Series, w_len: float, scale: bool = True) -> pd.Series:
+    """
+    Compute a robust z-score for each data point using a sliding window via pandas’ rolling().
+
+    For each point where a full, centered window is available, compute:
+          z = (x_center - median(window)) / MAD(window)
+    where MAD is the median absolute deviation and, if scale=True, MAD is scaled by 1.4826.
+
+    Parameters
+    ----------
+    F : pd.Series
+        Input time-series with a numeric index (time in seconds) and signal values.
+    w_len : float
+        The window length in seconds.
+    scale : bool, optional
+        If True, multiply MAD by 1.4826 (default is True).
+
+    Returns
+    -------
+    pd.Series
+        A Series containing the robust z-scores at the center of each window.
+        Points for which a full window cannot be computed will be NaN.
+    """
+    # Get the sample interval from the index
+    times = F.index.values.astype(float)
+    dt = np.median(np.diff(times))
+    # Compute window size in samples and ensure it is odd (so there's a unique center)
+    w_size = int(w_len / dt)
+    if w_size % 2 == 0:
+        w_size += 1
+
+    def robust_zscore(window):
+        # window is passed as a NumPy array (raw=True)
+        center = window[len(window) // 2]
+        med = np.median(window)
+        mad = np.median(np.abs(window - med))
+        if mad == 0:
+            return np.nan
+        if scale:
+            mad *= 1.4826
+        return (center - med) / mad
+
+    # Use rolling window with center=True so that the result corresponds to the window center.
+    F_proc = F.rolling(window=w_size, center=True).apply(robust_zscore, raw=True)
+    # Return only valid (non-NaN) portions of the transformed signal
+    return F_proc.loc[F_proc.first_valid_index():F_proc.last_valid_index()]
