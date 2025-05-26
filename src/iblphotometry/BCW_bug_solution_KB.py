@@ -10,12 +10,6 @@ labelling was incorrect for the probabilityLeft:
  - BCW block 2 - 20/80 or 80/20 = correct
  - BCW block 3 - 80/20 or 20/80 = incorrect - it starts shifting 0.2 and 0.8 for each consecutive trial
  
-1. LOAD THE BEHAVIOR AND PHOTOMETRY FILES
-2. ADD BEHAVIOR VARIABLES 
-3. SYNCHRONIZE BEHAV AND PHOTOMETRY 
-4. PREPROCESS PHOTOMETRY
-5. PLOT HEATMAP AND LINEPLOT DIVIDED BY FEEDBACK TYPE 
-
 """ 
 
 #%%
@@ -51,9 +45,6 @@ df_trials, eid = get_eid()
 
 plt.plot(df_trials.probabilityLeft, alpha=0.5)
 
-
-""" useful""" 
-# eids = one.search(project='ibl_fibrephotometry') 
 
 #%%
 """ LOAD TRIALS """
