@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 import warnings
-import pandera
+import pandera.pandas as pa
 from typing import Optional
 
 from iblphotometry.neurophotometrics import (
@@ -306,14 +306,14 @@ def read_digital_inputs_csv(path: str | Path, validate=True) -> pd.DataFrame:
 
 def validate_ibl_dataframe(ibl_df: pd.DataFrame, data_columns=None) -> pd.DataFrame:
     data_columns = infer_data_columns(ibl_df) if data_columns is None else data_columns
-    schema_ibl_data = pandera.DataFrameSchema(
+    schema_ibl_data = pa.DataFrameSchema(
         columns=dict(
-            times=pandera.Column(pandera.Float64),
-            # valid=pandera.Column(pandera.Bool), # optionally present
-            wavelength=pandera.Column(pandera.Float64, nullable=True),
-            name=pandera.Column(pandera.String),
-            color=pandera.Column(pandera.String),
-            **{k: pandera.Column(pandera.Float64) for k in data_columns},
+            times=pa.Column(pa.Float64),
+            # valid=pa.Column(pa.Bool), # optionally present
+            wavelength=pa.Column(pa.Float64, nullable=True),
+            name=pa.Column(pa.String),
+            color=pa.Column(pa.String),
+            **{k: pa.Column(pa.Float64) for k in data_columns},
         )
     )
     return schema_ibl_data.validate(ibl_df)
@@ -328,22 +328,22 @@ def validate_neurophotometrics_df(
 
     match version:
         case 'new':  # kcenia, carolina
-            schema_raw_data = pandera.DataFrameSchema(
+            schema_raw_data = pa.DataFrameSchema(
                 columns=dict(
-                    FrameCounter=pandera.Column(pandera.Int64),
-                    SystemTimestamp=pandera.Column(pandera.Float64),
-                    LedState=pandera.Column(pandera.Int16, coerce=True),
-                    ComputerTimestamp=pandera.Column(pandera.Float64),
-                    **{k: pandera.Column(pandera.Float64) for k in data_columns},
+                    FrameCounter=pa.Column(pa.Int64),
+                    SystemTimestamp=pa.Column(pa.Float64),
+                    LedState=pa.Column(pa.Int16, coerce=True),
+                    ComputerTimestamp=pa.Column(pa.Float64),
+                    **{k: pa.Column(pa.Float64) for k in data_columns},
                 )
             )
         case 'old':  # alejandro
-            schema_raw_data = pandera.DataFrameSchema(
+            schema_raw_data = pa.DataFrameSchema(
                 columns=dict(
-                    FrameCounter=pandera.Column(pandera.Int64),
-                    Timestamp=pandera.Column(pandera.Float64),
-                    LedState=pandera.Column(pandera.Int16, coerce=True),
-                    **{k: pandera.Column(pandera.Float64) for k in data_columns},
+                    FrameCounter=pa.Column(pa.Int64),
+                    Timestamp=pa.Column(pa.Float64),
+                    LedState=pa.Column(pa.Int16, coerce=True),
+                    **{k: pa.Column(pa.Float64) for k in data_columns},
                 )
             )
 
@@ -351,13 +351,13 @@ def validate_neurophotometrics_df(
 
 
 def validate_neurophotometrics_digital_inputs(df: pd.DataFrame) -> pd.DataFrame:
-    schema_digital_inputs = pandera.DataFrameSchema(
+    schema_digital_inputs = pa.DataFrameSchema(
         columns=dict(
-            ChannelName=pandera.Column(str, coerce=True),
-            Channel=pandera.Column(pandera.Int8, coerce=True),
-            AlwaysTrue=pandera.Column(bool, coerce=True),
-            SystemTimestamp=pandera.Column(pandera.Float64),
-            ComputerTimestamp=pandera.Column(pandera.Float64),
+            ChannelName=pa.Column(str, coerce=True),
+            Channel=pa.Column(pa.Int8, coerce=True),
+            AlwaysTrue=pa.Column(bool, coerce=True),
+            SystemTimestamp=pa.Column(pa.Float64),
+            ComputerTimestamp=pa.Column(pa.Float64),
         )
     )
     return schema_digital_inputs.validate(df)
