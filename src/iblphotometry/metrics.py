@@ -247,24 +247,50 @@ def spectral_entropy(A: pd.Series, eps: float = np.finfo('float').eps) -> float:
     return 1 - norm_entropy
 
 
-def ar_score(A: pd.Series) -> float:
+def ar_score(A: pd.Series | np.ndarray, order: int = 2) -> float:
     """
-    R-squared from an AR(1) model fit to the signal as a measure of the temporal
+    R-squared from an AR(n) model fit to the signal as a measure of the temporal
     structure present in the signal.
-
     Parameters
     ----------
-    A :
-        the signal time series with signal values in the columns and sample
-        times in the index
+    A : pd.Series or np.ndarray
+        The signal time series with signal values in the columns and sample
+        times in the index.
+    order : int, optional
+        The order of the AR model. Default is 2.
+    Returns
+    -------
+    float
+        The R-squared value indicating the variance explained by the AR model.
+        Returns NaN if the signal is constant.
     """
-    # Pull signal out of pandas series
-    signal = A.values
-    assert signal.ndim == 1  # only 1D for now
-    X = signal[:-1]
-    y = signal[1:]
-    res = stats.linregress(X, y)
-    return res.rvalue**2
+    # Pull signal out of pandas Series if needed
+    signal = A.values if isinstance(A, pd.Series) else A
+    assert signal.ndim == 1, 'Signal must be 1-dimensional.'
+
+    # Handle constant signal case
+    if len(np.unique(signal)) == 1:
+        return np.nan
+
+    # Create design matrix X and target vector y based on AR order
+    X = np.column_stack([signal[i : len(signal) - order + i] for i in range(order)])
+    y = signal[order:]
+
+    try:
+        # Fit linear regression using least squares
+        _, residual, _, _ = np.linalg.lstsq(X, y)
+    except np.linalg.LinAlgError:
+        return np.nan
+
+    if residual:
+        # Calculate R-squared using residuals
+        ss_residual = residual[0]
+        ss_total = np.sum((y - np.mean(y)) ** 2)
+        r_squared = 1 - (ss_residual / ss_total)
+    else:
+        r_squared = np.nan
+
+    return r_squared
 
 
 def noise_simulation(
