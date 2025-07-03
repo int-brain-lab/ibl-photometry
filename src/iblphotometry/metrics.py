@@ -3,6 +3,10 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+
+from iblphotometry.preprocessing import (
+    find_early_samples
+)
 from iblphotometry.processing import (
     z,
     Regression,
@@ -13,6 +17,8 @@ from iblphotometry.processing import (
 from iblphotometry.behavior import psth
 
 
+def n_early_samples(A: pd.DataFrame | pd.Series, dt_tol: float = 0.001) -> int:
+    return find_early_samples(A, dt_tol=dt_tol).sum()
 def percentile_dist(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
     """the distance between two percentiles in units of z. Captures the magnitude of transients.
 
