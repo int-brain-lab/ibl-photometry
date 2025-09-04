@@ -41,6 +41,24 @@ def n_unique_samples(A: pd.Series | np.ndarray) -> int:
 
 
     """the distance between two percentiles in units of z. Captures the magnitude of transients.
+def median_absolute_deviance(
+    A: pd.Series | np.ndarray,
+    normalize: bool = False
+    ) -> float:
+    """median absolute distance from the signal median. Low values indicate a
+    low overall signal amplitude.
+
+    Args:
+        A (pd.Series | np.ndarray): the input data
+
+    Returns:
+        float: median absolute deviance
+
+    """
+    a = A.values if isinstance(A, pd.Series) else A
+    return np.median(np.abs(a - np.median(a)))
+
+
 def percentile_distance(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
     """the distance between two percentiles in units of z.
 
