@@ -40,8 +40,9 @@ def n_unique_samples(A: pd.Series | np.ndarray) -> int:
     return np.unique(a).shape[0]
 
 
-def percentile_dist(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
     """the distance between two percentiles in units of z. Captures the magnitude of transients.
+def percentile_distance(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
+    """the distance between two percentiles in units of z.
 
     Args:
         A (pd.Series | np.ndarray): the input data, np.ndarray for stride tricks sliding windows
@@ -60,8 +61,8 @@ def percentile_dist(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) ->
     return P[1] - P[0]
 
 
-def signal_asymmetry(A: pd.Series | np.ndarray, pc_comp: int = 95, axis=-1) -> float:
     """the ratio between the distance of two percentiles to the median. Proportional to the the signal to noise.
+def percentile_asymmetry(A: pd.Series | np.ndarray, pc_comp: int = 95, axis=-1) -> float:
 
     Args:
         A (pd.Series | np.ndarray): _description_
@@ -74,8 +75,8 @@ def signal_asymmetry(A: pd.Series | np.ndarray, pc_comp: int = 95, axis=-1) -> f
     if not (isinstance(A, pd.Series) or isinstance(A, np.ndarray)):
         raise TypeError('A must be pd.Series or np.ndarray.')
 
-    a = np.absolute(percentile_dist(A, (50, pc_comp), axis=axis))
-    b = np.absolute(percentile_dist(A, (100 - pc_comp, 50), axis=axis))
+    a = np.absolute(percentile_distance(A, (50, pc_comp), axis=axis))
+    b = np.absolute(percentile_distance(A, (100 - pc_comp, 50), axis=axis))
     return a / b
 
 
