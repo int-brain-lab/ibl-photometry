@@ -14,13 +14,27 @@ from iblphotometry.behavior import psth
 
 
 def n_early_samples(A: pd.DataFrame | pd.Series, dt_tol: float = 0.001) -> int:
+    """
+    Number of samples that occur before the expected (median) dt.
+
+    Args:
+        A (pd.Series): the input data, needs to be series with sample timing in
+        index
+
+        dt_tol (float, optional): acceptable deviance from the median dt
+
+    Returns:
+        int: the number of early samples
+    """
     return find_early_samples(A, dt_tol=dt_tol).sum()
 
 
 def n_unique_samples(A: pd.Series | np.ndarray) -> int:
-    """
-    Number of unique samples in the signal. Low values indicate that the signal
-    was not within the range of the digitizer during acquisition.
+    """number of unique samples in the signal. Low values indicate that the
+    signal was not within the range of the digitizer during acquisition.
+
+    Args:
+
     """
     a = A.values if isinstance(A, pd.Series) else A
     return np.unique(a).shape[0]
