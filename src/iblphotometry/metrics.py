@@ -40,7 +40,6 @@ def n_unique_samples(A: pd.Series | np.ndarray) -> int:
     return np.unique(a).shape[0]
 
 
-    """the distance between two percentiles in units of z. Captures the magnitude of transients.
 def median_absolute_deviance(
     A: pd.Series | np.ndarray,
     normalize: bool = False
@@ -69,6 +68,10 @@ def percentile_distance(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1
 
     Returns:
         float: the value of the metric
+
+    Notes:
+        - if pc is set to (50, 95), the metric capture the magnitude of positive
+        transients in the signal
     """
     if isinstance(A, pd.Series):  # "overloading"
         P = np.percentile(z(A.values), pc, axis=axis)
@@ -79,16 +82,21 @@ def percentile_distance(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1
     return P[1] - P[0]
 
 
-    """the ratio between the distance of two percentiles to the median. Proportional to the the signal to noise.
 def percentile_asymmetry(A: pd.Series | np.ndarray, pc_comp: int = 95, axis=-1) -> float:
+    """the ratio between the distance of two percentiles to the median. High
+    values indicate large positive deflections in the signal.
+
+    FIXME: Proportional to the the signal to noise.
 
     Args:
-        A (pd.Series | np.ndarray): _description_
-        pc_comp (int, optional): _description_. Defaults to 95.
-        axis (int, optional): _description_. Defaults to -1.
+        A (pd.Series | np.ndarray): the input data
+        pc_comp (int, optional): the percentiles to compare to the median
+        (pc_comp, 100 - pc_comp). Defaults to 95.
+        axis (int, optional): the axis over which to take the percentiles.
+        Defaults to -1.
 
     Returns:
-        float: _description_
+        float: the ratio of positive and negative percentile distances
     """
     if not (isinstance(A, pd.Series) or isinstance(A, np.ndarray)):
         raise TypeError('A must be pd.Series or np.ndarray.')
