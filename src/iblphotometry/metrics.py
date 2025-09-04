@@ -52,7 +52,7 @@ def percentile_dist(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) ->
         float: the value of the metric
     """
     if isinstance(A, pd.Series):  # "overloading"
-        P = np.percentile(z(A.values), pc)
+        P = np.percentile(z(A.values), pc, axis=axis)
     elif isinstance(A, np.ndarray):
         P = np.percentile(z(A), pc, axis=axis)
     else:
