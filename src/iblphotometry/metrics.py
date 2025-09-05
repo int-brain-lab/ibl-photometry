@@ -106,16 +106,6 @@ def percentile_asymmetry(A: pd.Series | np.ndarray, pc_comp: int = 95, axis=-1) 
     return a / b
 
 
-def signal_skew(A: pd.Series | np.ndarray, axis=-1) -> float:
-    if isinstance(A, pd.Series):
-        P = stats.skew(A.values)
-    elif isinstance(A, np.ndarray):
-        P = stats.skew(A, axis=axis)
-    else:
-        raise TypeError('A must be pd.Series or np.ndarray.')
-    return P
-
-
 def n_unique_samples(A: pd.Series | np.ndarray) -> int:
     """number of unique samples in the signal. Low values indicate that the signal during acquisition was not within the range of the digitizer."""
     a = A.values if isinstance(A, pd.Series) else A
