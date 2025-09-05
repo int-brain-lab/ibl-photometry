@@ -106,12 +106,6 @@ def percentile_asymmetry(A: pd.Series | np.ndarray, pc_comp: int = 95, axis=-1) 
     return a / b
 
 
-def n_unique_samples(A: pd.Series | np.ndarray) -> int:
-    """number of unique samples in the signal. Low values indicate that the signal during acquisition was not within the range of the digitizer."""
-    a = A.values if isinstance(A, pd.Series) else A
-    return np.unique(a).shape[0]
-
-
 def n_spikes(A: pd.Series | np.ndarray, sd: int = 5):
     """count the number of spike artifacts in the recording."""
     a = A.values if isinstance(A, pd.Series) else A
