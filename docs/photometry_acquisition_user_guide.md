@@ -26,20 +26,20 @@ It will directly halt and prompt you to start the *daqami* software.
 ## 3. Start daqami software
 Start the daqami software, load in the most recently used configuration.
 
-## 4. Start recording in the daqami software
-Hit the red *record* button in the daqami software.
-
-- possible pitfall: make sure to hit the record button and *not* the play button. Hitting the play button will also display the incoming data, but it will not safe anything, and the sessions of that day will not be recoverable.
-
-## 5. Continue photometry pipeline startup
+## 4. Continue photometry pipeline startup
 go back to the shell window that prompted you to start the daqami software and hit _enter_
 
 A bonsai workflow window will appear.
 
-## 6. Adjust FP3002 settings
+## 5. Adjust FP3002 settings
 Clicking on the FP3002 bonsai node will give you access to the settings.
 
 adjust camera ROIs, power levels, verify triggers
+
+## 6. Start recording in the daqami software
+Hit the red *record* button in the daqami software.
+
+- possible pitfall: make sure to hit the record button and *not* the play button. Hitting the play button will also display the incoming data, but it will not safe anything, and the sessions of that day will not be recoverable.
 
 ## 7. Start the neurophotometrics acquisition
 Hit the green "play" button in the bonsai workflow to start aquiring data with the neurophotometrics.
