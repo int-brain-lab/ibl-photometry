@@ -101,6 +101,27 @@ def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):
     ix = first_samples + nswin // 2
     return ix, r
 
+def sobel(a: np.ndarray, k: int = 1, uniform=True):
+    """apply a Sobel operator to approxiamte the gradient of a signal.
+
+    Args:
+        a (np.ndarray): the input data
+        k (int, optional): the half-length of the Sobel kernel, defaults to 1
+        uniform (bool, optional): whether to uniformly weight all points in the
+        kernel, if False weights will be proportional to distance from the
+        center point, defaults to True
+
+    Returns:
+        np.ndarray: the filtered signal
+    """
+    # L1 normalized Sobel operator of 2k + 1 length
+    if uniform:  # uniform weighting
+        sobel_kernel = np.array(k * [-1] + [0] + k * [1]) / 2 * k
+    else:  # stronger weighting for points further away
+        sobel_kernel = np.arange(-k, k+1) / (k * (k+1))
+    # Apply Sobel filter using convolution
+    return signal.convolve(a, sobel_kernel, mode='same')
+
 
 """
 ##        #######   ######   ######     ######## ##     ## ##    ##  ######  ######## ####  #######  ##    ##  ######
