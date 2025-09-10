@@ -30,7 +30,7 @@ def from_raw_neurophotometrics_file_to_raw_df(path: str | Path, validate=True, v
             raw_df = pd.read_parquet(path)
 
     if validate:
-        if version == 'old':
+        if version == 'old' or version == 'very_old':
             if 'Flags' in raw_df.columns:
                 raw_df = raw_df.rename(columns={'Flags': 'LedState'})
         raw_df = validate_neurophotometrics_df(raw_df, version=version)
@@ -353,6 +353,7 @@ def validate_neurophotometrics_df(
                     **{k: pa.Column(pa.Float64) for k in data_columns},
                 )
             )
+
         case 'old':  # alejandro
             schema_raw_data = pa.DataFrameSchema(
                 columns=dict(
@@ -362,6 +363,19 @@ def validate_neurophotometrics_df(
                     **{k: pa.Column(pa.Float64) for k in data_columns},
                 )
             )
+
+        case 'very_old': # also kcenia
+            schema_raw_data = pa.DataFrameSchema(
+                columns=dict(
+                    FrameCounter=pa.Column(pa.Int64),
+                    Timestamp=pa.Column(pa.Float64),
+                    Flags=pa.Column(pa.Int16, coerce=True),
+                    **{k: pa.Column(pa.Float64) for k in data_columns},
+                )
+            )
+
+        case _:
+            raise ValueError(f'unknown version {version}')            
 
     return schema_raw_data.validate(df)
 
