@@ -616,6 +616,8 @@ def remove_outliers(
     return pd.Series(y, index=t)
 
 
+## TODO: Remove? This was previously here to detect channel swaps cause by NPM
+## sampling bug, which we now explicitly fix
 def detect_spikes(t: np.ndarray, sd: int = 5):
     dt = np.diff(t)
     bad_inds = dt < np.average(dt) - sd * np.std(dt)
@@ -623,6 +625,10 @@ def detect_spikes(t: np.ndarray, sd: int = 5):
 
 
 def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25) -> pd.Series:
+    """
+    FIXME: detect_spikes no longer exists, but this is still useful to fill in
+    other brief artifacts
+    """
     y, t = F.values, F.index.values
     y = copy(y)
     outliers = detect_spikes(y, sd=sd)
