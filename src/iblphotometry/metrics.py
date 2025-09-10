@@ -1,10 +1,12 @@
 from typing import Optional
+from itertools import groupby
 import numpy as np
 import pandas as pd
-from scipy import stats
+from scipy import stats, signal
 
 from iblphotometry.processing import (
     z,
+    sobel,
     Regression,
     ExponDecay,
     detect_outliers,
@@ -105,10 +107,45 @@ def percentile_asymmetry(A: pd.Series | np.ndarray, pc_comp: int = 95, axis=-1) 
     return a / b
 
 
-def n_spikes(A: pd.Series | np.ndarray, sd: int = 5):
-    """count the number of spike artifacts in the recording."""
+def n_edges(A: pd.Series | np.ndarray, sd: float = 5, k: int = 2, uniform=True):
+    """counts the number of abrupt jumps in a signal.
+
+    Args:
+        A (pd.Series | np.ndarray): the input data
+        sd (float, optional): the number of standard deviations to use as a
+        threshold, defaults to 5
+        k (int, optional): the half-length of the Sobel filter applied to the
+        signal, larger values will consider more points to estimate the signal
+        gradient
+        uniform (bool, optional): whether the Sobel filter should uniformly
+        weight all points or give a higher weight to more distant points,
+        defaults to True
+
+    Returns:
+        n_edges (int): the number of abrupt jumps in the signal
+    """
     a = A.values if isinstance(A, pd.Series) else A
-    return detect_spikes(a, sd=sd).shape[0]
+
+    # Detect edges using a sobel filter
+    a_sobel = sobel(a, k, uniform)
+    median = np.median(a_sobel)
+    mad = np.median(np.abs(median - a_sobel))
+    dy_threshold = sd * mad / 0.67  # mad / 0.67 approximates 1 s.d. in a normal distribution
+    jumps = (a_sobel > (median + dy_threshold)) | (a_sobel < (median - dy_threshold))
+
+    # Detect outliers based on local median and global deviance
+    mad = np.median(np.abs(np.median(a) - a))
+    y_threshold = sd * mad / 0.67  # mad / 0.67 approximates 1 s.d. in a normal distribution
+    # a_avg = np.convolve(a, np.ones(2 * k + 1) / (2 * k + 1), mode='same')
+    a_median = np.roll(signal.medfilt(a, (2 * k + 1)), k)
+    outliers = (a > (a_median + y_threshold)) | (a < (a_median - y_threshold))
+
+    # Define edges as large jumps to values that deviate from the local median
+    edges = (jumps & outliers)[k:-k]
+    # N is the number of contiguous stretches of True
+    n_edges = sum([1 for val, group in groupby(edges) if val])
+
+    return n_edges
 
 
 def n_outliers(
@@ -229,15 +266,15 @@ def low_freq_power_ratio(A: pd.Series, f_cutoff: float = 3.18) -> float:
         cutoff frequency, default value of 3.18 esitmated using the formula
         1 / (2 * pi * tau) and an approximate tau_rise for GCaMP6f of 0.05s.
     """
-    signal = A.copy()
-    assert signal.ndim == 1  # only 1D for now
+    a = A.copy()
+    assert a.ndim == 1  # only 1D for now
     # Get frequency bins
-    tpts = signal.index.values
+    tpts = a.index.values
     dt = np.median(np.diff(tpts))
-    n_pts = len(signal)
+    n_pts = len(a)
     freqs = np.fft.rfftfreq(n_pts, dt)
     # Compute power spectral density
-    psd = np.abs(np.fft.rfft(signal - signal.mean())) ** 2
+    psd = np.abs(np.fft.rfft(a - a.mean())) ** 2
     # Return the ratio of power contained in low freqs
     return psd[freqs <= f_cutoff].sum() / psd.sum()
 
@@ -257,10 +294,10 @@ def spectral_entropy(A: pd.Series, eps: float = np.finfo('float').eps) -> float:
     eps :
         small number added to the PSD for numerical stability
     """
-    signal = A.copy()
-    assert signal.ndim == 1  # only 1D for now
+    a = A.copy()
+    assert a.ndim == 1  # only 1D for now
     # Compute power spectral density
-    psd = np.abs(np.fft.rfft(signal - signal.mean())) ** 2
+    psd = np.abs(np.fft.rfft(a - a.mean())) ** 2
     psd_norm = psd / np.sum(psd)
     # Compute spectral entropy in bits
     spectral_entropy = -1 * np.sum(psd_norm * np.log2(psd_norm + eps))
@@ -289,16 +326,16 @@ def ar_score(A: pd.Series | np.ndarray, order: int = 2) -> float:
         Returns NaN if the signal is constant.
     """
     # Pull signal out of pandas Series if needed
-    signal = A.values if isinstance(A, pd.Series) else A
-    assert signal.ndim == 1, 'Signal must be 1-dimensional.'
+    a = A.values if isinstance(A, pd.Series) else A
+    assert a.ndim == 1, 'Signal must be 1-dimensional.'
 
     # Handle constant signal case
-    if len(np.unique(signal)) == 1:
+    if len(np.unique(a)) == 1:
         return np.nan
 
     # Create design matrix X and target vector y based on AR order
-    X = np.column_stack([signal[i : len(signal) - order + i] for i in range(order)])
-    y = signal[order:]
+    X = np.column_stack([a[i : len(a) - order + i] for i in range(order)])
+    y = a[order:]
 
     try:
         # Fit linear regression using least squares
@@ -339,6 +376,6 @@ def noise_simulation(
     A_z = z(A)
     scores = np.full(len(noise_sd), np.nan)
     for i, sd in enumerate(noise_sd):
-        signal = A_z + np.random.normal(scale=sd, size=len(A))
-        scores[i] = metric(signal)
+        a = A_z + np.random.normal(scale=sd, size=len(A))
+        scores[i] = metric(a)
     return scores
