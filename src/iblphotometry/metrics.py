@@ -11,7 +11,6 @@ from iblphotometry.processing import (
     z,
     Regression,
     ExponDecay,
-    detect_spikes,
     detect_outliers,
 )
 from iblphotometry.behavior import psth
