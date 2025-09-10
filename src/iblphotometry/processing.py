@@ -608,13 +608,11 @@ def remove_outliers(
     return pd.Series(y, index=t)
 
 
-def detect_spikes(t: np.ndarray, sd: int = 5):
-    dt = np.diff(t)
-    bad_inds = dt < np.average(dt) - sd * np.std(dt)
-    return np.where(bad_inds)[0]
-
-
 def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25):
+    """
+    FIXME: detect_spikes no longer exists, but this is still useful to fill in
+    other brief artifacts
+    """
     y, t = F.values, F.index.values
     y = copy(y)
     outliers = detect_spikes(y, sd=sd)
