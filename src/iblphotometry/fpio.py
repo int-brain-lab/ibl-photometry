@@ -6,6 +6,7 @@ import pandera.pandas as pa
 from pandera.errors import SchemaError
 from typing import Optional, List
 import os
+from one.api import ONE
 
 from iblphotometry.neurophotometrics import (
     LIGHT_SOURCE_MAP,
@@ -236,12 +237,17 @@ def from_photometry_df(
     channel_names: list[str] | None = None,
     rename: dict | None = None,  # the dict to rename the data_columns -> Region?G | G? -> brain_region
     validate: bool = True,
+    drop_first: bool = True,
 ) -> dict[pd.DataFrame]:
     # at this point this might be overkill ...
     if validate:
         photometry_df = validate_photometry_df(photometry_df)
 
     data_columns = infer_data_columns(photometry_df) if data_columns is None else data_columns
+
+    # drop first?
+    if drop_first:
+        photometry_df = photometry_df.iloc[1:]
 
     # infer channel names if they are not explicitly provided
     if channel_names is None:
@@ -257,7 +263,7 @@ def from_photometry_df(
         df = photometry_df.groupby('name').get_group(channel)
         # if rename dict is passed, rename Region0X to the corresponding brain region
         if rename is not None:
-            df.rename(columns=rename, inplace=True)
+            df = df.rename(columns=rename)
             data_columns = rename.values()
         signal_dfs[channel] = df.set_index('times')[data_columns]
 
@@ -267,6 +273,7 @@ def from_photometry_df(
 def from_photometry_pqt(
     photometry_pqt_path: str | Path,
     locations_pqt_path: Optional[str | Path] = None,
+    drop_first=True,
 ) -> dict[pd.DataFrame]:
     """ """
     photometry_df = pd.read_parquet(photometry_pqt_path)
@@ -280,7 +287,12 @@ def from_photometry_pqt(
         data_columns = None
         rename = None
 
-    return from_photometry_df(photometry_df, data_columns=data_columns, rename=rename)
+    return from_photometry_df(
+        photometry_df,
+        data_columns=data_columns,
+        rename=rename,
+        drop_first=drop_first,
+    )
 
 
 def from_neurophotometrics_file(
@@ -298,17 +310,23 @@ def from_neurophotometrics_file(
     return from_photometry_df(photometry_df)
 
 
-def from_session_path(session_path: str | Path) -> List[dict]:
+def from_eid(eid: str, one) -> List[dict]:
+    one.load_dataset(eid, 'alf/photometry/photometry.signal.pqt', download_only=True)
+    one.load_dataset(eid, 'alf/photometry/photometryROI.locations.pqt', download_only=True)
+    session_path = one.eid2path(eid)
+    return from_session_path(session_path)
+
+
+def from_session_path(session_path: str | Path, drop_first=True) -> List[dict]:
     # this should be the main user facing function
     # or the one to be recycled by the PhotometryLoader
     # load the data from the alf path
     #
-    ...
-
-
-def from_eid(eid: str, one) -> List[dict]:
-    # ...
-    ...
+    return from_photometry_pqt(
+        session_path / 'alf/photometry/photometry.signal.pqt',
+        session_path / 'alf/photometry/photometryROI.locations.pqt',
+        drop_first=drop_first,
+    )
 
 
 """
