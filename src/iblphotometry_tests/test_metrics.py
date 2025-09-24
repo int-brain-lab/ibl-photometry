@@ -1,5 +1,4 @@
 from iblphotometry import metrics, fpio
-import pandas as pd
 
 from iblphotometry_tests.base_tests import PhotometryDataTestCase
 

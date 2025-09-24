@@ -1,5 +1,3 @@
-from pathlib import Path
-import iblphotometry.fpio as fio
 from iblphotometry.pipelines import (
     run_pipeline,
     sliding_mad_pipeline,
