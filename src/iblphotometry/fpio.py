@@ -1,11 +1,8 @@
 import numpy as np
 import pandas as pd
 from pathlib import Path
-import warnings
 import pandera.pandas as pa
 from pandera.errors import SchemaError
-from typing import Optional, List
-import os
 from one.api import ONE
 
 from iblphotometry.neurophotometrics import (
@@ -61,8 +58,20 @@ photometry_df_schema = {
 
 
 def infer_neurophotometrics_version_from_data(df: pd.DataFrame) -> str:
+    """
+    Infer the neurophotometrics file version from DataFrame columns.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+
+    Returns:
+        str: Version string (e.g., 'version_1', 'version_2', etc.).
+
+    Raises:
+        ValueError: If no matching version is found for the input data.
+    """
     # parse the data column format
-    data_columns = infer_data_columns(df)
+    data_columns = _infer_data_columns(df)
 
     for version, schema in neurophotometrics_schemas.items():
         schema_ = pa.DataFrameSchema(
@@ -81,7 +90,8 @@ def infer_neurophotometrics_version_from_data(df: pd.DataFrame) -> str:
     raise ValueError('no matching version found for input data')
 
 
-def infer_data_columns(df: pd.DataFrame) -> List[str]:
+def _infer_data_columns(df: pd.DataFrame) -> list[str]:
+    # small helper, returns the data columns from a photometry dataframe
     if any([col.startswith('Region') for col in df.columns]):
         data_columns = [col for col in df.columns if col.startswith('Region')]
     else:
@@ -89,8 +99,24 @@ def infer_data_columns(df: pd.DataFrame) -> List[str]:
     return data_columns
 
 
-def validate_photometry_df(photometry_df: pd.DataFrame, data_columns=None) -> pd.DataFrame:
-    data_columns = infer_data_columns(photometry_df) if data_columns is None else data_columns
+def validate_photometry_df(
+    photometry_df: pd.DataFrame,
+    data_columns: list[str] | None = None,
+) -> pd.DataFrame:
+    """
+    Validate the photometry DataFrame against the schema.
+
+    Args:
+        photometry_df (pd.DataFrame): Input DataFrame.
+        data_columns (list[str] | None): List of data columns to validate. If None, inferred automatically.
+
+    Returns:
+        pd.DataFrame: Validated DataFrame.
+
+    Raises:
+        SchemaError: If validation fails.
+    """
+    data_columns = _infer_data_columns(photometry_df) if data_columns is None else data_columns
     schema = pa.DataFrameSchema(
         columns=dict(
             **photometry_df_schema,
@@ -112,6 +138,18 @@ def validate_photometry_df(photometry_df: pd.DataFrame, data_columns=None) -> pd
 
 
 def read_neurophotometrics_file(path: str | Path) -> pd.DataFrame:
+    """
+    Read a neurophotometrics file (.csv or .pqt) into a DataFrame.
+
+    Args:
+        path (str | Path): Path to the file.
+
+    Returns:
+        pd.DataFrame: Loaded DataFrame.
+
+    Raises:
+        ValueError: If file format is unsupported.
+    """
     path = Path(path) if isinstance(path, str) else path
     match path.suffix:
         case '.csv':
@@ -127,11 +165,27 @@ def from_neurophotometrics_df_to_photometry_df(
     raw_df: pd.DataFrame,
     version: str | None = None,
     validate: bool = True,
-    data_columns: List[str] | None = None,
+    data_columns: list[str] | None = None,
     drop_first: bool = True,
 ) -> pd.DataFrame:
+    """
+    Convert a neurophotometrics DataFrame to a the ibl internal standardized photometry DataFrame.
+
+    Args:
+        raw_df (pd.DataFrame): Raw neurophotometrics DataFrame.
+        version (str | None): Version string. If None, inferred automatically.
+        validate (bool): Whether to validate the output DataFrame.
+        data_columns (list[str] | None): List of data columns. If None, inferred automatically.
+        drop_first (bool): Whether to drop the first frame.
+
+    Returns:
+        pd.DataFrame: Standardized photometry DataFrame.
+
+    Raises:
+        ValueError: If unknown version is provided.
+    """
     if data_columns is None:
-        data_columns = infer_data_columns(raw_df)
+        data_columns = _infer_data_columns(raw_df)
 
     if version is None:
         version = infer_neurophotometrics_version_from_data(raw_df)
@@ -205,10 +259,22 @@ def from_neurophotometrics_file_to_photometry_df(
     path: str | Path,
     version: str | None = None,
     validate: bool = True,
-    data_columns: List[str] | None = None,
+    data_columns: list[str] | None = None,
     drop_first: bool = True,
 ) -> pd.DataFrame:
-    # this is the convenience function
+    """
+    Convenience function to read a neurophotometrics file and convert to photometry DataFrame.
+
+    Args:
+        path (str | Path): Path to the file.
+        version (str | None): Version string. If None, inferred automatically.
+        validate (bool): Whether to validate the output DataFrame.
+        data_columns (list[str] | None): List of data columns. If None, inferred automatically.
+        drop_first (bool): Whether to drop the first frame.
+
+    Returns:
+        pd.DataFrame: Standardized photometry DataFrame.
+    """
 
     raw_df = read_neurophotometrics_file(path)
     photometry_df = from_neurophotometrics_df_to_photometry_df(
@@ -221,16 +287,6 @@ def from_neurophotometrics_file_to_photometry_df(
     return photometry_df
 
 
-# def from_ibl_pqt_to_photometry_df(
-#     path: str | Path,
-#     validate=True,  # could default to false because it should not be possible to write a non-validated photometry_df to disk
-# ):
-#     photometry_df = pd.read_parquet(path)
-#     if validate is True:
-#         photometry_df = validate_photometry_df(photometry_df)
-#     return photometry_df
-
-
 def from_photometry_df(
     photometry_df: pd.DataFrame,
     data_columns: list[str] | None = None,
@@ -239,11 +295,24 @@ def from_photometry_df(
     validate: bool = True,
     drop_first: bool = True,
 ) -> dict[pd.DataFrame]:
-    # at this point this might be overkill ...
+    """
+    Split a photometry DataFrame into separate DataFrames per channel.
+
+    Args:
+        photometry_df (pd.DataFrame): Input photometry DataFrame.
+        data_columns (list[str] | None): List of data columns. If None, inferred automatically.
+        channel_names (list[str] | None): List of channel names. If None, inferred automatically.
+        rename (dict | None): Mapping to rename data columns.
+        validate (bool): Whether to validate the DataFrame.
+        drop_first (bool): Whether to drop the first frame.
+
+    Returns:
+        dict[pd.DataFrame]: Dictionary of DataFrames per channel.
+    """
     if validate:
         photometry_df = validate_photometry_df(photometry_df)
 
-    data_columns = infer_data_columns(photometry_df) if data_columns is None else data_columns
+    data_columns = _infer_data_columns(photometry_df) if data_columns is None else data_columns
 
     # drop first?
     if drop_first:
@@ -272,10 +341,20 @@ def from_photometry_df(
 
 def from_photometry_pqt(
     photometry_pqt_path: str | Path,
-    locations_pqt_path: Optional[str | Path] = None,
+    locations_pqt_path: str | Path | None = None,
     drop_first=True,
 ) -> dict[pd.DataFrame]:
-    """ """
+    """
+    Load photometry and location data from parquet files and split by channel.
+
+    Args:
+        photometry_pqt_path (str | Path): Path to photometry parquet file.
+        locations_pqt_path (str | Path | None): Path to locations parquet file.
+        drop_first (bool): Whether to drop the first frame.
+
+    Returns:
+        dict[pd.DataFrame]: Dictionary of DataFrames per channel.
+    """
     photometry_df = pd.read_parquet(photometry_pqt_path)
 
     if locations_pqt_path is not None:
@@ -301,6 +380,18 @@ def from_neurophotometrics_file(
     validate: bool = True,
     version: str | None = None,
 ) -> dict:
+    """
+    Read a neurophotometrics file and split into channel DataFrames.
+
+    Args:
+        path (str | Path): Path to the file.
+        drop_first (bool): Whether to drop the first frame.
+        validate (bool): Whether to validate the DataFrame.
+        version (str | None): Version string. If None, inferred automatically.
+
+    Returns:
+        dict: Dictionary of DataFrames per channel.
+    """
     photometry_df = from_neurophotometrics_file_to_photometry_df(
         path,
         drop_first=drop_first,
@@ -310,18 +401,36 @@ def from_neurophotometrics_file(
     return from_photometry_df(photometry_df)
 
 
-def from_eid(eid: str, one) -> List[dict]:
+def from_eid(eid: str, one) -> list[dict]:
+    """
+    Load photometry data for a session ID (eid) using ONE.
+
+    Args:
+        eid (str): Session ID.
+        one: ONE API instance.
+
+    Returns:
+        list[dict]: List of channel DataFrames.
+    """
     one.load_dataset(eid, 'alf/photometry/photometry.signal.pqt', download_only=True)
     one.load_dataset(eid, 'alf/photometry/photometryROI.locations.pqt', download_only=True)
     session_path = one.eid2path(eid)
     return from_session_path(session_path)
 
 
-def from_session_path(session_path: str | Path, drop_first=True) -> List[dict]:
-    # this should be the main user facing function
-    # or the one to be recycled by the PhotometryLoader
-    # load the data from the alf path
-    #
+def from_session_path(session_path: str | Path, drop_first: bool = True) -> list[dict]:
+    """
+    Load photometry data from a locally present session path.
+
+    Args:
+        session_path (str | Path): Path to session folder.
+        drop_first (bool): Whether to drop the first frame.
+
+    Returns:
+        list[dict]: List of channel DataFrames.
+    """
+    session_path = Path(session_path) if isinstance(session_path, str) else session_path
+    assert session_path.exists()
     return from_photometry_pqt(
         session_path / 'alf/photometry/photometry.signal.pqt',
         session_path / 'alf/photometry/photometryROI.locations.pqt',
@@ -374,6 +483,18 @@ digital_input_schema = {
 
 
 def infer_neurophotometrics_version_from_digital_inputs(df: pd.DataFrame) -> str:
+    """
+    Infer the neurophotometrics digital inputs file version from DataFrame columns.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+
+    Returns:
+        str: Version string.
+
+    Raises:
+        ValueError: If no matching version is found.
+    """
     for version, schema in neurophotometrics_digital_inputs_schemas.items():
         schema_ = pa.DataFrameSchema(columns=dict(**schema))
         try:
@@ -384,19 +505,6 @@ def infer_neurophotometrics_version_from_digital_inputs(df: pd.DataFrame) -> str
             ...
     # if all attemps fail:
     raise ValueError('no matching version found')
-
-
-# def validate_digital_inputs(digital_inputs_df: pd.DataFrame) -> pd.DataFrame:
-#     # DOCME
-#     schema_digital_inputs = pa.DataFrameSchema(
-#         columns=dict(
-#             times=pa.Column(pa.Float64),
-#             ChannelName=pa.Column(str, coerce=True),
-#             channel=pa.Column(pa.Int8, coerce=True),
-#             polarity=pa.Column(pa.Int8),
-#         )
-#     )
-#     return schema_digital_inputs.validate(digital_inputs_df)
 
 
 """
@@ -415,8 +523,25 @@ def read_digital_inputs_file(
     version: str | None = None,
     validate: bool = True,
     channel: int | None = None,
-    timestamps_colname: str | None = None,  # for version_1
+    timestamps_colname: str | None = None,
 ) -> pd.DataFrame:
+    """
+    Read and standardize a digital inputs file.
+
+    Args:
+        path (str | Path): Path to the file.
+        version (str | None): Version string. If None, inferred automatically.
+        validate (bool): Whether to validate the output DataFrame.
+        channel (int | None): Channel number (required for old versions).
+        timestamps_colname (str | None): Column name for timestamps (required for version 2).
+
+    Returns:
+        pd.DataFrame: Standardized digital inputs DataFrame.
+
+    Raises:
+        ValueError: If file format or version is unsupported.
+        AssertionError: If required arguments are missing for old versions.
+    """
     path = Path(path) if isinstance(path, str) else path
     match path.suffix:
         case '.csv':
@@ -441,7 +566,7 @@ def read_digital_inputs_file(
 
         case 'version_2':
             assert channel is not None, 'attempting to load an old file version without explicitly knowing the channel'
-            assert timestamps_colname is not None, 'for version 1, column name for timestamps need to be provided'
+            assert timestamps_colname is not None, 'for version 2, column name for timestamps need to be provided'
             assert timestamps_colname == 'Value.Seconds' or timestamps_colname == 'Timestamp', (
                 f'timestamps_colname needs to be either Value.Seconds or Timestamp, but is {timestamps_colname}'
             )
@@ -470,128 +595,3 @@ def read_digital_inputs_file(
     if validate:
         df = pa.DataFrameSchema(columns=digital_input_schema).validate(df)
     return df
-
-
-# def read_digital_inputs_csv(path: str | Path, version=None, validate=True, channel=None) -> pd.DataFrame:
-#     df = read_digital_inputs_file(path)
-#     if version is None:
-#         infer_neurophotometrics_version_from_digital_inputs(df)
-#     match version:
-#         case 'new':
-#             df_digital_inputs = pd.read_csv(path, header=None)
-#             df_digital_inputs.columns = [  # FIXME replace with rename
-#                 'ChannelName',
-#                 'Channel',
-#                 'AlwaysTrue',
-#                 'SystemTimestamp',
-#                 'ComputerTimestamp',
-#             ]
-
-#             if validate:
-#                 df_digital_inputs = validate_neurophotometrics_digital_inputs(df_digital_inputs, version=version)
-
-#         case 'old':
-#             # this is for the deprecated and legacy file format of the neurophotometrics
-#             # channel kwarg needs to be provided
-#             assert channel is not None, 'if using the legacy digital inputs format, a channel index needs to be provided'
-#             df_digital_inputs = pd.read_csv(path).groupby('Value.Value').get_group(True)
-#             df_digital_inputs = df_digital_inputs.drop(['Value.Value', 'Value.Seconds'], axis=1)
-#             df_digital_inputs['Channel'] = channel
-#             df_digital_inputs = df_digital_inputs.rename(columns={'Timestamp': 'SystemTimestamp'})
-
-#             if validate:
-#                 df_digital_inputs = validate_neurophotometrics_digital_inputs(df_digital_inputs, version=version)
-
-#         case 'very_old':
-#             # this is for the deprecated and legacy file format of the neurophotometrics
-#             # channel kwarg needs to be provided
-#             assert channel is not None, 'if using the legacy digital inputs format, a channel index needs to be provided'
-#             df_digital_inputs = pd.read_csv(path)
-#             df_digital_inputs = df_digital_inputs.groupby('Value').get_group(True).drop('Value', axis=1)
-#             df_digital_inputs['Channel'] = channel
-#             df_digital_inputs.columns = [
-#                 'SystemTimestamp',
-#                 'Channel',
-#             ]
-#             if validate:
-#                 df_digital_inputs = validate_neurophotometrics_digital_inputs(df_digital_inputs, version=version)
-
-#     return df_digital_inputs
-
-
-# def validate_neurophotometrics_df(
-#     df: pd.DataFrame,
-#     data_columns=None,
-#     version='infer',
-# ) -> pd.DataFrame:
-#     if version == 'infer':
-#         version = infer_neurophotometrics_version_from_data(df)
-
-#     match version:
-#         case 'new':  # kcenia, carolina
-#             schema_raw_data = pa.DataFrameSchema(
-#                 columns=dict(
-#                     FrameCounter=pa.Column(pa.Int64),
-#                     SystemTimestamp=pa.Column(pa.Float64),
-#                     LedState=pa.Column(pa.Int16, coerce=True),
-#                     ComputerTimestamp=pa.Column(pa.Float64),
-#                     **{k: pa.Column(pa.Float64) for k in data_columns},
-#                 )
-#             )
-
-#         case 'old':  # alejandro
-#             schema_raw_data = pa.DataFrameSchema(
-#                 columns=dict(
-#                     FrameCounter=pa.Column(pa.Int64),
-#                     Timestamp=pa.Column(pa.Float64),
-#                     LedState=pa.Column(pa.Int16, coerce=True),
-#                     **{k: pa.Column(pa.Float64) for k in data_columns},
-#                 )
-#             )
-
-#         case 'very_old':  # also kcenia
-#             schema_raw_data = pa.DataFrameSchema(
-#                 columns=dict(
-#                     FrameCounter=pa.Column(pa.Int64),
-#                     Timestamp=pa.Column(pa.Float64),
-#                     Flags=pa.Column(pa.Int16, coerce=True),
-#                     **{k: pa.Column(pa.Float64) for k in data_columns},
-#                 )
-#             )
-
-#         case _:
-#             raise ValueError(f'unknown version {version}')
-
-#     return schema_raw_data.validate(df)
-
-
-# def validate_neurophotometrics_digital_inputs(df: pd.DataFrame, version='new') -> pd.DataFrame:
-#     match version:
-#         case 'new':
-#             schema_digital_inputs = pa.DataFrameSchema(
-#                 columns=dict(
-#                     ChannelName=pa.Column(str, coerce=True),
-#                     Channel=pa.Column(pa.Int8, coerce=True),
-#                     AlwaysTrue=pa.Column(bool, coerce=True),
-#                     SystemTimestamp=pa.Column(pa.Float64),
-#                     ComputerTimestamp=pa.Column(pa.Float64),
-#                 )
-#             )
-
-#         case 'old':
-#             schema_digital_inputs = pa.DataFrameSchema(
-#                 columns=dict(
-#                     Channel=pa.Column(pa.Int8, coerce=True),
-#                     SystemTimestamp=pa.Column(pa.Float64),
-#                 )
-#             )
-
-#         # case 'very_old':
-#         #     schema_digital_inputs = pa.DataFrameSchema(
-#         #         columns=
-#         #     )
-
-#         case _:
-#             raise ValueError(f'unknown version {version}')
-
-#     return schema_digital_inputs.validate(df)
