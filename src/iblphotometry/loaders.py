@@ -1,6 +1,6 @@
 import pandas as pd
 from pathlib import Path
-from iblphotometry import io
+from iblphotometry import fpio
 # from brainbox.io.one import SessionLoader
 
 
@@ -27,7 +27,7 @@ class PhotometryLoader:
             data_columns=list(locations_df.index),
             rename=locations_df['brain_region'].to_dict() if rename else None,
         )
-        raw_dfs = io.from_ibl_dataframe(raw_photometry_df, **read_config)
+        raw_dfs = fpio.from_ibl_dataframe(raw_photometry_df, **read_config)
 
         signal_band_names = list(raw_dfs.keys())
         col_names = list(raw_dfs[signal_band_names[0]].columns)

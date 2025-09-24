@@ -1,22 +1,17 @@
-import iblphotometry.io as fio
-import iblphotometry.processing as processing
-# import pandas as pd
-
+from iblphotometry import fpio, processing
 from iblphotometry_tests.base_tests import PhotometryDataTestCase
 
 
 class TestProcessing(PhotometryDataTestCase):
-    # think here about the possible use cases
+    def setUp(self):
+        super().setUp()
+        path = self.versions_path / 'version_5' / '_neurophotometrics_fpData.raw.pqt'
+        self.photometry_df = fpio.from_neurophotometrics_file_to_photometry_df(path)
+        self.signals_dfs = fpio.from_photometry_df(self.photometry_df)
 
     def test_processing(self):
-        self.set_paths('alejandro')
-        # get data
-        raw_dfs = fio.from_ibl_pqt(
-            self.paths['photometry_signal_pqt'],
-            self.paths['photometryROI_locations_pqt'],
-        )
         # trials = pd.read_parquet(self.paths['trials_table_pqt'])
-        raw_df = raw_dfs['GCaMP']['DMS']
+        raw_df = self.signals_dfs['GCaMP']['G0']
 
         # bleach corrections
         processing.lowpass_bleachcorrect(raw_df)

@@ -1,0 +1,17 @@
+# version descriptions 
+
+## version_0
+
+## version_1
+used in kcenia reextraction
+data from
+eid = 'ba01bf35-8a0d-4ca3-a66e-b3a540b21128'
+/mnt/s0/Data/Subjects/ZFM-03059/2021-08-27/001
+
+
+## version_2
+
+## version_3
+
+## version_4
+the one that is currently in use by latest measurements of carolina and laura

@@ -1,62 +1,50 @@
-import iblphotometry.io as fpio
+import iblphotometry.fpio as fpio
 from iblphotometry_tests.base_tests import PhotometryDataTestCase
 import pandas as pd
 
 
 class TestLoaders(PhotometryDataTestCase):
-    # think here about the possible use cases
+    def test_infer_version(self):
+        versions = ['version_1', 'version_2', 'version_5']  # ...
+        for version in versions:
+            path = self.versions_path / version / '_neurophotometrics_fpData.raw.pqt'
+            df = fpio.read_neurophotometrics_file(path)
+            version_inferred = fpio.infer_neurophotometrics_version_from_data(df)
+            assert version == version_inferred
 
-    # to read from a .csv from disk
-    # def test_from_array(self):
-    #     n_samples = 1000
-    #     n_channels = 3
-    #     times = np.linspace(0, 100, n_samples)
-    #     data = np.random.randn(n_samples, n_channels)
-    #     names = ['a', 'b', 'c']
-    #     fpio.from_array(times, data, names)
-
-    # for neurophotometrics hardware
-    def test_from_raw_neurophotometrics_file(self):
-        datasets = ['carolina', 'alejandro']
-
-        for dataset in datasets:
-            self.set_paths(dataset)
-            version = 'old' if dataset == 'alejandro' else 'new'
-
-            # 1) validation reading a raw photometrics file
-            # unfortunately I don't have the corresponding pqt files. TODO change this
-            # fpio.from_raw_neurophotometrics_file_to_raw_df(self.paths['raw_neurophotometrics_csv'])
-
-            # 2) read a pqt file, compare
-            raw_df = fpio.from_raw_neurophotometrics_file_to_raw_df(
-                self.paths['raw_neurophotometrics_pqt'], version=version
+        for version in versions:
+            path = (
+                self.versions_path
+                / version
+                / '_neurophotometrics_fpData.digitalInputs.pqt'
             )
-            ibl_df_a = fpio.from_raw_neurophotometrics_file_to_ibl_df(
-                self.paths['raw_neurophotometrics_pqt'], version=version
+            df = pd.read_parquet(
+                path
+            )  # shortcut to be able to test just infer version, see test below
+            version_inferred = fpio.infer_neurophotometrics_version_from_digital_inputs(
+                df
             )
+            assert version == version_inferred
 
-            ibl_df_b = fpio.from_raw_neurophotometrics_df_to_ibl_df(raw_df)
-            pd.testing.assert_frame_equal(ibl_df_a, ibl_df_b)
-
-            # 2) converting from ibl format to final
-            dfs_a = fpio.from_ibl_dataframe(ibl_df_a)
-            dfs_b = fpio.from_raw_neurophotometrics_file(
-                self.paths['raw_neurophotometrics_pqt'], version=version
+    def test_read_digital_inputs(self):
+        versions = ['version_1', 'version_2', 'version_5']  # ...
+        for version in versions:
+            path = (
+                self.versions_path
+                / version
+                / '_neurophotometrics_fpData.digitalInputs.pqt'
+            )
+            channel = 0 if version == 'version_1' or version == 'version_2' else None
+            timestamps_colname = 'Timestamp' if version == 'version_2' else None
+            fpio.read_digital_inputs_file(
+                path, channel=channel, timestamps_colname=timestamps_colname
             )
 
-            # check if they are the same
-            assert dfs_a.keys() == dfs_b.keys()
-            for key in dfs_a.keys():
-                pd.testing.assert_frame_equal(dfs_a[key], dfs_b[key])
-
-    # from pqt files as they are returned from ONE by .load_dataset()
-    def test_from_ibl_pqt(self):
-        datasets = ['carolina', 'alejandro']
-
-        for dataset in datasets:
-            self.set_paths(dataset)
-            fpio.from_ibl_pqt(self.paths['photometry_signal_pqt'])
-            fpio.from_ibl_pqt(
-                self.paths['photometry_signal_pqt'],
-                self.paths['photometryROI_locations_pqt'],
-            )
+    def test_read_neurophotometrics_file(self):
+        versions = ['version_1', 'version_2', 'version_5']  # ...
+        for version in versions:
+            path = self.versions_path / version / '_neurophotometrics_fpData.raw.pqt'
+            raw_df = fpio.read_neurophotometrics_file(path)
+            fpio.from_neurophotometrics_df_to_photometry_df(raw_df)
+            # the chained version
+            fpio.from_neurophotometrics_file(path)

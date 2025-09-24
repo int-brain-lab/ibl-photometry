@@ -13,7 +13,7 @@ from PyQt5.QtWidgets import (
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 
-from iblphotometry.io import from_raw_neurophotometrics_file
+from iblphotometry.fpio import from_raw_neurophotometrics_file
 import iblphotometry.plots as plots
 
 import iblphotometry.preprocessing as ffpr
