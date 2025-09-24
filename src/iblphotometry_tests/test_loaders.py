@@ -1,7 +1,6 @@
 import iblphotometry.fpio as fpio
 from iblphotometry_tests.base_tests import PhotometryDataTestCase
 import pandas as pd
-from pathlib import Path
 
 
 class TestLoaders(PhotometryDataTestCase):
@@ -37,7 +36,7 @@ class TestLoaders(PhotometryDataTestCase):
             )
             channel = 0 if version == 'version_1' or version == 'version_2' else None
             timestamps_colname = 'Timestamp' if version == 'version_2' else None
-            df = fpio.read_digital_inputs_file(
+            fpio.read_digital_inputs_file(
                 path, channel=channel, timestamps_colname=timestamps_colname
             )
 
