@@ -51,6 +51,6 @@ rois begin with band e.g. G1, G2 etc.
 288a54bc-483a-48e2-91d2-eefbb76dc43c
 /mnt/s0/Data/Subjects/ZFM-08554/2025-02-26/001
 
-# laura with daw
+# laura with daq
 34f55b3a-725e-4cc7-aed3-6e6338f573bf
 /mnt/s0/Data/Subjects/ZFM-09044/2025-09-11/001
