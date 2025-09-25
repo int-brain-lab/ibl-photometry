@@ -550,7 +550,7 @@ def validate_digital_inputs_df(
     validate: bool = True,
     channel: int | None = None,
     timestamps_colname: str | None = None,
-) -> pd.DataFame:
+) -> pd.DataFrame:
     if version is None:
         version = infer_neurophotometrics_version_from_digital_inputs(df)
 
