@@ -95,9 +95,7 @@ def _infer_data_columns(df: pd.DataFrame) -> list[str]:
     if any([col.startswith('Region') for col in df.columns]):
         data_columns = [col for col in df.columns if col.startswith('Region')]
     else:
-        data_columns = [
-            col for col in df.columns if col.startswith('R') or col.startswith('G')
-        ]
+        data_columns = [col for col in df.columns if col.startswith('R') or col.startswith('G')]
     return data_columns
 
 
@@ -118,9 +116,7 @@ def validate_photometry_df(
     Raises:
         SchemaError: If validation fails.
     """
-    data_columns = (
-        _infer_data_columns(photometry_df) if data_columns is None else data_columns
-    )
+    data_columns = _infer_data_columns(photometry_df) if data_columns is None else data_columns
     schema = pa.DataFrameSchema(
         columns=dict(
             **photometry_df_schema,
@@ -214,9 +210,7 @@ def from_neurophotometrics_df_to_photometry_df(
             raw_df['valid'] = True
             raw_df['valid'] = raw_df['valid'].astype('bool')
         case _:
-            raise ValueError(
-                f'unknown version {version}'
-            )  # should be impossible though
+            raise ValueError(f'unknown version {version}')  # should be impossible though
 
     photometry_df = raw_df.filter(items=data_columns, axis=1).sort_index(axis=1)
     photometry_df['times'] = raw_df['Timestamp']  # covered by validation now
@@ -243,18 +237,14 @@ def from_neurophotometrics_df_to_photometry_df(
                     name = '+'.join([channel_meta_map['name'][c] for c in combo])
                     color = '+'.join([channel_meta_map['color'][c] for c in combo])
                     wavelength = np.nan
-                    photometry_df.loc[
-                        states == state, ['name', 'color', 'wavelength']
-                    ] = (
+                    photometry_df.loc[states == state, ['name', 'color', 'wavelength']] = (
                         name,
                         color,
                         wavelength,
                     )
         else:
             for cn in ['name', 'color', 'wavelength']:
-                photometry_df.loc[states == state, cn] = channel_meta_map.iloc[ic[0]][
-                    cn
-                ]
+                photometry_df.loc[states == state, cn] = channel_meta_map.iloc[ic[0]][cn]
 
     # drop first frame
     if drop_first:
@@ -301,8 +291,7 @@ def from_photometry_df(
     photometry_df: pd.DataFrame,
     data_columns: list[str] | None = None,
     channel_names: list[str] | None = None,
-    rename: dict
-    | None = None,  # the dict to rename the data_columns -> Region?G | G? -> brain_region
+    rename: dict | None = None,  # the dict to rename the data_columns -> Region?G | G? -> brain_region
     validate: bool = True,
     drop_first: bool = True,
 ) -> dict[pd.DataFrame]:
@@ -323,9 +312,7 @@ def from_photometry_df(
     if validate:
         photometry_df = validate_photometry_df(photometry_df)
 
-    data_columns = (
-        _infer_data_columns(photometry_df) if data_columns is None else data_columns
-    )
+    data_columns = _infer_data_columns(photometry_df) if data_columns is None else data_columns
 
     # drop first?
     if drop_first:
@@ -426,9 +413,7 @@ def from_eid(eid: str, one: ONE) -> list[dict]:
         list[dict]: List of channel DataFrames.
     """
     one.load_dataset(eid, 'alf/photometry/photometry.signal.pqt', download_only=True)
-    one.load_dataset(
-        eid, 'alf/photometry/photometryROI.locations.pqt', download_only=True
-    )
+    one.load_dataset(eid, 'alf/photometry/photometryROI.locations.pqt', download_only=True)
     session_path = one.eid2path(eid)
     return from_session_path(session_path)
 
@@ -540,23 +525,6 @@ def read_digital_inputs_file(
     channel: int | None = None,
     timestamps_colname: str | None = None,
 ) -> pd.DataFrame:
-    """
-    Read and standardize a digital inputs file.
-
-    Args:
-        path (str | Path): Path to the file.
-        version (str | None): Version string. If None, inferred automatically.
-        validate (bool): Whether to validate the output DataFrame.
-        channel (int | None): Channel number (required for old versions).
-        timestamps_colname (str | None): Column name for timestamps (required for version 2).
-
-    Returns:
-        pd.DataFrame: Standardized digital inputs DataFrame.
-
-    Raises:
-        ValueError: If file format or version is unsupported.
-        AssertionError: If required arguments are missing for old versions.
-    """
     path = Path(path) if isinstance(path, str) else path
     match path.suffix:
         case '.csv':
@@ -566,15 +534,30 @@ def read_digital_inputs_file(
         case _:
             raise ValueError('unsupported file format')
 
+    if validate:
+        df = validate_digital_inputs_df(
+            df,
+            version=version,
+            channel=channel,
+            timestamps_colname=timestamps_colname,
+        )
+    return df
+
+
+def validate_digital_inputs_df(
+    df: pd.DataFrame,
+    version: str | None = None,
+    validate: bool = True,
+    channel: int | None = None,
+    timestamps_colname: str | None = None,
+) -> pd.DataFame:
     if version is None:
         version = infer_neurophotometrics_version_from_digital_inputs(df)
 
     # modify block - here all version specific adjustments will be made
     match version:
         case 'version_1':
-            assert channel is not None, (
-                'attempting to load an old file version without explicitly knowing the channel'
-            )
+            assert channel is not None, 'attempting to load an old file version without explicitly knowing the channel'
             df['channel'] = channel
             df['channel_name'] = f'channel_{channel}'
             df['channel'] = df['channel'].astype('int64')
@@ -582,16 +565,9 @@ def read_digital_inputs_file(
             df['polarity'] = df['polarity'].replace({True: 1, False: -1}).astype('int8')
 
         case 'version_2':
-            assert channel is not None, (
-                'attempting to load an old file version without explicitly knowing the channel'
-            )
-            assert timestamps_colname is not None, (
-                'for version 2, column name for timestamps need to be provided'
-            )
-            assert (
-                timestamps_colname == 'Value.Seconds'
-                or timestamps_colname == 'Timestamp'
-            ), (
+            assert channel is not None, 'attempting to load an old file version without explicitly knowing the channel'
+            assert timestamps_colname is not None, 'for version 2, column name for timestamps need to be provided'
+            assert timestamps_colname in {'Value.Seconds', 'Timestamp'}, (
                 f'timestamps_colname needs to be either Value.Seconds or Timestamp, but is {timestamps_colname}'
             )
             df['channel'] = channel
@@ -620,10 +596,7 @@ def read_digital_inputs_file(
             df['polarity'] = 1
             df = df.astype({'polarity': 'int8'})
         case _:
-            raise ValueError(
-                f'unknown version {version}'
-            )  # should be impossible though
+            raise ValueError(f'unknown version {version}')  # should be impossible though
 
-    if validate:
-        df = pa.DataFrameSchema(columns=digital_input_schema).validate(df)
+    df = pa.DataFrameSchema(columns=digital_input_schema).validate(df)
     return df
