@@ -401,7 +401,13 @@ def from_neurophotometrics_file(
     return from_photometry_df(photometry_df)
 
 
-def from_eid(eid: str, one: ONE) -> list[dict]:
+def from_eid(
+    eid: str,
+    one: ONE,
+    collection: str = 'photometry',
+    drop_first: bool = True,
+    revision: str | None = None,
+) -> list[dict]:
     """
     Load photometry data for a session ID (eid) using ONE.
 
@@ -412,13 +418,24 @@ def from_eid(eid: str, one: ONE) -> list[dict]:
     Returns:
         list[dict]: List of channel DataFrames.
     """
-    one.load_dataset(eid, 'alf/photometry/photometry.signal.pqt', download_only=True)
-    one.load_dataset(eid, 'alf/photometry/photometryROI.locations.pqt', download_only=True)
-    session_path = one.eid2path(eid)
-    return from_session_path(session_path)
+    datasets = ['photometry.signal.pqt', 'photometryROI.locations.pqt']
+    for dataset in datasets:
+        one.load_dataset(
+            eid,
+            dataset,
+            collection=f'alf/{collection}',
+            revision=revision,
+            download_only=True,
+        )
+    return from_session_path(one.eid2path(eid), drop_first=drop_first)
 
 
-def from_session_path(session_path: str | Path, drop_first: bool = True) -> list[dict]:
+def from_session_path(
+    session_path: str | Path,
+    collection: str = 'photometry',
+    drop_first: bool = True,
+    revision: str | None = None,
+) -> list[dict]:
     """
     Load photometry data from a locally present session path.
 
@@ -430,10 +447,16 @@ def from_session_path(session_path: str | Path, drop_first: bool = True) -> list
         list[dict]: List of channel DataFrames.
     """
     session_path = Path(session_path) if isinstance(session_path, str) else session_path
-    assert session_path.exists()
+    if revision in ['', None]:
+        data_paths = [
+            session_path / f'alf/{collection}/photometry.signal.pqt',
+            session_path / f'alf/{collection}/photometryROI.locations.pqt',
+        ]
+    else:
+        raise NotImplementedError('loading with revisions from a local folder is not implemented yet')
+
     return from_photometry_pqt(
-        session_path / 'alf/photometry/photometry.signal.pqt',
-        session_path / 'alf/photometry/photometryROI.locations.pqt',
+        *data_paths,
         drop_first=drop_first,
     )
 
