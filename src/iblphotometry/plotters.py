@@ -256,12 +256,8 @@ def plot_psths_from_eid(
     return axes
 
 
-# %%
-
-
 # eid = '7c67fbd4-18c1-42f2-b989-8cbfde0d2374'  # looks highly problematic
 # eid = '40909756-d0ce-4146-9588-249bf97f074b'
-
-eid = '58861dac-4b4c-4f82-83fb-33d98d67df3a'
-one = ONE()
-axes = plot_photometry_traces_from_eid(eid, one)
+# eid = '58861dac-4b4c-4f82-83fb-33d98d67df3a'
+# one = ONE()
+# axes = plot_photometry_traces_from_eid(eid, one)
