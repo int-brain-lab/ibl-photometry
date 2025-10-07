@@ -33,7 +33,7 @@ eps = np.finfo(np.float64).eps
 """
 
 
-def z(A: np.ndarray, mode='classic'):
+def z(A: np.ndarray, mode='classic') -> np.ndarray:
     """classic z-score. Deviation from sample mean in units of sd
 
     :param A: _description_
@@ -49,7 +49,7 @@ def z(A: np.ndarray, mode='classic'):
         return (A - np.median(A)) / np.std(A)
 
 
-def mad(A: np.ndarray):
+def mad(A: np.ndarray) -> np.ndarray:
     """the MAD is defined as the median of the absolute deviations from the data's median
     see https://en.wikipedia.org/wiki/Median_absolute_deviation
 
@@ -61,13 +61,13 @@ def mad(A: np.ndarray):
     return np.median(np.absolute(A - np.median(A)), axis=-1)
 
 
-def madscore(F: pd.Series):
+def madscore(F: pd.Series) -> pd.Series:
     # TODO overloading of mad?
     y, t = F.values, F.index.values
     return pd.Series(mad(y), index=t)
 
 
-def zscore(F: pd.Series, mode='classic'):
+def zscore(F: pd.Series, mode='classic') -> pd.Series:
     y, t = F.values, F.index.values
     # mu, sig = np.average(y), np.std(y)
     return pd.Series(z(y, mode=mode), index=t)
@@ -246,9 +246,7 @@ class BleachCorrection:
         correction_method: str = 'subtract',
     ):
         self.model = model
-        self.regression = Regression(
-            model=model, method=regression_method, method_params=regression_params
-        )
+        self.regression = Regression(model=model, method=regression_method, method_params=regression_params)
         self.correction_method = correction_method
 
     def correct(self, F: pd.Series):
@@ -266,7 +264,7 @@ class LowpassBleachCorrection:
         self.filter_params = filter_params
         self.correction_method = correction_method
 
-    def correct(self, F: pd.Series):
+    def correct(self, F: pd.Series) -> pd.Series:
         F_filt = filt(F, **self.filter_params)
         return correct(F, F_filt, mode=self.correction_method)
 
@@ -291,7 +289,7 @@ class IsosbesticCorrection:
         self,
         F_ca: pd.Series,
         F_iso: pd.Series,
-    ):
+    ) -> pd.Series:
         if self.lowpass_isosbestic is not None:
             F_iso = filt(F_iso, **self.lowpass_isosbestic)
 
@@ -302,7 +300,9 @@ class IsosbesticCorrection:
 
 
 def correct(
-    signal: pd.Series, reference: pd.Series, mode: str = 'subtract'
+    signal: pd.Series,
+    reference: pd.Series,
+    mode: str = 'subtract',
 ) -> pd.Series:
     """the main function that applies the correction of a signal with a reference. Correcions can be applied in 3 principle ways:
     - The reference can be subtracted from the signal
@@ -361,9 +361,7 @@ class AbstractModel(ABC):
         if use_kde is True:
             # explicit estimation of the distribution of residuals
             if n_samples == -1:
-                warnings.warn(
-                    f'calculating KDE on {y.values.shape[0]} samples. This might be slow'
-                )
+                warnings.warn(f'calculating KDE on {y.values.shape[0]} samples. This might be slow')
             dist = gaussian_kde(rs)
         else:
             # using RSME
@@ -442,9 +440,7 @@ class TripleExponDecay(AbstractModel):
     )
 
     def eq(self, t, A1, tau1, A2, tau2, A3, tau3, b):
-        return (
-            A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2) + A3 * np.exp(-t / tau3) + b
-        )
+        return A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2) + A3 * np.exp(-t / tau3) + b
 
     def est_p0(self, t: np.ndarray, y: np.ndarray):
         A_est = y[0]
@@ -474,18 +470,28 @@ class TripleExponDecay(AbstractModel):
 # these are the convenience functions that are called in pipelines
 
 
-def lowpass_bleachcorrect(F: pd.Series, **kwargs):
+def lowpass_bleachcorrect(
+    F: pd.Series,
+    **kwargs,
+) -> pd.Series:
     bc = LowpassBleachCorrection(**kwargs)
     return bc.correct(F)
 
 
-def exponential_bleachcorrect(F: pd.Series, **kwargs):
+def exponential_bleachcorrect(
+    F: pd.Series,
+    **kwargs,
+) -> pd.Series:
     model = DoubleExponDecay()
     ec = BleachCorrection(model, **kwargs)
     return ec.correct(F)
 
 
-def isosbestic_correct(F_sig: pd.DataFrame, F_ref: pd.DataFrame, **kwargs):
+def isosbestic_correct(
+    F_sig: pd.DataFrame,
+    F_ref: pd.DataFrame,
+    **kwargs,
+) -> pd.Series:
     ic = IsosbesticCorrection(**kwargs)
     return ic.correct(F_sig, F_ref)
 
@@ -501,7 +507,11 @@ def isosbestic_correct(F_sig: pd.DataFrame, F_ref: pd.DataFrame, **kwargs):
 """
 
 
-def _grubbs_single(y: np.ndarray, alpha: float = 0.005, mode: str = 'median') -> bool:
+def _grubbs_single(
+    y: np.ndarray,
+    alpha: float = 0.005,
+    mode: str = 'median',
+) -> bool:
     # to apply a single pass of grubbs outlier detection
     # see https://en.wikipedia.org/wiki/Grubbs%27s_test
 
@@ -549,9 +559,7 @@ def detect_outliers(y: np.ndarray, w_size: int = 1000, alpha: float = 0.005):
 
     # explicitly taking care of the remaining samples if they exist
     if y.shape[0] > np.prod(B.shape):
-        outlier_ix.append(
-            grubbs_test(y[np.prod(B.shape) :], alpha=alpha) + B.shape[0] * w_size
-        )
+        outlier_ix.append(grubbs_test(y[np.prod(B.shape) :], alpha=alpha) + B.shape[0] * w_size)
 
     outlier_ix = np.concatenate(outlier_ix).astype('int64')
     return np.unique(outlier_ix)
@@ -588,7 +596,7 @@ def remove_outliers(
     w: int = 25,
     fs=None,
     max_it=100,
-):
+) -> pd.Series:
     y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)
@@ -614,7 +622,7 @@ def detect_spikes(t: np.ndarray, sd: int = 5):
     return np.where(bad_inds)[0]
 
 
-def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25):
+def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25) -> pd.Series:
     y, t = F.values, F.index.values
     y = copy(y)
     outliers = detect_spikes(y, sd=sd)
@@ -687,7 +695,7 @@ def make_sliding_window(
     return B
 
 
-def sliding_dFF(F: pd.Series, w_len: float, fs=None, weights=None):
+def sliding_dFF(F: pd.Series, w_len: float, fs=None, weights=None) -> pd.Series:
     y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)
@@ -701,10 +709,7 @@ def sliding_dFF(F: pd.Series, w_len: float, fs=None, weights=None):
         weights /= weights.sum()
         n_samples = y.shape[0]
         wg = WindowGenerator(n_samples - 1, w_size, w_size - 1)
-        d = [
-            np.sum(_dFF(F[first:last].values) * weights)
-            for (first, last) in wg.firstlast
-        ]
+        d = [np.sum(_dFF(F[first:last].values) * weights) for (first, last) in wg.firstlast]
     else:
         B = make_sliding_window(y, w_size)
         mus = np.average(B, axis=1)
@@ -712,7 +717,7 @@ def sliding_dFF(F: pd.Series, w_len: float, fs=None, weights=None):
     return pd.Series(d, index=t)
 
 
-def sliding_z(F: pd.Series, w_len: float, fs=None, weights=None):
+def sliding_z(F: pd.Series, w_len: float, fs=None, weights=None) -> pd.Series:
     """sliding window z-score of a pynapple time series with data with optional weighting
 
     Args:
@@ -733,9 +738,7 @@ def sliding_z(F: pd.Series, w_len: float, fs=None, weights=None):
         weights /= weights.sum()
         n_samples = y.shape[0]
         wg = WindowGenerator(n_samples - 1, w_size, w_size - 1)
-        d = [
-            np.sum(z(F[first:last].values) * weights) for (first, last) in wg.firstlast
-        ]
+        d = [np.sum(z(F[first:last].values) * weights) for (first, last) in wg.firstlast]
     else:
         B = make_sliding_window(y, w_size)
         mus, sds = np.average(B, axis=1), np.std(B, axis=1)
@@ -743,7 +746,7 @@ def sliding_z(F: pd.Series, w_len: float, fs=None, weights=None):
     return pd.Series(d, index=t)
 
 
-def sliding_mad(F: pd.Series, w_len: float = None, fs=None, overlap=90):
+def sliding_mad(F: pd.Series, w_len: float = None, fs=None, overlap=90) -> pd.Series:
     y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)
