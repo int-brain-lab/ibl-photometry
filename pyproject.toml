@@ -1,10 +1,12 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
-build-backend = "setuptools.build_meta"
+requires      = ["pdm-backend"]
+build-backend = "pdm.backend"
 
 [project]
 name = "ibl-photometry"
 description = "IBL photometry module"
+dynamic = [ "version" ]
+keywords = [ "IBL", "neuroscience", "photometry"]
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
@@ -16,20 +18,29 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-version = "0.1.2"
-dynamic = ["dependencies"]
+dependencies = [
+    "pytest",
+    "numpy",
+    "scipy",
+    "pandas",
+    "pandera[pandas] >= 0.24.0",
+    "pywavelets",
+    "matplotlib",
+    "ibllib>=3.4.0",
+    "ONE-api>=3.3.0",
+]
 
-[project.scripts]
-run_qc = "iblphotometry.run_qc:main"
+[project.optional-dependencies]
+analysis = [
+    "pynapple"
+]
+
+[tool.pdm.version]
+source = "file"
+path = 'src/iblphotometry/__init__.py'
 
 [project.urls]
 "Homepage" = "https://github.com/int-brain-lab/ibl-photometry"
-
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
-
-[tool.setuptools]
-include-package-data = true
 
 [options.packages.find]
 where = "src"
