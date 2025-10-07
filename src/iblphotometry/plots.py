@@ -2,10 +2,79 @@ import numpy as np
 import warnings
 import matplotlib.pyplot as plt
 import seaborn as sns
-import iblphotometry.preprocessing as ffpr
+import scipy.signal
 
-# from iblphotometry.behavior import filter_trials_by_trial_idx
-from iblphotometry.behavior import psth, psth_times
+import numpy as np
+import copy
+from iblutil.util import Bunch
+
+
+def psth_times(fs, event_window):
+    psth_samples = np.arange(event_window[0] * fs, event_window[1] * fs + 1)
+    psth_times = psth_samples / fs
+    return psth_times
+
+
+def psth(signal, times, t_events, fs=None, event_window=np.array([-1, 2])):
+    """
+    Compute the peri-event time histogram of a calcium signal
+    :param signal:
+    :param times:
+    :param t_events:
+    :param fs:
+    :param event_window:
+    :return:
+    """
+    if fs is None:
+        fs = 1 / np.nanmedian(np.diff(times))
+    # compute a vector of indices corresponding to the perievent window at the given sampling rate
+    sample_window = np.round(np.arange(event_window[0] * fs, event_window[1] * fs + 1)).astype(int)
+    # we inflate this vector to a 2d array where each column corresponds to an event
+    idx_psth = np.tile(sample_window[:, np.newaxis], (1, t_events.size))
+    # we add the index of each event too their respective column
+    idx_event = np.searchsorted(times, t_events)
+    idx_psth += idx_event
+    i_out_of_bounds = np.logical_or(idx_psth > (signal.size - 1), idx_psth < 0)
+    idx_psth[i_out_of_bounds] = -1
+    psth = signal[idx_psth]  # psth is a 2d array (ntimes, nevents)
+    psth[i_out_of_bounds] = np.nan  # remove events that are out of bounds
+
+    return psth, idx_psth  # TODO transpose PSTH before return
+
+
+# -------------------------------------------------------------------------------------------------
+# Filtering of trials
+# -------------------------------------------------------------------------------------------------
+def _filter(obj, idx):
+    obj = Bunch(copy.deepcopy(obj))
+    for key in obj.keys():
+        obj[key] = obj[key][idx]
+
+    return obj
+
+
+def filter_trials_by_trial_idx(trials, trial_idx):
+    return _filter(trials, trial_idx)
+
+
+def low_pass_filter(raw_signal, fs):
+    params = {}
+    sos = scipy.signal.butter(
+        fs=fs,
+        output='sos',
+        **params.get('butterworth_lowpass', {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}),
+    )
+    signal_lp = scipy.signal.sosfiltfilt(sos, raw_signal)
+    return signal_lp
+
+
+def mad_raw_signal(raw_signal, fs):
+    # This is a convenience function to get going whilst the preprocessing refactoring is being done
+    # TODO delete this function once processing can be applied
+    signal_lp = low_pass_filter(raw_signal, fs)
+    signal_processed = (raw_signal - signal_lp) / signal_lp
+    return signal_processed
+
 
 LINE_COLOURS = {
     'raw_isosbestic': '#9d4edd',  # purple
@@ -41,9 +110,7 @@ Loader objects for plotting
 
 
 class PlotSignal:
-    def set_data(
-        self, raw_signal, times, raw_isosbestic=None, processed_signal=None, fs=None
-    ):
+    def set_data(self, raw_signal, times, raw_isosbestic=None, processed_signal=None, fs=None):
         # TODO this init could change, pass in a dataframe with specific keys and LP processing done earlier
         self.raw_signal = raw_signal
         self.raw_isosbestic = raw_isosbestic
@@ -55,9 +122,9 @@ class PlotSignal:
             self.fs = 1 / np.nanmedian(np.diff(times))
         else:
             self.fs = fs
-        self.lp_signal = ffpr.low_pass_filter(self.raw_signal, self.fs)
+        self.lp_signal = low_pass_filter(self.raw_signal, self.fs)
         if self.raw_isosbestic is not None:
-            self.lp_isosbestic = ffpr.low_pass_filter(self.raw_isosbestic, self.fs)
+            self.lp_isosbestic = low_pass_filter(self.raw_isosbestic, self.fs)
         else:
             self.lp_isosbestic = None
 
@@ -66,9 +133,7 @@ class PlotSignal:
         axs[2, 1].axis('off')
 
         # --- Column 0
-        plot_raw_signals(
-            self.raw_signal, self.times, self.raw_isosbestic, ax=axs[0, 0], title='Raw'
-        )
+        plot_raw_signals(self.raw_signal, self.times, self.raw_isosbestic, ax=axs[0, 0], title='Raw')
         if self.processed_signal is not None:
             plot_processed_signal(
                 self.processed_signal,
@@ -91,9 +156,7 @@ class PlotSignal:
             title='Low Pass',
         )
         if self.raw_isosbestic is not None:
-            plot_photometry_correlation(
-                self.lp_signal, self.lp_isosbestic, self.times, ax=axs[1, 1]
-            )
+            plot_photometry_correlation(self.lp_signal, self.lp_isosbestic, self.times, ax=axs[1, 1])
         fig.tight_layout()
         return fig, axs
 
@@ -104,9 +167,7 @@ class PlotSignal:
             DE
             """
         if figure is None:
-            fig, axd = plt.subplot_mosaic(
-                str_mosaic, constrained_layout=True, figsize=(14, 8)
-            )  # , constrained_layout=True
+            fig, axd = plt.subplot_mosaic(str_mosaic, constrained_layout=True, figsize=(14, 8))  # , constrained_layout=True
         else:
             axd = figure.subplot_mosaic(str_mosaic)
             fig = figure
@@ -116,9 +177,7 @@ class PlotSignal:
         return fig, axd
 
     def raw_processed_figure2(self, axd):
-        plot_raw_signals(
-            self.raw_signal, self.times, self.raw_isosbestic, ax=axd['A'], title='Raw'
-        )
+        plot_raw_signals(self.raw_signal, self.times, self.raw_isosbestic, ax=axd['A'], title='Raw')
         if self.processed_signal is not None:
             plot_processed_signal(
                 self.processed_signal,
@@ -134,18 +193,14 @@ class PlotSignal:
             )
 
         if self.raw_isosbestic is not None:
-            plot_photometry_correlation(
-                self.lp_signal, self.lp_isosbestic, self.times, ax=axd['E']
-            )
+            plot_photometry_correlation(self.lp_signal, self.lp_isosbestic, self.times, ax=axd['E'])
 
 
 class PlotSignalResponse:
     def __init__(self):
         self.psth_dict = {}
 
-    def set_data(
-        self, trials, processed_signal, times, fs=None, event_window=np.array([-1, 2])
-    ):
+    def set_data(self, trials, processed_signal, times, fs=None, event_window=np.array([-1, 2])):
         self.trials = trials
         self.times = times
         self.processed_signal = processed_signal
@@ -274,9 +329,7 @@ def plot_raw_signals(
     return fig, ax
 
 
-def plot_processed_signal(
-    signal, times, ax=None, xlim=None, ylim=None, xlabel='Time', ylabel=None, title=None
-):
+def plot_processed_signal(signal, times, ax=None, xlim=None, ylim=None, xlabel='Time', ylabel=None, title=None):
     if ax is None:
         fig, ax = plt.subplots(1, 1)
     else:
@@ -294,9 +347,7 @@ def plot_processed_signal(
     return fig, ax
 
 
-def plot_photometry_correlation(
-    signal_lp, isosbestic_lp, times, ax=None, ax_cbar=None, title=None
-):
+def plot_photometry_correlation(signal_lp, isosbestic_lp, times, ax=None, ax_cbar=None, title=None):
     # Requires the Low pass filtered signals at minima
     if ax is None:
         fig, ax = plt.subplots(1, 1)

@@ -16,7 +16,7 @@ from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationTo
 from iblphotometry.fpio import from_raw_neurophotometrics_file
 import iblphotometry.plots as plots
 
-import iblphotometry.preprocessing as ffpr
+from iblphotometry.plots import mad_raw_signal
 import numpy as np
 import pandas as pd
 
@@ -104,11 +104,7 @@ class DataFrameVisualizerApp(QWidget):
 
     def load_file(self, file_path):
         try:
-            if (
-                file_path.endswith('.csv')
-                or file_path.endswith('.pqt')
-                or file_path.endswith('.parquet')
-            ):
+            if file_path.endswith('.csv') or file_path.endswith('.pqt') or file_path.endswith('.parquet'):
                 self.dfs = from_raw_neurophotometrics_file(file_path)
             else:
                 raise ValueError('Unsupported file format')
@@ -140,9 +136,7 @@ class DataFrameVisualizerApp(QWidget):
 
     def open_dialog(self):
         # Open a file dialog to choose the CSV or PQT file
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, 'Open File', '', 'CSV and PQT Files (*.csv *.pqt);;All Files (*)'
-        )
+        file_path, _ = QFileDialog.getOpenFileName(self, 'Open File', '', 'CSV and PQT Files (*.csv *.pqt);;All Files (*)')
         if file_path:
             # Load the file into a DataFrame based on its extension
             self.load_file(file_path)
@@ -184,9 +178,7 @@ class DataFrameVisualizerApp(QWidget):
                 self.plot_time_index = indx_time
                 self.update_plots()
         except ValueError:
-            print(
-                'Invalid time format. Please enter a valid time point in the format of a float.'
-            )
+            print('Invalid time format. Please enter a valid time point in the format of a float.')
 
     def update_column_selector(self):
         if self.df is not None:
@@ -202,9 +194,7 @@ class DataFrameVisualizerApp(QWidget):
             raw_signal = self.df[selected_column].values[self.plot_time_index]
             times = self.times[self.plot_time_index]
             if self.dfiso is not None:
-                raw_isosbestic = self.dfiso[selected_column].values[
-                    self.plot_time_index
-                ]
+                raw_isosbestic = self.dfiso[selected_column].values[self.plot_time_index]
             else:
                 raw_isosbestic = None
 
@@ -214,9 +204,7 @@ class DataFrameVisualizerApp(QWidget):
             if self.filtered_df is None:
                 processed_signal = None
             else:
-                processed_signal = self.filtered_df[selected_column].values[
-                    self.plot_time_index
-                ]
+                processed_signal = self.filtered_df[selected_column].values[self.plot_time_index]
 
             self.plotobj.set_data(
                 raw_signal=raw_signal,
@@ -271,7 +259,7 @@ class DataFrameVisualizerApp(QWidget):
 
         filtered_df = df.copy()
         for col in filtered_df.columns:
-            filtered_df[col] = ffpr.mad_raw_signal(df[col], fs)
+            filtered_df[col] = mad_raw_signal(df[col], fs)
 
         return filtered_df
 
@@ -365,9 +353,7 @@ class BehaviorVisualizerGUI(QWidget):
             print(f'Error loading file: {e}')
 
     def open_dialog(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, 'Open File', '', 'CSV and PQT Files (*.csv *.pqt);;All Files (*)'
-        )
+        file_path, _ = QFileDialog.getOpenFileName(self, 'Open File', '', 'CSV and PQT Files (*.csv *.pqt);;All Files (*)')
         if file_path:
             self.load_file(file_path)
 
