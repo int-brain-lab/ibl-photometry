@@ -13,7 +13,7 @@ from scipy.stats.distributions import norm
 from scipy.stats import gaussian_kde, t
 from scipy.special import pseudo_huber
 
-from iblphotometry.behavior import psth
+from iblphotometry.analysis import psth_np
 from inspect import signature
 from copy import copy
 
@@ -755,7 +755,7 @@ def sliding_mad(F: pd.Series, w_len: float = None, fs=None, overlap=90) -> pd.Se
     wg = WindowGenerator(ns=n_samples, nswin=w_size, overlap=overlap)
     trms = np.array([first for first, last in wg.firstlast]) / fs + t[0]
 
-    rmswin, _ = psth(y, t, t_events=trms, fs=fs, event_window=[0, w_len])
+    rmswin, _ = psth_np(y, t, t_events=trms, fs=fs, event_window=[0, w_len])
     gain = np.nanmedian(np.abs(y)) / np.nanmedian(np.abs(rmswin), axis=0)
     gain = np.interp(t, trms, gain)
     return pd.Series(y * gain, index=t)
