@@ -223,6 +223,23 @@ def from_neurophotometrics_df_to_photometry_df(
     channel_meta_map = pd.DataFrame(LIGHT_SOURCE_MAP)
     led_states = pd.DataFrame(LED_STATES).set_index('Condition')
 
+    # much cleaner code - should be the same functionality though
+    # # decode led_state
+    # possible_led_combos = [(0,), (1,), (2,), (3,), (1, 2), (1, 3), (2, 3), (1, 2, 3)]
+    # states_map = np.concatenate([np.sum(led_states.values[:,combo], axis=1)[:,np.newaxis] for combo in possible_led_combos],axis=1)
+
+    # # 
+    # def decode_led_state(led_state: int):
+    #     i, j = np.where(states_map == led_state)
+    #     condition = led_states.index[i[0]]
+    #     combo = possible_led_combos[j[0]]
+    #     name = '+'.join([channel_meta_map['name'][c] for c in combo])
+    #     color = '+'.join([channel_meta_map['color'][c] for c in combo])
+    #     return name, color, condition
+
+    # for state, group in raw_df.groupby('LedState'):
+    #     raw_df.loc[group.index, 'color'] = decode_led_state(state)[1]
+
     states = raw_df['LedState']
     for state in states.unique():
         ir, ic = np.where(led_states == state)
