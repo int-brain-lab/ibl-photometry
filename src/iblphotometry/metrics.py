@@ -15,7 +15,7 @@ from iblphotometry.processing import (
     ExponDecay,
     detect_outliers,
 )
-from iblphotometry.behavior import psth
+from iblphotometry.analysis import psth
 
 
 def n_early_samples(A: pd.DataFrame | pd.Series, dt_tol: float = 0.001) -> int:
