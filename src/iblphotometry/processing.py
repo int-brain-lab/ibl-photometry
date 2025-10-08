@@ -82,6 +82,18 @@ def filt(F: pd.Series, N: int, Wn: float, fs: float | None = None, btype='low'):
     y_filt = signal.sosfiltfilt(sos, y)
     return pd.Series(y_filt, index=t)
 
+"""
+# Orphaned function from preprocesing
+def low_pass_filter(raw_signal, fs):
+    params = {}
+    sos = scipy.signal.butter(
+        fs=fs,
+        output='sos',
+        **params.get('butterworth_lowpass', {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}),
+    )
+    signal_lp = scipy.signal.sosfiltfilt(sos, raw_signal)
+    return signal_lp
+"""
 
 def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):
     """

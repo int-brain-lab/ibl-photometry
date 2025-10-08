@@ -4,6 +4,10 @@ import numpy as np
 import pandas as pd
 from scipy import stats, signal
 
+
+from iblphotometry.preprocessing import (
+    find_early_samples
+)
 from iblphotometry.processing import (
     z,
     sobel,
@@ -312,6 +316,7 @@ def ar_score(A: pd.Series | np.ndarray, order: int = 2) -> float:
     """
     R-squared from an AR(n) model fit to the signal as a measure of the temporal
     structure present in the signal.
+
     Parameters
     ----------
     A : pd.Series or np.ndarray
@@ -319,6 +324,7 @@ def ar_score(A: pd.Series | np.ndarray, order: int = 2) -> float:
         times in the index.
     order : int, optional
         The order of the AR model. Default is 2.
+
     Returns
     -------
     float
