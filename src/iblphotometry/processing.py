@@ -704,7 +704,7 @@ def make_sliding_window(
         if w_size % 2 != 0:
             if on_error == 'raise':
                 raise ValueError('w_size needs to be an even number')
-            else:
+            if on_error == 'expand':
                 w_size += 1  # dangerous
         B = np.lib.stride_tricks.as_strided(A, ((n_samples - w_size), w_size), (8, 8))
 
@@ -723,6 +723,7 @@ def sliding_dFF(
     w_len: float,
     fs: float | None = None,
     weights: np.ndarray | None = None,
+    on_error: Literal['raise', 'pass'] = 'raise',
 ) -> pd.Series:
     y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
@@ -739,7 +740,7 @@ def sliding_dFF(
         wg = WindowGenerator(n_samples - 1, w_size, w_size - 1)
         d = [np.sum(_dFF(F[first:last].values) * weights) for (first, last) in wg.firstlast]
     else:
-        B = make_sliding_window(y, w_size)
+        B = make_sliding_window(y, w_size, on_error=on_error)
         mus = np.average(B, axis=1)
         d = (y - mus) / mus
     return pd.Series(d, index=t)
@@ -750,6 +751,7 @@ def sliding_z(
     w_len: float,
     fs: float | None = None,
     weights: np.ndarray | None = None,
+    on_error: Literal['raise', 'pass'] = 'raise',
 ) -> pd.Series:
     """sliding window z-score of a pynapple time series with data with optional weighting
 
@@ -773,7 +775,7 @@ def sliding_z(
         wg = WindowGenerator(n_samples - 1, w_size, w_size - 1)
         d = [np.sum(z(F[first:last].values) * weights) for (first, last) in wg.firstlast]
     else:
-        B = make_sliding_window(y, w_size)
+        B = make_sliding_window(y, w_size, on_error=on_error)
         mus, sds = np.average(B, axis=1), np.std(B, axis=1)
         d = (y - mus) / sds
     return pd.Series(d, index=t)

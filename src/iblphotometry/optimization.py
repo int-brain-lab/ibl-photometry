@@ -43,11 +43,12 @@ def introspect_processing_function(
 
 def analyze_pipeline(pipeline: dict) -> list[list]:
     # get optimizable arguments for a pipeline
-    optable_args = []
+    optimizable_args = []
     for step in pipeline:
         args = introspect_processing_function(step['function'])
-        optable_args.append([arg for arg in args if arg['type'] in [int, float]])
-    return optable_args
+        # probably here: filter out categorical kwargs like substract/divide etc
+        optimizable_args.append([arg for arg in args if arg['type'] in [int, float]])
+    return optimizable_args
 
 
 def get_param_map_for_pipeline(pipeline: dict):

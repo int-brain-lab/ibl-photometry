@@ -87,7 +87,7 @@ sliding_mad_pipeline = [
     ),
 ]
 
-isosbestic_pipeline = [
+isosbestic_correction_pipeline = [
     dict(
         function=processing.lowpass_bleachcorrect,
         parameters=dict(

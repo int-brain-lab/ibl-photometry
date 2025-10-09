@@ -63,6 +63,37 @@ def has_band_inversion(raw_df, check_col='color'):
     return np.any(col.values == np.roll(col.values, 1))
 
 
+# %% get example data
+from one.api import ONE
+from brainbox.io.one import PhotometrySessionLoader
+
+one = ONE()
+
+eid = '58861dac-4b4c-4f82-83fb-33d98d67df3a'
+eid = '34f55b3a-725e-4cc7-aed3-6e6338f573bf'
+psl = PhotometrySessionLoader(eid=eid, one=one)
+psl.load_photometry()
+brain_region = psl.photometry['GCaMP'].columns[0]
+signal = psl.photometry['GCaMP'][brain_region]
+
+
+psl.photometry['GCaMP'].shape
+psl.photometry['Isosbestic'].shape
+
+# %%
+base_folder = Path('/mnt/s0/Data/Subjects')
+session_folder = base_folder / one.eid2path(eid).session_path_short()
+photometry_df = fpio.from_neurophotometrics_file_to_photometry_df(
+    session_folder / 'raw_photometry_data' / '_neurophotometrics_fpData.raw.pqt', drop_first=True
+)
+photometry_df.shape[0] / 2
+fpio.from_photometry_df(photometry_df, drop_first=False)
+
+(photometry_df['name'] == '').sum()
+
+# %%
+
+
 # # %%
 # eids = pd.read_csv('/home/georg/code/ibldevtools/georg/photometry/extraction/kcenia/kb_photometry_sessions_table.csv')[
 #     'eid'
