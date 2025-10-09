@@ -16,7 +16,7 @@ logger = logging.getLogger()
 
 def qc_series(
     F: pd.Series,
-    qc_metrics: dict,
+    metrics: dict,
     sliding_kwargs=None,  # if present, calculate everything in a sliding manner
     trials=None,  # if present, put trials into params
     eid: str = None,  # FIXME but left as is for now just to keep the logger happy
@@ -25,17 +25,12 @@ def qc_series(
     if isinstance(F, pd.DataFrame):
         raise TypeError('F can not be a dataframe')
 
-    # should cover all cases
     qc_results = {}
-    for metric, params in qc_metrics:
+    for metric, params in metrics:
         try:
             if trials is not None:  # if trials are passed
                 params['trials'] = trials
-            res = eval_metric(F, metric, params, sliding_kwargs)
-            qc_results[f'{metric.__name__}'] = res['value']
-            if sliding_kwargs:
-                qc_results[f'{metric.__name__}_r'] = res['rval']
-                qc_results[f'{metric.__name__}_p'] = res['pval']
+            qc_results[metric] = eval_metric(F, metric, params, sliding_kwargs)
         except Exception as e:
             logger.warning(
                 f'{eid}, {brain_region}: metric {metric.__name__} failure: {type(e).__name__}:{e}'

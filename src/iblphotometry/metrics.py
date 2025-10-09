@@ -395,6 +395,7 @@ def eval_metric(
         - 'p': p-value for the correlation
     """
 
+    ## FIXME: do we want this for consistent output, or prefer missing keys?
     results_vals = ['value', 'sliding_values', 'sliding_timepoints', 'r', 'p']
     result = {k: np.nan for k in results_vals}
 
@@ -448,6 +449,31 @@ def eval_metric(
             result['r'], result['p'] = stats.linregress(S_times, S_values)[2:4]
 
     return result
+
+
+def qc_series(
+    F: pd.Series,
+    metrics: dict,
+    sliding_kwargs=None,  # if present, calculate everything in a sliding manner
+    trials=None,  # if present, put trials into params
+    eid: str = None,  # FIXME but left as is for now just to keep the logger happy
+    brain_region: str = None,  # FIXME but left as is for now just to keep the logger happy
+) -> dict:
+    if isinstance(F, pd.DataFrame):
+        raise TypeError('F can not be a dataframe')
+
+    qc_results = {}
+    for metric, params in metrics.items():
+        # try:
+        if trials is not None:  # if trials are passed
+            params['trials'] = trials
+        qc_results[metric.__name__] = eval_metric(F, metric, params, sliding_kwargs)
+        # except Exception as e:
+            # continue
+            # logger.warning(
+                # f'{eid}, {brain_region}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
+            # )
+    return qc_results
 
 
 def noise_simulation(
