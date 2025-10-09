@@ -3,6 +3,7 @@ from itertools import groupby
 import numpy as np
 import pandas as pd
 from scipy import stats, signal
+from numpy.lib.stride_tricks import as_strided
 
 
 from iblphotometry.preprocessing import (
@@ -358,6 +359,95 @@ def ar_score(A: pd.Series | np.ndarray, order: int = 2) -> float:
         r_squared = np.nan
 
     return r_squared
+
+
+def eval_metric(
+    F: pd.Series,
+    metric: callable,
+    metric_kwargs: dict = {},
+    sliding_kwargs: dict = {},
+    detrend: bool = True
+) -> dict:
+    """
+    Evaluate a metric on a time series, optionally with sliding window analysis.
+
+    Parameters:
+    -----------
+    F : pd.Series
+        Input time series data
+    metric : Callable
+        Metric function to evaluate
+    metric_kwargs : dict, optional
+        Arguments to pass to the metric function
+    sliding_kwargs : dict, optional
+        Sliding window parameters. If None or empty, evaluates on full signal only.
+        Expected keys: 'w_len' (window length)
+    full_output : bool
+        Whether to include sliding values and timepoints in output
+
+    Returns:
+    --------
+    dict : Results dictionary with keys:
+        - 'value': metric evaluated on full signal
+        - 'sliding_values': metric values for each window (if full_output=True)
+        - 'sliding_timepoints': timepoints for each window (if full_output=True)
+        - 'r': correlation coefficient of sliding values vs time
+        - 'p': p-value for the correlation
+    """
+
+    results_vals = ['value', 'sliding_values', 'sliding_timepoints', 'r', 'p']
+    result = {k: np.nan for k in results_vals}
+
+    # Always calculate the full signal metric
+    result['value'] = metric(F.values, **metric_kwargs)
+
+    # Determine windowing parameters
+    if sliding_kwargs and 'w_len' in sliding_kwargs:
+        # Sliding window case
+        dt = np.median(np.diff(F.index))
+        w_len = sliding_kwargs['w_len']
+        w_size = int(w_len // dt)
+        step_size = int(w_size // 2)
+        n_windows = int((len(F) - w_size) // step_size + 1)
+
+        # Check if we have enough data for meaningful sliding analysis
+        if n_windows <= 2:
+            return result
+
+        # Create time indices for sliding windows
+        S_times = F.index.values[
+            np.linspace(step_size, n_windows * step_size, n_windows).astype(int)
+        ]
+
+        # Create windowed view into array
+        a = F.values
+        windows = as_strided(
+            a,
+            shape=(n_windows, w_size),
+            strides=(step_size * a.strides[0], a.strides[0])
+        )
+
+        if detrend:
+            def _metric(w, **metric_kwargs):
+                x = np.arange(len(w))
+                slope, intercept = stats.linregress(x, w)[:2]
+                x_detrended = x - (slope * x + intercept)
+                return metric(w, **metric_kwargs)
+        else:
+            _metric = metric
+        # Apply metric to each window
+        S_values = np.apply_along_axis(
+            lambda w: _metric(w, **metric_kwargs), axis=1, arr=windows
+        )
+
+        result['sliding_values'] = S_values
+        result['sliding_timepoints'] = S_times
+
+        # Calculate trend statistics
+        if n_windows > 1:
+            result['r'], result['p'] = stats.linregress(S_times, S_values)[2:4]
+
+    return result
 
 
 def noise_simulation(
