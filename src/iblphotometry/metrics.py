@@ -300,6 +300,36 @@ def ar_score(A: pd.Series | np.ndarray, order: int = 2) -> float:
 
     return r_squared
 
+## TODO: these should use psth functions found in analysis module
+def response_variability_ratio(
+    A: pd.Series, events: np.ndarray, window: tuple = (0, 1)
+):
+    signal = A.values.squeeze()
+    assert signal.ndim == 1
+    tpts = A.index.values
+    dt = np.median(np.diff(tpts))
+    events = events[events + window[1] < tpts.max()]
+    event_inds = tpts.searchsorted(events)
+    i0s = event_inds - int(window[0] / dt)
+    i1s = event_inds + int(window[1] / dt)
+    responses = np.row_stack([signal[i0:i1] for i0, i1 in zip(i0s, i1s)])
+    responses = (responses.T - signal[event_inds]).T
+    return (responses).mean(axis=0).var() / (responses).var(axis=0).mean()
+
+
+def response_magnitude(A: pd.Series, events: np.ndarray, window: tuple = (0, 1)):
+    signal = A.values.squeeze()
+    assert signal.ndim == 1
+    tpts = A.index.values
+    dt = np.median(np.diff(tpts))
+    events = events[events + window[1] < tpts.max()]
+    event_inds = tpts.searchsorted(events)
+    i0s = event_inds - int(window[0] / dt)
+    i1s = event_inds + int(window[1] / dt)
+    responses = np.row_stack([signal[i0:i1] for i0, i1 in zip(i0s, i1s)])
+    responses = (responses.T - signal[event_inds]).T
+    return np.abs(responses.mean(axis=0)).sum()
+
 
 def ttest_pre_post(
     A: pd.Series,
