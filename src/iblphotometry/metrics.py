@@ -431,7 +431,7 @@ def eval_metric(
             def _metric(w, **metric_kwargs):
                 x = np.arange(len(w))
                 slope, intercept = stats.linregress(x, w)[:2]
-                x_detrended = x - (slope * x + intercept)
+                w_detrended = x - (slope * x + intercept)
                 return metric(w_detrended, **metric_kwargs)
         else:
             _metric = metric
