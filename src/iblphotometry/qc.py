@@ -14,30 +14,6 @@ from iblphotometry.pipelines import run_pipeline
 logger = logging.getLogger()
 
 
-def qc_series(
-    F: pd.Series,
-    metrics: dict,
-    sliding_kwargs=None,  # if present, calculate everything in a sliding manner
-    trials=None,  # if present, put trials into params
-    eid: str = None,  # FIXME but left as is for now just to keep the logger happy
-    brain_region: str = None,  # FIXME but left as is for now just to keep the logger happy
-) -> dict:
-    if isinstance(F, pd.DataFrame):
-        raise TypeError('F can not be a dataframe')
-
-    qc_results = {}
-    for metric, params in metrics:
-        try:
-            if trials is not None:  # if trials are passed
-                params['trials'] = trials
-            qc_results[metric] = eval_metric(F, metric, params, sliding_kwargs)
-        except Exception as e:
-            logger.warning(
-                f'{eid}, {brain_region}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
-            )
-    return qc_results
-
-
 # %% main QC loop
 def run_qc(
     data_loader,
