@@ -176,93 +176,6 @@ def bleaching_tau(A: pd.Series) -> float:
     return reg.popt[1]
 
 
-def ttest_pre_post(
-    A: pd.Series,
-    trials: pd.DataFrame,
-    event_name: str,
-    fs=None,
-    pre_w=[-1, -0.2],
-    post_w=[0.2, 1],
-    alpha=0.001,
-) -> bool:
-    """
-    :param calcium: np array, trace of the signal to be used
-    :param times: np array, times of the signal to be used
-    :param t_events: np array, times of the events to align to
-    :param fs: float, sampling frequency of the signal
-    :param pre_w: list of floats, pre window sizes in seconds
-    :param post_w: list of floats, post window sizes in seconds
-    :param confid: float, confidence level (alpha)
-    :return: boolean, True if metric passes
-    """
-    y, t = A.values, A.index.values
-    fs = 1 / np.median(np.diff(t)) if fs is None else fs
-
-    t_events = trials[event_name].values
-
-    psth_pre = psth(y, t, t_events, fs=fs, event_window=pre_w)[0]
-    psth_post = psth(y, t, t_events, fs=fs, event_window=post_w)[0]
-
-    # Take median value of signal over time
-    pre = np.median(psth_pre, axis=0)
-    post = np.median(psth_post, axis=0)
-    # Paired t-test
-    ttest = stats.ttest_rel(pre, post)
-    passed_confg = ttest.pvalue < alpha
-    return passed_confg
-
-
-def has_response_to_event(
-    A: pd.Series,
-    event_times: np.ndarray,
-    fs: Optional[float] = None,
-    window: tuple = (-1, 1),
-    alpha: float = 0.005,
-    mode='peak',
-) -> bool:
-    # checks if there is a significant response to an event
-
-    # ibldsb way
-    y, t = A.values, A.index.values
-    fs = 1 / np.median(np.diff(t)) if fs is None else fs
-    P, psth_ix = psth(y, t, event_times, fs=fs, event_window=window)
-
-    # temporally averages the samples in the window. Sensitive to window size!
-    if mode == 'mean':
-        sig_samples = np.average(P, axis=0)
-    # takes the peak sample, minus one sd
-    if mode == 'peak':
-        sig_samples = np.max(P, axis=0) - np.std(y)
-
-    # baseline is all samples that are not part of the response
-    base_ix = np.setdiff1d(np.arange(y.shape[0]), psth_ix.flatten())
-    base_samples = y[base_ix]
-
-    res = stats.ttest_ind(sig_samples, base_samples)
-    return res.pvalue < alpha
-
-
-def has_responses(
-    A: pd.Series,
-    trials: pd.DataFrame,
-    event_names: list,
-    fs: Optional[float] = None,
-    window: tuple = (-1, 1),
-    alpha: float = 0.005,
-) -> bool:
-    t = A.index.values
-    fs = 1 / np.median(np.diff(t)) if fs is None else fs
-
-    res = []
-    for event_name in event_names:
-        event_times = trials[event_name]
-        res.append(
-            has_response_to_event(A, event_times, fs=fs, window=window, alpha=alpha)
-        )
-
-    return np.any(res)
-
-
 def low_freq_power_ratio(A: pd.Series, f_cutoff: float = 3.18) -> float:
     """
     Fraction of the total signal power contained below a given cutoff frequency.
@@ -364,6 +277,93 @@ def ar_score(A: pd.Series | np.ndarray, order: int = 2) -> float:
         r_squared = np.nan
 
     return r_squared
+
+
+def ttest_pre_post(
+    A: pd.Series,
+    trials: pd.DataFrame,
+    event_name: str,
+    fs=None,
+    pre_w=[-1, -0.2],
+    post_w=[0.2, 1],
+    alpha=0.001,
+) -> bool:
+    """
+    :param calcium: np array, trace of the signal to be used
+    :param times: np array, times of the signal to be used
+    :param t_events: np array, times of the events to align to
+    :param fs: float, sampling frequency of the signal
+    :param pre_w: list of floats, pre window sizes in seconds
+    :param post_w: list of floats, post window sizes in seconds
+    :param confid: float, confidence level (alpha)
+    :return: boolean, True if metric passes
+    """
+    y, t = A.values, A.index.values
+    fs = 1 / np.median(np.diff(t)) if fs is None else fs
+
+    t_events = trials[event_name].values
+
+    psth_pre = psth(y, t, t_events, fs=fs, event_window=pre_w)[0]
+    psth_post = psth(y, t, t_events, fs=fs, event_window=post_w)[0]
+
+    # Take median value of signal over time
+    pre = np.median(psth_pre, axis=0)
+    post = np.median(psth_post, axis=0)
+    # Paired t-test
+    ttest = stats.ttest_rel(pre, post)
+    passed_confg = ttest.pvalue < alpha
+    return passed_confg
+
+
+def has_response_to_event(
+    A: pd.Series,
+    event_times: np.ndarray,
+    fs: Optional[float] = None,
+    window: tuple = (-1, 1),
+    alpha: float = 0.005,
+    mode='peak',
+) -> bool:
+    # checks if there is a significant response to an event
+
+    # ibldsb way
+    y, t = A.values, A.index.values
+    fs = 1 / np.median(np.diff(t)) if fs is None else fs
+    P, psth_ix = psth(y, t, event_times, fs=fs, event_window=window)
+
+    # temporally averages the samples in the window. Sensitive to window size!
+    if mode == 'mean':
+        sig_samples = np.average(P, axis=0)
+    # takes the peak sample, minus one sd
+    if mode == 'peak':
+        sig_samples = np.max(P, axis=0) - np.std(y)
+
+    # baseline is all samples that are not part of the response
+    base_ix = np.setdiff1d(np.arange(y.shape[0]), psth_ix.flatten())
+    base_samples = y[base_ix]
+
+    res = stats.ttest_ind(sig_samples, base_samples)
+    return res.pvalue < alpha
+
+
+def has_responses(
+    A: pd.Series,
+    trials: pd.DataFrame,
+    event_names: list,
+    fs: Optional[float] = None,
+    window: tuple = (-1, 1),
+    alpha: float = 0.005,
+) -> bool:
+    t = A.index.values
+    fs = 1 / np.median(np.diff(t)) if fs is None else fs
+
+    res = []
+    for event_name in event_names:
+        event_times = trials[event_name]
+        res.append(
+            has_response_to_event(A, event_times, fs=fs, window=window, alpha=alpha)
+        )
+
+    return np.any(res)
 
 
 def eval_metric(
