@@ -167,6 +167,28 @@ def n_outliers(
     a = A.values if isinstance(A, pd.Series) else A
     return detect_outliers(a, w_size=w_size, alpha=alpha).shape[0]
 
+def _expected_max_gauss(x):
+    """
+    https://math.stackexchange.com/questions/89030/expectation-of-the-maximum-of-gaussian-random-variables
+    """
+    return np.mean(x) + np.std(x) * np.sqrt(2 * np.log(len(x)))
+
+
+def n_expmax_violations(A: pd.Series | np.ndarray) -> int:
+    a = A.values if isinstance(A, pd.Series) else A
+    exp_max = _expected_max_gauss(a)
+    return sum(np.abs(a) > exp_max)
+
+
+def expmax_violation(A: pd.Series | np.ndarray) -> float:
+    a = A.values if isinstance(A, pd.Series) else A
+    exp_max = _expected_max_gauss(a)
+    n_violations = sum(np.abs(a) > exp_max)
+    if n_violations == 0:
+        return 0.0
+    else:
+        return np.sum(np.abs(a[np.abs(a) > exp_max]) - exp_max) / n_violations
+
 
 def bleaching_tau(A: pd.Series) -> float:
     """overall tau of bleaching."""
