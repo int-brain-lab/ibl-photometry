@@ -82,6 +82,7 @@ def filt(F: pd.Series, N: int, Wn: float, fs: float | None = None, btype='low'):
     y_filt = signal.sosfiltfilt(sos, y)
     return pd.Series(y_filt, index=t)
 
+
 """
 # Orphaned function from preprocesing
 def low_pass_filter(raw_signal, fs):
@@ -130,7 +131,7 @@ def sobel(a: np.ndarray, k: int = 1, uniform=True):
     if uniform:  # uniform weighting
         sobel_kernel = np.array(k * [-1] + [0] + k * [1]) / 2 * k
     else:  # stronger weighting for points further away
-        sobel_kernel = np.arange(-k, k+1) / (k * (k+1))
+        sobel_kernel = np.arange(-k, k + 1) / (k * (k + 1))
     # Apply Sobel filter using convolution
     return signal.convolve(a, sobel_kernel, mode='same')
 

@@ -40,14 +40,20 @@ def fill_gaps(photometry_df: pd.DataFrame, gaps: list[np.ndarray]) -> pd.DataFra
 
     # fills the gaps
     for gap in gaps:
-        if photometry_df.iloc[gap]['dt'].mean() > (mu - mu * 0.1) and photometry_df.iloc[gap]['dt'].mean() < (mu + mu * 0.1):
+        if photometry_df.iloc[gap]['dt'].mean() > (
+            mu - mu * 0.1
+        ) and photometry_df.iloc[gap]['dt'].mean() < (mu + mu * 0.1):
             # fill
             # TODO deal with these hardcodes
             prev_color = photometry_df.iloc[gap[0] - 1]['color']
             if prev_color == 'Blue':
-                fill_colors = np.array(['Violet', 'Blue'] * gap.shape[0])[: gap.shape[0]]
+                fill_colors = np.array(['Violet', 'Blue'] * gap.shape[0])[
+                    : gap.shape[0]
+                ]
             if prev_color == 'Violet':
-                fill_colors = np.array(['Blue', 'Violet'] * gap.shape[0])[: gap.shape[0]]
+                fill_colors = np.array(['Blue', 'Violet'] * gap.shape[0])[
+                    : gap.shape[0]
+                ]
             photometry_df.loc[gap, 'color'] = fill_colors
         else:
             # TODO should have a logger warning or similar
@@ -120,7 +126,9 @@ def _fill_missing_channel_names(A: np.ndarray) -> np.ndarray:
 
 
 def find_repeated_samples(
-    A: pd.DataFrame, dt: Optional[float] = None, dt_tol: float = 0.001,
+    A: pd.DataFrame,
+    dt: Optional[float] = None,
+    dt_tol: float = 0.001,
 ) -> int:
     if any(A['name'] == ''):
         A['name'] = _fill_missing_channel_names(A['name'].values)
