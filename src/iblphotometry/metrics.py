@@ -432,7 +432,7 @@ def eval_metric(
                 x = np.arange(len(w))
                 slope, intercept = stats.linregress(x, w)[:2]
                 x_detrended = x - (slope * x + intercept)
-                return metric(w, **metric_kwargs)
+                return metric(w_detrended, **metric_kwargs)
         else:
             _metric = metric
         # Apply metric to each window
