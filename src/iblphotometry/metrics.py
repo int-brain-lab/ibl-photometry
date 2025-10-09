@@ -3,14 +3,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-from iblphotometry.processing import (
-    z,
-    Regression,
-    ExponDecay,
-    detect_spikes,
-    detect_outliers,
-)
-from iblphotometry.behavior import psth
+from iblphotometry.processing import z, Regression, ExponDecay, detect_spikes, detect_outliers
+from iblphotometry.analysis import psth
 
 
 def percentile_dist(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
@@ -74,9 +68,7 @@ def n_spikes(A: pd.Series | np.ndarray, sd: int = 5):
     return detect_spikes(a, sd=sd).shape[0]
 
 
-def n_outliers(
-    A: pd.Series | np.ndarray, w_size: int = 1000, alpha: float = 0.0005
-) -> int:
+def n_outliers(A: pd.Series | np.ndarray, w_size: int = 1000, alpha: float = 0.0005) -> int:
     """counts the number of outliers as detected by grubbs test for outliers.
     int: _description_
     """
@@ -172,9 +164,7 @@ def has_responses(
     res = []
     for event_name in event_names:
         event_times = trials[event_name]
-        res.append(
-            has_response_to_event(A, event_times, fs=fs, window=window, alpha=alpha)
-        )
+        res.append(has_response_to_event(A, event_times, fs=fs, window=window, alpha=alpha))
 
     return np.any(res)
 
@@ -254,9 +244,7 @@ def ar_score(A: pd.Series) -> float:
     return res.rvalue**2
 
 
-def noise_simulation(
-    A: pd.Series, metric: callable, noise_sd: np.ndarray = np.logspace(-2, 1)
-) -> np.ndarray:
+def noise_simulation(A: pd.Series, metric: callable, noise_sd: np.ndarray = np.logspace(-2, 1)) -> np.ndarray:
     """
     See how a quality metric changes when adding Gaussian noise to a signal.
     The signal will be z-scored before noise is added, so noise_sd should be

@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 from one.api import ONE
-from iblphotometry import fpio, preprocessing, analysis, processing, pipelines
+from iblphotometry import fpio, preprocessing, analysis, processing  # , pipelines
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -46,11 +46,13 @@ def plot_photometry_trace(
         signal.values,
         **plot_kwargs,
     )
+    axes.set_xlabel(f'time ({time_base})')
+    axes.set_ylabel('fluorescence (au)')
     return axes
 
 
 def plot_photometry_traces(
-    signals: pd.DataFrame,
+    signals: pd.Series | pd.DataFrame,
     time_base: str = 'min',
     axes: Axes | None = None,
     legend: bool = True,
@@ -68,8 +70,7 @@ def plot_photometry_traces(
             axes=axes,
             **plot_kwargs,
         )
-        axes.set_xlabel(f'time ({time_base})')
-        axes.set_ylabel('fluorescence (au)')
+
     if legend:
         axes.legend()
     return axes
@@ -221,39 +222,52 @@ def plot_photometry_traces_from_eid(
     return axes
 
 
-def plot_psths_from_eid(
-    eid: str,
-    one: ONE,
-    channel: str = 'GCaMP',
-    split_by='feedbackType',
-    align_on='feedback_times',
+def plot_psths_from_trace(
+    signal: pd.Series,
+    trials_df: pd.DataFrame,
+    split_by: str = 'feedbackType',
+    align_on: str = 'feedback_times',
+    axes: Axes | None = None,
 ):
-    psl = PhotometrySessionLoader(eid=eid, one=one)
-    psl.load_photometry()
+    # if axes is None:
+    # _, axes = plt.subplots()
 
-    raw_df = psl.photometry[channel]
-    trials_df = psl.trials
-
-    brain_regions = raw_df.columns
-    for brain_region in brain_regions:
-        # simple pipeline to be replaced eventually
-        signal = processing.lowpass_bleachcorrect(raw_df[brain_region])
-        signal = processing.sliding_z(signal, w_len=10)
-
-        # cast to pynapple
-        signal = nap.Tsd(signal.index, signal.values)
-        psths = analysis.psth_nap(
-            signal,
-            trials_df,
-            split_by=split_by,
-            align_on=align_on,
-        )
-        axes = plot_psths(psths, split_by=split_by, align_on=align_on)
-
-        # add the brain region to the title
-        fig = axes[0].figure
-        fig.suptitle(f'{brain_region}: {fig.get_suptitle()}')
+    # cast to pynapple
+    signal = nap.Tsd(signal.index, signal.values)
+    psths = analysis.psth_nap(
+        signal,
+        trials_df,
+        split_by=split_by,
+        align_on=align_on,
+    )
+    axes = plot_psths(psths, split_by=split_by, align_on=align_on)
     return axes
+
+
+# def plot_psths_from_eid(
+#     eid: str,
+#     one: ONE,
+#     channel: str = 'GCaMP',
+#     split_by: str = 'feedbackType',
+#     align_on: str = 'feedback_times',
+#     pipeline: dict = pipelines.sliding_mad_pipeline,
+# ):
+#     psl = PhotometrySessionLoader(eid=eid, one=one)
+#     psl.load_photometry()
+
+#     raw_df = psl.photometry[channel]
+#     trials_df = psl.trials
+
+#     brain_regions = raw_df.columns
+#     for brain_region in brain_regions:
+#         # run pipeline
+#         signal = pipelines.run_pipeline(pipeline, raw_df[[brain_region]])
+#         # and plot
+#         axes = plot_psths_from_trace(signal, trials_df, split_by=split_by, align_on=align_on)
+#         # add the brain region to the title
+#         fig = axes[0].figure
+#         fig.suptitle(f'{brain_region}: {fig.get_suptitle()}')
+#     return axes
 
 
 # eid = '7c67fbd4-18c1-42f2-b989-8cbfde0d2374'  # looks highly problematic
