@@ -4,10 +4,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats, signal
 from numpy.lib.stride_tricks import as_strided
-
 from iblphotometry.preprocessing import find_early_samples
-from iblphotometry.processing import z, Regression, ExponDecay, detect_outliers, sobel
-from iblphotometry.analysis import psth
+from iblphotometry.processing import z, Regression, ExponDecay, detect_outliers, sobel, psth
 
 
 def n_early_samples(A: pd.DataFrame | pd.Series, dt_tol: float = 0.001) -> int:
@@ -67,12 +65,8 @@ def percentile_distance(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1
         - if pc is set to (50, 95), the metric capture the magnitude of positive
         transients in the signal
     """
-    if isinstance(A, pd.Series):  # "overloading"
-        P = np.percentile(z(A.values), pc, axis=axis)
-    elif isinstance(A, np.ndarray):
-        P = np.percentile(z(A), pc, axis=axis)
-    else:
-        raise TypeError('A must be pd.Series or np.ndarray.')
+    A = A.values if isinstance(A, pd.Series) else A
+    P = np.percentile(z(A), pc, axis=axis)
     return P[1] - P[0]
 
 
@@ -92,12 +86,19 @@ def percentile_asymmetry(A: pd.Series | np.ndarray, pc_comp: int = 95, axis=-1) 
     Returns:
         float: the ratio of positive and negative percentile distances
     """
+    # TODO embrace pydantic
     if not (isinstance(A, pd.Series) or isinstance(A, np.ndarray)):
         raise TypeError('A must be pd.Series or np.ndarray.')
 
     a = np.absolute(percentile_distance(A, (50, pc_comp), axis=axis))
     b = np.absolute(percentile_distance(A, (100 - pc_comp, 50), axis=axis))
     return a / b
+
+
+def signal_skew(A: pd.Series | np.ndarray, axis=-1) -> float:
+    A = A.values if isinstance(A, pd.Series) else A
+    P = stats.skew(A, axis=axis)
+    return P
 
 
 def n_edges(A: pd.Series | np.ndarray, sd: float = 5, k: int = 2, uniform=True):

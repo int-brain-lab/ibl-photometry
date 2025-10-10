@@ -140,8 +140,10 @@ def fix_repeated_sampling(A: pd.DataFrame, dt_tol: float = 0.001, w_size: int = 
         value = A.iloc[i][roi]
         i0, i1 = A.index[i - w_size], A.index[i]
         same = A.loc[i0:i1].query('name == @name')[roi].mean()
-        _ = name_alternator[name]
-        other = A.loc[i0:i1].query('name == @other_name')[roi].mean()
+        other_name = name_alternator[name]
+        # other = A.loc[i0:i1].query('name == @other_name')[roi].mean()
+        # alternative syntax just to keep ruff happy
+        other = A.loc[i0:i1].groupby('name').get_group(other_name)[roi].mean()
         assert np.abs(value - same) > np.abs(value - other)
         A.loc[A.index[i] :, 'name'] = [name_alternator[name] for name in A.loc[A.index[i] :, 'name']]
     return A

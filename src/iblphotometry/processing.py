@@ -14,7 +14,6 @@ from scipy.stats.distributions import norm
 from scipy.stats import gaussian_kde, t
 from scipy.special import pseudo_huber
 
-from iblphotometry.analysis import psth
 from inspect import signature
 from copy import copy
 
@@ -95,21 +94,12 @@ def filt(
     return pd.Series(y_filt, index=t)
 
 
-"""
-# Orphaned function from preprocesing
-def low_pass_filter(raw_signal, fs):
-    params = {}
-    sos = scipy.signal.butter(
-        fs=fs,
-        output='sos',
-        **params.get('butterworth_lowpass', {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}),
-    )
-    signal_lp = scipy.signal.sosfiltfilt(sos, raw_signal)
-    return signal_lp
-"""
-
-
-def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):
+def sliding_rcoeff(
+    signal_a: np.ndarray,
+    signal_b: np.ndarray,
+    nswin: int,
+    overlap: int = 0,
+):
     """
     Computes the local correlation coefficient between two signals in sliding windows
     :param signal_a:
@@ -128,7 +118,7 @@ def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):
     return ix, r
 
 
-def sobel(a: np.ndarray, k: int = 1, uniform=True):
+def sobel(a: np.ndarray, k: int = 1, uniform: bool = True):
     """apply a Sobel operator to approxiamte the gradient of a signal.
 
     Args:
@@ -148,6 +138,34 @@ def sobel(a: np.ndarray, k: int = 1, uniform=True):
         sobel_kernel = np.arange(-k, k + 1) / (k * (k + 1))
     # Apply Sobel filter using convolution
     return signal.convolve(a, sobel_kernel, mode='same')
+
+
+# currently here now so analysis.py is optional
+def psth(signal, times, t_events, fs=None, event_window=np.array([-1, 2])):
+    """
+    Compute the peri-event time histogram of a calcium signal
+    :param signal:
+    :param times:
+    :param t_events:
+    :param fs:
+    :param event_window:
+    :return:
+    """
+    if fs is None:
+        fs = 1 / np.nanmedian(np.diff(times))
+    # compute a vector of indices corresponding to the perievent window at the given sampling rate
+    sample_window = np.round(np.arange(event_window[0] * fs, event_window[1] * fs + 1)).astype(int)
+    # we inflate this vector to a 2d array where each column corresponds to an event
+    idx_psth = np.tile(sample_window[:, np.newaxis], (1, t_events.size))
+    # we add the index of each event too their respective column
+    idx_event = np.searchsorted(times, t_events)
+    idx_psth += idx_event
+    i_out_of_bounds = np.logical_or(idx_psth > (signal.size - 1), idx_psth < 0)
+    idx_psth[i_out_of_bounds] = -1
+    psth = signal[idx_psth]  # psth is a 2d array (ntimes, nevents)
+    psth[i_out_of_bounds] = np.nan  # remove events that are out of bounds
+
+    return psth, idx_psth
 
 
 """
@@ -265,13 +283,16 @@ class Regression:
         #     self.popt = (self.reg.coef_, self.reg.intercept_)
         #     print(self.popt)
 
-    def predict(self, x: np.ndarray, return_type='numpy'):
+    def predict(self, x: np.ndarray, return_type: Literal['numpy', 'pandas'] = 'numpy'):
         x = np.sort(x)  # just in case
         y_hat = self.model.eq(x, *self.popt)
-        if return_type == 'numpy':
-            return y_hat
-        if return_type == 'pandas':
-            return pd.Series(y_hat, index=x)
+        match return_type:
+            case 'numpy':
+                return y_hat
+            case 'pandas':
+                return pd.Series(y_hat, index=x)
+            case _:
+                raise ValueError(f'unknown return type {return_type}')
 
 
 """
@@ -536,7 +557,7 @@ def lowpass_bleachcorrect(
 # todo, also make order an argument
 def exponential_bleachcorrect(
     F: pd.Series,
-    order: int,  # maybe better: single/double/triple
+    order: int,  # maybe better as a string, as this will be subjected to optimization
     regression_method: str = 'mse',
     correction_method: str = 'subtract',
 ) -> pd.Series:
@@ -583,18 +604,21 @@ def isosbestic_correct(
 def _grubbs_single(
     y: np.ndarray,
     alpha: float = 0.005,
-    mode: str = 'median',
+    mode: Literal['median', 'classic'] = 'median',
 ) -> bool:
     # to apply a single pass of grubbs outlier detection
     # see https://en.wikipedia.org/wiki/Grubbs%27s_test
 
     N = y.shape[0]
-    if mode == 'classic':
-        # this is the formulation as from wikipedia
-        G = np.max(np.absolute(y - np.average(y))) / np.std(y)
-    if mode == 'median':
-        # this is more robust against outliers
-        G = np.max(np.absolute(y - np.median(y))) / np.std(y)
+    match mode:
+        case 'classic':
+            # this is the formulation as from wikipedia
+            G = np.max(np.absolute(y - np.average(y))) / np.std(y)
+        case 'median':
+            # this is more robust against outliers
+            G = np.max(np.absolute(y - np.median(y))) / np.std(y)
+        case _:
+            raise ValueError(f'unknown mode {mode}')
     tsq = t.ppf(1 - alpha / (2 * N), df=N - 2) ** 2
     g = (N - 1) / np.sqrt(N) * np.sqrt(tsq / (N - 2 + tsq))
 
@@ -604,15 +628,22 @@ def _grubbs_single(
         return False
 
 
-def grubbs_test(y: np.ndarray, alpha: float = 0.005, mode: str = 'median'):
+def grubbs_test(
+    y: np.ndarray,
+    alpha: float = 0.005,
+    mode: Literal['median', 'classic'] = 'median',
+):
     # apply grubbs test iteratively until no more outliers are found
     outliers = []
     while _grubbs_single(y, alpha=alpha):
         # get the outlier index
-        if mode == 'classic':
-            ix = np.argmax(np.absolute(y - np.average(y)))
-        if mode == 'median':
-            ix = np.argmax(np.absolute(y - np.median(y)))
+        match mode:
+            case 'classic':
+                ix = np.argmax(np.absolute(y - np.average(y)))
+            case 'median':
+                ix = np.argmax(np.absolute(y - np.median(y)))
+            case _:
+                raise ValueError(f'unknown mode {mode}')
         outliers.append(ix)
         y[ix] = np.median(y)
     return np.sort(outliers)
