@@ -5,10 +5,8 @@ import pandas as pd
 from scipy import stats, signal
 from numpy.lib.stride_tricks import as_strided
 
-from scipy.ndimage import sobel
-
 from iblphotometry.preprocessing import find_early_samples
-from iblphotometry.processing import z, Regression, ExponDecay, detect_outliers
+from iblphotometry.processing import z, Regression, ExponDecay, detect_outliers, sobel
 from iblphotometry.analysis import psth
 
 
