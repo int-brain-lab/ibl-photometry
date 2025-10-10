@@ -1,5 +1,4 @@
 # %%
-import numpy as np
 import pandas as pd
 from iblphotometry import processing
 import logging

@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 from one.api import ONE
-from iblphotometry import fpio, preprocessing, analysis, processing  # , pipelines
+from iblphotometry import fpio, preprocessing, analysis  # , pipelines
 
 import matplotlib.pyplot as plt
 import seaborn as sns

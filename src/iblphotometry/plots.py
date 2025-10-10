@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import scipy.signal
 
-import numpy as np
 import copy
 from iblutil.util import Bunch
 

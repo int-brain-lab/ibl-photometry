@@ -8,16 +8,11 @@ call signature will be something like
 """
 
 # %%
-import pandas as pd
 import inspect
-from one.api import ONE
 from typing import Literal, get_type_hints, get_origin, get_args
-from scipy.optimize import differential_evolution
 from copy import deepcopy
-from brainbox.io.one import PhotometrySessionLoader
 
-from iblphotometry.pipelines import sliding_mad_pipeline, run_pipeline
-from iblphotometry import metrics
+from iblphotometry.pipelines import run_pipeline
 
 
 def introspect_processing_function(

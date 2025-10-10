@@ -1,14 +1,9 @@
 # %%
 import gc
-from collections.abc import Callable
 from tqdm import tqdm
 import logging
 
-import numpy as np
-import pandas as pd
-from scipy.stats import linregress
-
-from iblphotometry.processing import make_sliding_window
+from iblphotometry.metrics import qc_series
 from iblphotometry.pipelines import run_pipeline
 
 logger = logging.getLogger()
@@ -46,9 +41,7 @@ def run_qc(
             for band in signal_bands:
                 raw_tf = raw_dfs[band]
                 for region in brain_regions:
-                    qc_result = qc_series(
-                        raw_tf[region], qc_metrics['raw'], sliding_kwargs=None, eid=eid
-                    )
+                    qc_result = qc_series(raw_tf[region], qc_metrics['raw'], sliding_kwargs=None, eid=eid)
                     qc_results.append(
                         dict(
                             eid=eid,

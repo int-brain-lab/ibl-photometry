@@ -110,6 +110,7 @@ def low_pass_filter(raw_signal, fs):
     return signal_lp
 """
 
+
 def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):
     """
     Computes the local correlation coefficient between two signals in sliding windows
@@ -127,6 +128,7 @@ def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):
     r = rcoeff(signal_a[iwin], signal_b[iwin])
     ix = first_samples + nswin // 2
     return ix, r
+
 
 def sobel(a: np.ndarray, k: int = 1, uniform=True):
     """apply a Sobel operator to approxiamte the gradient of a signal.

@@ -5,9 +5,10 @@ import pandas as pd
 from scipy import stats, signal
 from numpy.lib.stride_tricks import as_strided
 
+from scipy.ndimage import sobel
 
 from iblphotometry.preprocessing import find_early_samples
-from iblphotometry.processing import z, Regression, ExponDecay, detect_spikes, detect_outliers
+from iblphotometry.processing import z, Regression, ExponDecay, detect_outliers
 from iblphotometry.analysis import psth
 
 
@@ -38,9 +39,7 @@ def n_unique_samples(A: pd.Series | np.ndarray) -> int:
     return np.unique(a).shape[0]
 
 
-def median_absolute_deviance(
-    A: pd.Series | np.ndarray, normalize: bool = False
-) -> float:
+def median_absolute_deviance(A: pd.Series | np.ndarray, normalize: bool = False) -> float:
     """median absolute distance from the signal median. Low values indicate a
     low overall signal amplitude.
 
@@ -55,9 +54,7 @@ def median_absolute_deviance(
     return np.median(np.abs(a - np.median(a)))
 
 
-def percentile_distance(
-    A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1
-) -> float:
+def percentile_distance(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
     """the distance between two percentiles in units of z.
 
     Args:
@@ -81,9 +78,7 @@ def percentile_distance(
     return P[1] - P[0]
 
 
-def percentile_asymmetry(
-    A: pd.Series | np.ndarray, pc_comp: int = 95, axis=-1
-) -> float:
+def percentile_asymmetry(A: pd.Series | np.ndarray, pc_comp: int = 95, axis=-1) -> float:
     """the ratio between the distance of two percentiles to the median. High
     values indicate large positive deflections in the signal.
 
@@ -130,16 +125,12 @@ def n_edges(A: pd.Series | np.ndarray, sd: float = 5, k: int = 2, uniform=True):
     a_sobel = sobel(a, k, uniform)
     median = np.median(a_sobel)
     mad = np.median(np.abs(median - a_sobel))
-    dy_threshold = (
-        sd * mad / 0.67
-    )  # mad / 0.67 approximates 1 s.d. in a normal distribution
+    dy_threshold = sd * mad / 0.67  # mad / 0.67 approximates 1 s.d. in a normal distribution
     jumps = (a_sobel > (median + dy_threshold)) | (a_sobel < (median - dy_threshold))
 
     # Detect outliers based on local median and global deviance
     mad = np.median(np.abs(np.median(a) - a))
-    y_threshold = (
-        sd * mad / 0.67
-    )  # mad / 0.67 approximates 1 s.d. in a normal distribution
+    y_threshold = sd * mad / 0.67  # mad / 0.67 approximates 1 s.d. in a normal distribution
     # a_avg = np.convolve(a, np.ones(2 * k + 1) / (2 * k + 1), mode='same')
     a_median = np.roll(signal.medfilt(a, (2 * k + 1)), k)
     outliers = (a > (a_median + y_threshold)) | (a < (a_median - y_threshold))
@@ -158,6 +149,7 @@ def n_outliers(A: pd.Series | np.ndarray, w_size: int = 1000, alpha: float = 0.0
     """
     a = A.values if isinstance(A, pd.Series) else A
     return detect_outliers(a, w_size=w_size, alpha=alpha).shape[0]
+
 
 def _expected_max_gauss(x):
     """
@@ -292,10 +284,9 @@ def ar_score(A: pd.Series | np.ndarray, order: int = 2) -> float:
 
     return r_squared
 
+
 ## TODO: these should use psth functions found in analysis module
-def response_variability_ratio(
-    A: pd.Series, events: np.ndarray, window: tuple = (0, 1)
-):
+def response_variability_ratio(A: pd.Series, events: np.ndarray, window: tuple = (0, 1)):
     signal = A.values.squeeze()
     assert signal.ndim == 1
     tpts = A.index.values
@@ -463,9 +454,7 @@ def eval_metric(
             return result
 
         # Create time indices for sliding windows
-        S_times = F.index.values[
-            np.linspace(step_size, n_windows * step_size, n_windows).astype(int)
-        ]
+        S_times = F.index.values[np.linspace(step_size, n_windows * step_size, n_windows).astype(int)]
 
         # Create windowed view into array
         a = F.values
@@ -485,9 +474,7 @@ def eval_metric(
         else:
             _metric = metric
         # Apply metric to each window
-        S_values = np.apply_along_axis(
-            lambda w: _metric(w, **metric_kwargs), axis=1, arr=windows
-        )
+        S_values = np.apply_along_axis(lambda w: _metric(w, **metric_kwargs), axis=1, arr=windows)
 
         result['sliding_values'] = S_values
         result['sliding_timepoints'] = S_times
@@ -516,9 +503,7 @@ def qc_series(
         # try:
         if trials is not None:  # if trials are passed
             params['trials'] = trials
-        qc_results[metric.__name__] = eval_metric(
-            F, metric, params, sliding_kwargs, detrend=detrend
-        )
+        qc_results[metric.__name__] = eval_metric(F, metric, params, sliding_kwargs, detrend=detrend)
         # except Exception as e:
         # continue
         # logger.warning(
