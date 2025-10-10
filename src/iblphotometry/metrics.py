@@ -7,13 +7,7 @@ from numpy.lib.stride_tricks import as_strided
 
 
 from iblphotometry.preprocessing import find_early_samples
-from iblphotometry.processing import (
-    z,
-    sobel,
-    Regression,
-    ExponDecay,
-    detect_outliers,
-)
+from iblphotometry.processing import z, Regression, ExponDecay, detect_spikes, detect_outliers
 from iblphotometry.analysis import psth
 
 
@@ -158,9 +152,7 @@ def n_edges(A: pd.Series | np.ndarray, sd: float = 5, k: int = 2, uniform=True):
     return n_edges
 
 
-def n_outliers(
-    A: pd.Series | np.ndarray, w_size: int = 1000, alpha: float = 0.0005
-) -> int:
+def n_outliers(A: pd.Series | np.ndarray, w_size: int = 1000, alpha: float = 0.0005) -> int:
     """counts the number of outliers as detected by grubbs test for outliers.
     int: _description_
     """
@@ -411,9 +403,7 @@ def has_responses(
     res = []
     for event_name in event_names:
         event_times = trials[event_name]
-        res.append(
-            has_response_to_event(A, event_times, fs=fs, window=window, alpha=alpha)
-        )
+        res.append(has_response_to_event(A, event_times, fs=fs, window=window, alpha=alpha))
 
     return np.any(res)
 
@@ -537,9 +527,7 @@ def qc_series(
     return qc_results
 
 
-def noise_simulation(
-    A: pd.Series, metric: callable, noise_sd: np.ndarray = np.logspace(-2, 1)
-) -> np.ndarray:
+def noise_simulation(A: pd.Series, metric: callable, noise_sd: np.ndarray = np.logspace(-2, 1)) -> np.ndarray:
     """
     See how a quality metric changes when adding Gaussian noise to a signal.
     The signal will be z-scored before noise is added, so noise_sd should be

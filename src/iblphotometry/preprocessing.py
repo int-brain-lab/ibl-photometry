@@ -2,7 +2,7 @@
 preprocessing operates on the raw data files (pd.DataFrame, as returned by fpio.from_neurophotometrics_file_to_photometry_df)
 processing operates on the dict[pd.DataFrame] format (split by signal band) as returned by fpio.from_photometry_df"""
 
-# %%
+
 import pandas as pd
 from one.api import ONE
 from pathlib import Path
@@ -11,10 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from typing import Optional
 
-# one = ONE()
 
-
-# %%
 def has_gaps(photometry_df: pd.DataFrame) -> bool:
     # some neurophotometrics files come with "gaps" in the band information
     return '' in photometry_df['color'].unique()
@@ -165,6 +162,36 @@ def fix_repeated_sampling(
             name_alternator[name] for name in A.loc[A.index[i] :, 'name']
         ]
     return A
+  
+
+# %% get example data
+from one.api import ONE
+from brainbox.io.one import PhotometrySessionLoader
+
+one = ONE()
+
+eid = '58861dac-4b4c-4f82-83fb-33d98d67df3a'
+eid = '34f55b3a-725e-4cc7-aed3-6e6338f573bf'
+psl = PhotometrySessionLoader(eid=eid, one=one)
+psl.load_photometry()
+brain_region = psl.photometry['GCaMP'].columns[0]
+signal = psl.photometry['GCaMP'][brain_region]
+
+
+psl.photometry['GCaMP'].shape
+psl.photometry['Isosbestic'].shape
+
+# %%
+base_folder = Path('/mnt/s0/Data/Subjects')
+session_folder = base_folder / one.eid2path(eid).session_path_short()
+photometry_df = fpio.from_neurophotometrics_file_to_photometry_df(
+    session_folder / 'raw_photometry_data' / '_neurophotometrics_fpData.raw.pqt', drop_first=True
+)
+photometry_df.shape[0] / 2
+fpio.from_photometry_df(photometry_df, drop_first=False)
+
+(photometry_df['name'] == '').sum()
+# %%
 
 
 # # %%

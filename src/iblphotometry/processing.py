@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import warnings
+from typing import Literal
 
 import numpy as np
 from scipy import signal
@@ -13,7 +14,7 @@ from scipy.stats.distributions import norm
 from scipy.stats import gaussian_kde, t
 from scipy.special import pseudo_huber
 
-from iblphotometry.analysis import psth_np
+from iblphotometry.analysis import psth
 from inspect import signature
 from copy import copy
 
@@ -21,7 +22,20 @@ from copy import copy
 # machine resolution
 eps = np.finfo(np.float64).eps
 
+"""
+some notes for definitions here
+a pipeline function takes a pd.Series and outputs a pd.Series
+OR
+if it consumes a reference:
+if takes a pd.DataFrame and outputs a pd.Series
 
+parameters:
+everything has to be a kwarg
+parameters that have default values will _not_ be objected to optimization
+this will take care of all the Literals
+"""
+
+# %%
 """
 ######## ##     ## ##    ##  ######  ######## ####  #######  ##    ##  ######
 ##       ##     ## ###   ## ##    ##    ##     ##  ##     ## ###   ## ##    ##
@@ -67,7 +81,7 @@ def madscore(F: pd.Series) -> pd.Series:
     return pd.Series(mad(y), index=t)
 
 
-def zscore(F: pd.Series, mode='classic') -> pd.Series:
+def zscore(F: pd.Series, mode: Literal['classic', 'median'] = 'classic') -> pd.Series:
     y, t = F.values, F.index.values
     # mu, sig = np.average(y), np.std(y)
     return pd.Series(z(y, mode=mode), index=t)
@@ -309,14 +323,14 @@ class IsosbesticCorrection:
         regression_method: str = 'mse',
         regression_params: dict | None = None,
         correction_method: str = 'subtract-divide',
-        lowpass_isosbestic: dict | None = None,
+        # lowpass_isosbestic: dict | None = None,
     ):
         self.reg = Regression(
             model=LinearModel(),
             method=regression_method,
             method_params=regression_params,
         )
-        self.lowpass_isosbestic = lowpass_isosbestic
+        # self.lowpass_isosbestic = lowpass_isosbestic
         self.correction_method = correction_method
 
     def correct(
@@ -324,8 +338,8 @@ class IsosbesticCorrection:
         F_ca: pd.Series,
         F_iso: pd.Series,
     ) -> pd.Series:
-        if self.lowpass_isosbestic is not None:
-            F_iso = filt(F_iso, **self.lowpass_isosbestic)
+        # if self.lowpass_isosbestic is not None:
+        #     F_iso = filt(F_iso, **self.lowpass_isosbestic)
 
         self.reg.fit(F_iso.values, F_ca.values)
         F_iso_fit = self.reg.predict(F_iso.values, return_type='pandas')
@@ -506,9 +520,18 @@ class TripleExponDecay(AbstractModel):
 
 def lowpass_bleachcorrect(
     F: pd.Series,
-    **kwargs,
+    N: int = 3,
+    Wn: float = 0.01,
+    correction_method: Literal['subract', 'divide', 'subtract-divide'] = 'subtract-divide',
 ) -> pd.Series:
-    bc = LowpassBleachCorrection(**kwargs)
+    bc = LowpassBleachCorrection(
+        correction_method=correction_method,
+        filter_params=dict(
+            N=N,
+            Wn=Wn,
+            btype='lowpass',
+        ),
+    )
     return bc.correct(F)
 
 
@@ -522,8 +545,8 @@ def exponential_bleachcorrect(
 
 
 def isosbestic_correct(
-    F_sig: pd.DataFrame,
-    F_ref: pd.DataFrame,
+    F_sig: pd.Series,
+    F_ref: pd.Series,
     **kwargs,
 ) -> pd.Series:
     ic = IsosbesticCorrection(**kwargs)
@@ -696,9 +719,9 @@ def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25) -> pd.Series:
 def make_sliding_window(
     A: np.ndarray,
     w_size: int,
-    pad_mode='edge',
-    method='stride_tricks',
-    warning=None,
+    pad_mode: str = 'edge',
+    method: Literal['stride_tricks', 'window_generator'] = 'stride_tricks',
+    on_error: Literal['raise', 'pass'] = 'raise',
 ):
     """use np.stride_tricks to make a sliding window view of a 1-d np.ndarray A
     full overlap, step size 1
@@ -719,9 +742,9 @@ def make_sliding_window(
 
     if method == 'stride_tricks':
         if w_size % 2 != 0:
-            if warning == 'raise_exception':
+            if on_error == 'raise':
                 raise ValueError('w_size needs to be an even number')
-            else:
+            if on_error == 'expand':
                 w_size += 1  # dangerous
         B = np.lib.stride_tricks.as_strided(A, ((n_samples - w_size), w_size), (8, 8))
 
@@ -735,7 +758,13 @@ def make_sliding_window(
     return B
 
 
-def sliding_dFF(F: pd.Series, w_len: float, fs=None, weights=None) -> pd.Series:
+def sliding_dFF(
+    F: pd.Series,
+    w_len: float,
+    fs: float | None = None,
+    weights: np.ndarray | None = None,
+    on_error: Literal['raise', 'pass'] = 'raise',
+) -> pd.Series:
     y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)
@@ -751,13 +780,19 @@ def sliding_dFF(F: pd.Series, w_len: float, fs=None, weights=None) -> pd.Series:
         wg = WindowGenerator(n_samples - 1, w_size, w_size - 1)
         d = [np.sum(_dFF(F[first:last].values) * weights) for (first, last) in wg.firstlast]
     else:
-        B = make_sliding_window(y, w_size)
+        B = make_sliding_window(y, w_size, on_error=on_error)
         mus = np.average(B, axis=1)
         d = (y - mus) / mus
     return pd.Series(d, index=t)
 
 
-def sliding_z(F: pd.Series, w_len: float, fs=None, weights=None) -> pd.Series:
+def sliding_z(
+    F: pd.Series,
+    w_len: float,
+    fs: float | None = None,
+    weights: np.ndarray | None = None,
+    on_error: Literal['raise', 'pass'] = 'raise',
+) -> pd.Series:
     """sliding window z-score of a pynapple time series with data with optional weighting
 
     Args:
@@ -780,13 +815,18 @@ def sliding_z(F: pd.Series, w_len: float, fs=None, weights=None) -> pd.Series:
         wg = WindowGenerator(n_samples - 1, w_size, w_size - 1)
         d = [np.sum(z(F[first:last].values) * weights) for (first, last) in wg.firstlast]
     else:
-        B = make_sliding_window(y, w_size)
+        B = make_sliding_window(y, w_size, on_error=on_error)
         mus, sds = np.average(B, axis=1), np.std(B, axis=1)
         d = (y - mus) / sds
     return pd.Series(d, index=t)
 
 
-def sliding_mad(F: pd.Series, w_len: float = None, fs=None, overlap=90) -> pd.Series:
+def sliding_mad(
+    F: pd.Series,
+    w_len: float = None,
+    overlap: int = 90,
+    fs: float | None = None,
+) -> pd.Series:
     y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)
@@ -795,7 +835,7 @@ def sliding_mad(F: pd.Series, w_len: float = None, fs=None, overlap=90) -> pd.Se
     wg = WindowGenerator(ns=n_samples, nswin=w_size, overlap=overlap)
     trms = np.array([first for first, last in wg.firstlast]) / fs + t[0]
 
-    rmswin, _ = psth_np(y, t, t_events=trms, fs=fs, event_window=[0, w_len])
+    rmswin, _ = psth(y, t, t_events=trms, fs=fs, event_window=[0, w_len])
     gain = np.nanmedian(np.abs(y)) / np.nanmedian(np.abs(rmswin), axis=0)
     gain = np.interp(t, trms, gain)
     return pd.Series(y * gain, index=t)

@@ -1,13 +1,7 @@
+# %%
 import numpy as np
 import pandas as pd
-from iblphotometry.processing import (
-    remove_spikes,
-    lowpass_bleachcorrect,
-    isosbestic_correct,
-    sliding_mad,
-    zscore,
-)
-
+from iblphotometry import processing
 import logging
 
 logger = logging.getLogger()
@@ -15,180 +9,132 @@ logger = logging.getLogger()
 
 def run_pipeline(
     pipeline,
-    F_signal: pd.DataFrame,
-    F_reference: pd.DataFrame | None = None,
-) -> pd.DataFrame:
-    # copy
-    Fc = F_signal.copy()
-    if F_reference is not None:
-        Fc_ref = F_reference.copy()
+    signal: pd.Series,
+    reference: pd.Series | None = None,
+    full_output: bool = False,
+):
+    """function to run a pipeline.
 
-    if isinstance(F_signal, pd.Series):
-        raise TypeError(
-            'F_signal can not be pd.Series, is now required to be pd.DataFrame'
-        )
+    Parameters
+    ----------
+    pipeline : _type_
+        _description_
+    signal : pd.Series
+        _description_
+    reference : pd.Series | None, optional
+        _description_, by default None
+    full_output : bool, optional
+        _description_, by default False
 
-    # iterate over the individual processing steps of the pipeline
-    for i, (pipe_func, pipe_args) in enumerate(pipeline):
-        # if pipeline function is to be executed on columns of a TsdFrame
-        if 'needs_reference' in pipe_args:
-            _pipe_args = {k: v for k, v in pipe_args.items() if k != 'needs_reference'}
-            # check if F_ref is not None
-            _d = np.zeros_like(Fc.values)
-            # _Fcd_ref = np.zeros_like(Fc_ref.d)
-            for i, col in enumerate(Fc.columns):
-                _d[:, i] = pipe_func(Fc[col], Fc_ref[col], **_pipe_args)
-            # this step consumes the reference!
-            Fc = pd.DataFrame(_d, index=Fc.index.values, columns=Fc.columns)
-        else:
-            _d = np.zeros_like(Fc.values)
-            for i, col in enumerate(Fc.columns):
-                _d[:, i] = pipe_func(Fc[col], **pipe_args)
-            Fc = pd.DataFrame(_d, index=Fc.index.values, columns=Fc.columns)
-    return Fc
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    res = dict(signal=signal, reference=reference)
+    for step in pipeline:
+        # resolving inputs
+        inputs = [res[inp] for inp in step['inputs']]
+        # calling the steps sequentially
+        res[step['output']] = step['function'](*inputs, **step['parameters'])
+        # passing metadata through - taking the name of the first
+        res[step['output']].name = inputs[0].name
+        res[step['output']].index.name = inputs[0].index.name
+    if not full_output:
+        return res['result']
+    else:
+        return res
 
 
-# these are now pipelines
+"""
+Definition of a pipeline:
+
+1. a list of individual (sequentially ordered) processing steps
+2. each list entry is a dict with keys
+    - function: a callable that takes one (or more) series as ordered inputs
+    - parameters: a dict with all kwargs to be passed to the function
+    - inputs: a tuple of str with: the name of the input (usually the previous processing step)
+        in case of multiple inputs (such as for isosbestic correction), need to be ordered accordingly
+        the first input of the first function is either called 'signal' or 'reference'
+    - output: the name of the output of the processing step (usually the input for the next step)
+
+"""
 sliding_mad_pipeline = [
-    (remove_spikes, dict(sd=5)),
-    (
-        lowpass_bleachcorrect,
-        dict(
+    dict(
+        function=processing.lowpass_bleachcorrect,
+        parameters=dict(
             correction_method='subtract-divide',
-            filter_params=dict(N=3, Wn=0.01, btype='lowpass'),
+            N=3,
+            Wn=0.01,
         ),
+        inputs=('signal',),
+        output='bleach_corrected',
     ),
-    (sliding_mad, dict(w_len=120, overlap=90)),
-    (zscore, dict(mode='median')),
+    dict(
+        function=processing.sliding_mad,
+        parameters=dict(
+            w_len=120,
+            overlap=90,
+        ),
+        inputs=('bleach_corrected',),
+        output='mad',
+    ),
+    dict(
+        function=processing.zscore,
+        parameters=dict(mode='median'),
+        inputs=('mad',),
+        output='result',
+    ),
 ]
 
 isosbestic_correction_pipeline = [
-    (remove_spikes, dict(sd=5)),
-    (
-        isosbestic_correct,
-        dict(
-            needs_reference=True,
-            correction_method='subtract',
-            regression_method='huber',
-            lowpass_isosbestic=dict(N=3, Wn=0.01, btype='lowpass'),
+    dict(
+        function=processing.lowpass_bleachcorrect,
+        parameters=dict(
+            correction_method='subtract-divide',
+            N=3,
+            Wn=0.01,
         ),
+        inputs=('signal',),
+        output='signal_bleach_corrected',
     ),
-    (zscore, dict(mode='median')),
+    dict(
+        function=processing.lowpass_bleachcorrect,
+        parameters=dict(
+            correction_method='subtract-divide',
+            N=3,
+            Wn=0.01,
+        ),
+        inputs=('reference',),
+        output='reference_bleach_corrected',
+    ),
+    dict(
+        function=processing.isosbestic_correct,
+        parameters=dict(
+            regression_method='mse',
+            correction_method='subtract',
+        ),
+        inputs=('signal_bleach_corrected', 'reference_bleach_corrected'),
+        output='result',
+    ),
 ]
 
+# # %%
 
-# TODO this is not following the definition of a pipeline anymore
-# to be reconstructed
-# def bc_lp_sliding_mad(
-#     F: nap.Tsd | nap.TsdFrame,
-#     w_len: float = 120,
-#     overlap: int = 90,
-#     butterworth_lowpass=dict(N=3, Wn=0.01, btype='lowpass'),
-#     signal_name: str = 'raw_calcium',
-# ):
-#     """_summary_
+# %% get example data
+# from one.api import ONE
+# from brainbox.io.one import PhotometrySessionLoader
 
-#     Args:
-#         F (nap.Tsd): _description_
-#         w_len (float, optional): _description_. Defaults to 120.
-#         overlap (int, optional): _description_. Defaults to 90.
-#         butterworth_lowpass (_type_, optional): _description_. Defaults to dict(N=3, Wn=0.01, btype="lowpass").
+# one = ONE()
 
-#     Returns:
-#         _type_: _description_
-#     """
+# eid = '58861dac-4b4c-4f82-83fb-33d98d67df3a'
+# eid = '34f55b3a-725e-4cc7-aed3-6e6338f573bf'
+# psl = PhotometrySessionLoader(eid=eid, one=one)
+# psl.load_photometry()
+# brain_region = psl.photometry['GCaMP'].columns[0]
+# signal = psl.photometry['GCaMP'][brain_region]
 
-#     if isinstance(
-#         F, nap.TsdFrame
-#     ):  # if F is as TsdFrame, then use signal name to get the correct column - this is needed for the pipeline functionality in run_qc
-#         if signal_name is None:
-#             logger.critical('no signal name is provided for the pipeline')
-#         else:
-#             F = F[signal_name]
+# signal_opt = run_pipeline(sliding_mad_pipeline, signal=signal)
+# from iblphotometry.plotters import plot_photometry_trace
 
-#     bleach_correction = bleach_corrections.LowpassBleachCorrection(
-#         correction_method='subtract-divide',
-#         filter_params=butterworth_lowpass,
-#     )
-#     F_bc = bleach_correction.correct(F)
-#     F_res = sliding_operations.sliding_mad(F_bc, w_len=w_len, overlap=overlap)
-#     return F_res
-
-
-# # TODO this is not following the definition of a pipeline anymore
-# def jove2019(
-#     F: nap.TsdFrame,
-#     ca_signal_name: str = 'raw_calcium',
-#     isosbestic_signal_name: str = 'raw_isosbestic',
-#     **params,
-# ):
-#     """
-#     Martianova, Ekaterina, Sage Aronson, and Christophe D. Proulx. "Multi-fiber photometry to record neural activity in freely-moving animals." JoVE (Journal of Visualized Experiments) 152 (2019): e60278.
-#     :param raw_calcium:
-#     :param raw_isosbestic:
-#     :param params:
-#     :return:
-#     """
-#     raw_calcium = F[ca_signal_name]
-#     raw_isosbestic = F[isosbestic_signal_name]
-
-#     # replace this with a low pass corrector
-#     # remove photobleaching
-#     bleach_correction = bleach_corrections.LowpassBleachCorrection(
-#         correction_method='subtract-divide',
-#         filter_params=dict(N=3, Wn=0.01, btype='lowpass'),
-#     )
-#     calcium = bleach_correction.correct(
-#         raw_calcium,
-#         mode='subtract',
-#     ).values
-#     isosbestic = bleach_correction.correct(
-#         raw_isosbestic,
-#         mode='subtract',
-#     ).values
-
-#     # zscoring using median instead of mean
-#     calcium = z(calcium, mode='median')
-#     isosbestic = z(isosbestic, mode='median')
-
-#     # regular regression
-#     m = np.polyfit(isosbestic, calcium, 1)
-#     ref = isosbestic * m[0] + m[1]
-#     ph = (calcium - ref) / 100
-#     return nap.Tsd(t=raw_calcium.times(), d=ph)
-
-
-# # TODO this is not following the definition of a pipeline anymore
-# def isosbestic_regression(
-#     F: nap.TsdFrame,
-#     ca_signal_name: str = 'raw_calcium',
-#     isosbestic_signal_name: str = 'raw_isosbestic',
-#     fs: float = None,
-#     regression_method: str = 'irls',
-#     correction_method: str = 'subtract-divide',
-#     **params,
-# ):
-#     raw_calcium = F[ca_signal_name]
-#     raw_isosbestic = F[isosbestic_signal_name]
-
-#     t = F.times()
-#     fs = 1 / np.median(np.diff(t)) if fs is None else fs
-
-#     isosbestic_correction = bleach_corrections.IsosbesticCorrection(
-#         regression_method=regression_method,
-#         correction_method=correction_method,
-#         lowpass_isosbestic=dict(N=3, Wn=0.01, btype='lowpass'),
-#     )
-
-#     F_corr = isosbestic_correction.correct(
-#         raw_calcium,
-#         raw_isosbestic,
-#     )
-
-#     butterworth_signal = params.get(
-#         'butterworth_signal',
-#         dict(N=3, Wn=7, btype='lowpass', fs=fs),  # changed from 10 to 7
-#     )
-
-#     F_corr = filt(F_corr, **butterworth_signal)
-#     return F_corr
+# plot_photometry_trace(signal_opt)

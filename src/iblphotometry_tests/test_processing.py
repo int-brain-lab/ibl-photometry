@@ -22,8 +22,8 @@ class TestProcessing(PhotometryDataTestCase):
         processing.remove_spikes(raw_df)
 
         # other functions
-        processing.make_sliding_window(raw_df.values, 100, method='stride_tricks')
-        processing.make_sliding_window(raw_df.values, 100, method='window_generator')
-        processing.sliding_dFF(raw_df, w_len=60)
-        processing.sliding_z(raw_df, w_len=60)
+        processing.make_sliding_window(raw_df.values, 100, method='stride_tricks', on_error='expand')
+        processing.make_sliding_window(raw_df.values, 100, method='window_generator', on_error='expand')
+        processing.sliding_dFF(raw_df, w_len=60, on_error='expand')
+        processing.sliding_z(raw_df, w_len=60, on_error='expand')
         processing.sliding_mad(raw_df, w_len=60)
