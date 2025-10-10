@@ -228,7 +228,7 @@ def from_neurophotometrics_df_to_photometry_df(
     # possible_led_combos = [(0,), (1,), (2,), (3,), (1, 2), (1, 3), (2, 3), (1, 2, 3)]
     # states_map = np.concatenate([np.sum(led_states.values[:,combo], axis=1)[:,np.newaxis] for combo in possible_led_combos],axis=1)
 
-    # # 
+    # #
     # def decode_led_state(led_state: int):
     #     i, j = np.where(states_map == led_state)
     #     condition = led_states.index[i[0]]

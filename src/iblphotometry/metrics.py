@@ -4,7 +4,7 @@ import pandas as pd
 from scipy import stats
 
 from iblphotometry.processing import z, Regression, ExponDecay, detect_spikes, detect_outliers
-from iblphotometry.analysis import psth # TODO put somewhere else ... 
+from iblphotometry.analysis import psth  # TODO put somewhere else ...
 
 
 def percentile_dist(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
@@ -126,7 +126,7 @@ def has_response_to_event(
     fs: Optional[float] = None,
     window: tuple = (-1, 1),
     alpha: float = 0.005,
-    mode: Literal['peak','mean'] = 'peak',
+    mode: Literal['peak', 'mean'] = 'peak',
 ) -> bool:
     # checks if there is a significant response to an event
 
