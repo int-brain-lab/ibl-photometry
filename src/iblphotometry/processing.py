@@ -35,7 +35,6 @@ parameters that have default values will _not_ be objected to optimization
 this will take care of all the Literals
 """
 
-# %%
 """
 ######## ##     ## ##    ##  ######  ######## ####  #######  ##    ##  ######
 ##       ##     ## ###   ## ##    ##    ##     ##  ##     ## ###   ## ##    ##

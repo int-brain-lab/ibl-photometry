@@ -35,6 +35,7 @@ def psth_nap(
     return psths
 
 
+# TODO this one has to be available without the analysis install
 # TODO change this to match the above call signature
 def psth(signal, times, t_events, fs=None, event_window=np.array([-1, 2])):
     """
