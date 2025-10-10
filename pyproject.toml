@@ -45,6 +45,10 @@ path = 'src/iblphotometry/__init__.py'
 [options.packages.find]
 where = "src"
 
+[tool.ruff]
+indent-width = 4
+line-length = 130
+
 [tool.ruff.lint.isort]
 known-first-party = [ "ibl*", "one*", "pybpod*" ]
 
