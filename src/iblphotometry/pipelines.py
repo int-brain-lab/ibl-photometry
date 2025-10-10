@@ -1,4 +1,3 @@
-# %%
 import pandas as pd
 from iblphotometry import processing
 import logging
@@ -56,7 +55,7 @@ Definition of a pipeline:
         in case of multiple inputs (such as for isosbestic correction), need to be ordered accordingly
         the first input of the first function is either called 'signal' or 'reference'
     - output: the name of the output of the processing step (usually the input for the next step)
-
+        after all pipeline steps are done, 'result' will be returend
 """
 sliding_mad_pipeline = [
     dict(
@@ -117,23 +116,3 @@ isosbestic_correction_pipeline = [
         output='result',
     ),
 ]
-
-# # %%
-
-# %% get example data
-# from one.api import ONE
-# from brainbox.io.one import PhotometrySessionLoader
-
-# one = ONE()
-
-# eid = '58861dac-4b4c-4f82-83fb-33d98d67df3a'
-# eid = '34f55b3a-725e-4cc7-aed3-6e6338f573bf'
-# psl = PhotometrySessionLoader(eid=eid, one=one)
-# psl.load_photometry()
-# brain_region = psl.photometry['GCaMP'].columns[0]
-# signal = psl.photometry['GCaMP'][brain_region]
-
-# signal_opt = run_pipeline(sliding_mad_pipeline, signal=signal)
-# from iblphotometry.plotters import plot_photometry_trace
-
-# plot_photometry_trace(signal_opt)

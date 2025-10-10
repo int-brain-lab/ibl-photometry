@@ -1,9 +1,8 @@
-# %%
 import numpy as np
 import pandas as pd
 
 from one.api import ONE
-from iblphotometry import fpio, preprocessing, analysis  # , pipelines
+from iblphotometry import fpio, preprocessing, analysis, pipelines
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -244,30 +243,30 @@ def plot_psths_from_trace(
     return axes
 
 
-# def plot_psths_from_eid(
-#     eid: str,
-#     one: ONE,
-#     channel: str = 'GCaMP',
-#     split_by: str = 'feedbackType',
-#     align_on: str = 'feedback_times',
-#     pipeline: dict = pipelines.sliding_mad_pipeline,
-# ):
-#     psl = PhotometrySessionLoader(eid=eid, one=one)
-#     psl.load_photometry()
+def plot_psths_from_eid(
+    eid: str,
+    one: ONE,
+    channel: str = 'GCaMP',
+    split_by: str = 'feedbackType',
+    align_on: str = 'feedback_times',
+    pipeline: dict = pipelines.sliding_mad_pipeline,
+):
+    psl = PhotometrySessionLoader(eid=eid, one=one)
+    psl.load_photometry()
 
-#     raw_df = psl.photometry[channel]
-#     trials_df = psl.trials
+    raw_df = psl.photometry[channel]
+    trials_df = psl.trials
 
-#     brain_regions = raw_df.columns
-#     for brain_region in brain_regions:
-#         # run pipeline
-#         signal = pipelines.run_pipeline(pipeline, raw_df[[brain_region]])
-#         # and plot
-#         axes = plot_psths_from_trace(signal, trials_df, split_by=split_by, align_on=align_on)
-#         # add the brain region to the title
-#         fig = axes[0].figure
-#         fig.suptitle(f'{brain_region}: {fig.get_suptitle()}')
-#     return axes
+    brain_regions = raw_df.columns
+    for brain_region in brain_regions:
+        # run pipeline
+        signal = pipelines.run_pipeline(pipeline, raw_df[[brain_region]])
+        # and plot
+        axes = plot_psths_from_trace(signal, trials_df, split_by=split_by, align_on=align_on)
+        # add the brain region to the title
+        fig = axes[0].figure
+        fig.suptitle(f'{brain_region}: {fig.get_suptitle()}')
+    return axes
 
 
 # eid = '7c67fbd4-18c1-42f2-b989-8cbfde0d2374'  # looks highly problematic

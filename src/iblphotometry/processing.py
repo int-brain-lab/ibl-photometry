@@ -35,7 +35,6 @@ parameters that have default values will _not_ be objected to optimization
 this will take care of all the Literals
 """
 
-# %%
 """
 ######## ##     ## ##    ##  ######  ######## ####  #######  ##    ##  ######
 ##       ##     ## ###   ## ##    ##    ##     ##  ##     ## ###   ## ##    ##
@@ -47,30 +46,21 @@ this will take care of all the Literals
 """
 
 
-def z(A: np.ndarray, mode='classic') -> np.ndarray:
-    """classic z-score. Deviation from sample mean in units of sd
-
-    :param A: _description_
-    :type A: np.ndarray
-    :param mode: _description_, defaults to 'classic'
-    :type mode: str, optional
-    :return: _description_
-    :rtype: _type_
-    """
-    if mode == 'classic':
-        return (A - np.average(A)) / np.std(A)
-    if mode == 'median':
-        return (A - np.median(A)) / np.std(A)
+def z(
+    A: np.ndarray,
+    mode: Literal['classic', 'median'] = 'classic',
+) -> np.ndarray:
+    """classic z-score. Deviation from sample mean in units of sd"""
+    match mode:
+        case 'classic':
+            return (A - np.average(A)) / np.std(A)
+        case 'median':
+            return (A - np.median(A)) / np.std(A)
 
 
 def mad(A: np.ndarray) -> np.ndarray:
     """the MAD is defined as the median of the absolute deviations from the data's median
     see https://en.wikipedia.org/wiki/Median_absolute_deviation
-
-    :param A: _description_
-    :type A: np.ndarray
-    :return: _description_
-    :rtype: _type_
     """
     return np.median(np.absolute(A - np.median(A)), axis=-1)
 
@@ -81,13 +71,21 @@ def madscore(F: pd.Series) -> pd.Series:
     return pd.Series(mad(y), index=t)
 
 
-def zscore(F: pd.Series, mode: Literal['classic', 'median'] = 'classic') -> pd.Series:
+def zscore(
+    F: pd.Series,
+    mode: Literal['classic', 'median'] = 'classic',
+) -> pd.Series:
     y, t = F.values, F.index.values
-    # mu, sig = np.average(y), np.std(y)
     return pd.Series(z(y, mode=mode), index=t)
 
 
-def filt(F: pd.Series, N: int, Wn: float, fs: float | None = None, btype='low'):
+def filt(
+    F: pd.Series,
+    N: int,
+    Wn: float,
+    fs: float | None = None,
+    btype: str = 'low',
+):
     """a wrapper for scipy.signal.butter and sosfiltfilt"""
     y, t = F.values, F.index.values
     if fs is None:
@@ -325,14 +323,12 @@ class IsosbesticCorrection:
         regression_method: str = 'mse',
         regression_params: dict | None = None,
         correction_method: str = 'subtract-divide',
-        # lowpass_isosbestic: dict | None = None,
     ):
         self.reg = Regression(
             model=LinearModel(),
             method=regression_method,
             method_params=regression_params,
         )
-        # self.lowpass_isosbestic = lowpass_isosbestic
         self.correction_method = correction_method
 
     def correct(
@@ -340,9 +336,6 @@ class IsosbesticCorrection:
         F_ca: pd.Series,
         F_iso: pd.Series,
     ) -> pd.Series:
-        # if self.lowpass_isosbestic is not None:
-        #     F_iso = filt(F_iso, **self.lowpass_isosbestic)
-
         self.reg.fit(F_iso.values, F_ca.values)
         F_iso_fit = self.reg.predict(F_iso.values, return_type='pandas')
 
@@ -352,9 +345,9 @@ class IsosbesticCorrection:
 def correct(
     signal: pd.Series,
     reference: pd.Series,
-    mode: str = 'subtract',
+    mode: Literal['subtract', 'divide', 'subtract-divide'] = 'subtract',
 ) -> pd.Series:
-    """the main function that applies the correction of a signal with a reference. Correcions can be applied in 3 principle ways:
+    """the main function that applies the correction of a signal with a reference. Corrections can be applied in 3 principle ways:
     - The reference can be subtracted from the signal
     - the signal can be divided by the reference
     - both of the above (first subtraction, then division) - this is akin to df/f
@@ -368,12 +361,15 @@ def correct(
     :return: _description_
     :rtype: pd.Series
     """
-    if mode == 'subtract':
-        signal_corrected = signal.values - reference.values
-    if mode == 'divide':
-        signal_corrected = signal.values / reference.values
-    if mode == 'subtract-divide':
-        signal_corrected = (signal.values - reference.values) / reference.values
+    match mode:
+        case 'subtract':
+            signal_corrected = signal.values - reference.values
+        case 'divide':
+            signal_corrected = signal.values / reference.values
+        case 'subtract-divide':
+            signal_corrected = (signal.values - reference.values) / reference.values
+        case _:
+            raise ValueError(f'unknown correction mode: {mode}')
     return pd.Series(signal_corrected, index=signal.index.values)
 
 
@@ -537,21 +533,39 @@ def lowpass_bleachcorrect(
     return bc.correct(F)
 
 
+# todo, also make order an argument
 def exponential_bleachcorrect(
     F: pd.Series,
-    **kwargs,
+    order: int,  # maybe better: single/double/triple
+    regression_method: str = 'mse',
+    correction_method: str = 'subtract',
 ) -> pd.Series:
-    model = DoubleExponDecay()
-    ec = BleachCorrection(model, **kwargs)
+    match order:
+        case 1:
+            model = ExponDecay()
+        case 2:
+            model = DoubleExponDecay()
+        case 3:
+            model = TripleExponDecay()
+    ec = BleachCorrection(
+        model,
+        regression_method=regression_method,
+        correction_method=correction_method,
+    )
     return ec.correct(F)
 
 
+# todo fix
 def isosbestic_correct(
     F_sig: pd.Series,
     F_ref: pd.Series,
-    **kwargs,
+    regression_method: str = 'mse',
+    correction_method: str = 'subtract-divide',
 ) -> pd.Series:
-    ic = IsosbesticCorrection(**kwargs)
+    ic = IsosbesticCorrection(
+        regression_method=regression_method,
+        correction_method=correction_method,
+    )
     return ic.correct(F_sig, F_ref)
 
 
@@ -810,8 +824,9 @@ def sliding_z(
     w_size = int(w_len * fs)
 
     if weights is not None:
-        # note: passing weights makes the stride trick not possible, or only with allocating a matrix of shape (n_samples * w_size)
-        # true sliding operation implemented, much slower
+        # note: passing weights makes the stride trick not possible, or only with
+        # allocating a matrix of shape (n_samples * w_size)
+        # hence, true sliding operation implemented, which is much slower
         weights /= weights.sum()
         n_samples = y.shape[0]
         wg = WindowGenerator(n_samples - 1, w_size, w_size - 1)

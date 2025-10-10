@@ -354,7 +354,7 @@ def has_response_to_event(
     fs: Optional[float] = None,
     window: tuple = (-1, 1),
     alpha: float = 0.005,
-    mode='peak',
+    mode: Literal['peak', 'mean'] = 'peak',
 ) -> bool:
     # checks if there is a significant response to an event
 
@@ -363,12 +363,14 @@ def has_response_to_event(
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     P, psth_ix = psth(y, t, event_times, fs=fs, event_window=window)
 
-    # temporally averages the samples in the window. Sensitive to window size!
-    if mode == 'mean':
-        sig_samples = np.average(P, axis=0)
-    # takes the peak sample, minus one sd
-    if mode == 'peak':
-        sig_samples = np.max(P, axis=0) - np.std(y)
+    match mode:
+        case 'mean':
+            # temporally averages the samples in the window.
+            # Sensitive to window size!
+            sig_samples = np.average(P, axis=0)
+        case 'peak':
+            # takes the peak sample, minus one sd
+            sig_samples = np.max(P, axis=0) - np.std(y)
 
     # baseline is all samples that are not part of the response
     base_ix = np.setdiff1d(np.arange(y.shape[0]), psth_ix.flatten())

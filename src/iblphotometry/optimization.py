@@ -1,13 +1,3 @@
-"""
-to define here:
-which parameters of a pipeline to be optimized
-datasets to include
-
-call signature will be something like
-
-"""
-
-# %%
 import inspect
 from typing import Literal, get_type_hints, get_origin, get_args
 from copy import deepcopy
@@ -72,9 +62,7 @@ def loss(p, pipeline, param_map, signal, metric):
     # run pipeline
     signal_proc = run_pipeline(pipeline, signal)
     # eval
-    # TODO here - probably parameterize this
     res = metric(signal_proc)
-
     return -res
 
 
