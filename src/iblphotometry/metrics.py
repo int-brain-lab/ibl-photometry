@@ -1,14 +1,59 @@
-from typing import Optional, Literal
+from typing import Optional
+from itertools import groupby
 import numpy as np
 import pandas as pd
-from scipy import stats
+from scipy import stats, signal
+from numpy.lib.stride_tricks import as_strided
 
-from iblphotometry.processing import z, Regression, ExponDecay, detect_spikes, detect_outliers
-from iblphotometry.analysis import psth  # TODO put somewhere else ...
+from iblphotometry.preprocessing import find_early_samples
+from iblphotometry.processing import z, Regression, ExponDecay, detect_outliers, sobel
+from iblphotometry.analysis import psth
 
 
-def percentile_dist(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
-    """the distance between two percentiles in units of z. Captures the magnitude of transients.
+def n_early_samples(A: pd.DataFrame | pd.Series, dt_tol: float = 0.001) -> int:
+    """
+    Number of samples that occur before the expected (median) dt.
+
+    Args:
+        A (pd.Series): the input data, needs to be series with sample timing in
+        index
+
+        dt_tol (float, optional): acceptable deviance from the median dt
+
+    Returns:
+        int: the number of early samples
+    """
+    return find_early_samples(A, dt_tol=dt_tol).sum()
+
+
+def n_unique_samples(A: pd.Series | np.ndarray) -> int:
+    """number of unique samples in the signal. Low values indicate that the
+    signal was not within the range of the digitizer during acquisition.
+
+    Args:
+
+    """
+    a = A.values if isinstance(A, pd.Series) else A
+    return np.unique(a).shape[0]
+
+
+def median_absolute_deviance(A: pd.Series | np.ndarray, normalize: bool = False) -> float:
+    """median absolute distance from the signal median. Low values indicate a
+    low overall signal amplitude.
+
+    Args:
+        A (pd.Series | np.ndarray): the input data
+
+    Returns:
+        float: median absolute deviance
+
+    """
+    a = A.values if isinstance(A, pd.Series) else A
+    return np.median(np.abs(a - np.median(a)))
+
+
+def percentile_distance(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) -> float:
+    """the distance between two percentiles in units of z.
 
     Args:
         A (pd.Series | np.ndarray): the input data, np.ndarray for stride tricks sliding windows
@@ -17,9 +62,13 @@ def percentile_dist(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) ->
 
     Returns:
         float: the value of the metric
+
+    Notes:
+        - if pc is set to (50, 95), the metric capture the magnitude of positive
+        transients in the signal
     """
     if isinstance(A, pd.Series):  # "overloading"
-        P = np.percentile(z(A.values), pc)
+        P = np.percentile(z(A.values), pc, axis=axis)
     elif isinstance(A, np.ndarray):
         P = np.percentile(z(A), pc, axis=axis)
     else:
@@ -27,45 +76,69 @@ def percentile_dist(A: pd.Series | np.ndarray, pc: tuple = (50, 95), axis=-1) ->
     return P[1] - P[0]
 
 
-def signal_asymmetry(A: pd.Series | np.ndarray, pc_comp: int = 95, axis=-1) -> float:
-    """the ratio between the distance of two percentiles to the median. Proportional to the the signal to noise.
+def percentile_asymmetry(A: pd.Series | np.ndarray, pc_comp: int = 95, axis=-1) -> float:
+    """the ratio between the distance of two percentiles to the median. High
+    values indicate large positive deflections in the signal.
+
+    FIXME: Proportional to the the signal to noise.
 
     Args:
-        A (pd.Series | np.ndarray): _description_
-        pc_comp (int, optional): _description_. Defaults to 95.
-        axis (int, optional): _description_. Defaults to -1.
+        A (pd.Series | np.ndarray): the input data
+        pc_comp (int, optional): the percentiles to compare to the median
+        (pc_comp, 100 - pc_comp). Defaults to 95.
+        axis (int, optional): the axis over which to take the percentiles.
+        Defaults to -1.
 
     Returns:
-        float: _description_
+        float: the ratio of positive and negative percentile distances
     """
     if not (isinstance(A, pd.Series) or isinstance(A, np.ndarray)):
         raise TypeError('A must be pd.Series or np.ndarray.')
 
-    a = np.absolute(percentile_dist(A, (50, pc_comp), axis=axis))
-    b = np.absolute(percentile_dist(A, (100 - pc_comp, 50), axis=axis))
+    a = np.absolute(percentile_distance(A, (50, pc_comp), axis=axis))
+    b = np.absolute(percentile_distance(A, (100 - pc_comp, 50), axis=axis))
     return a / b
 
 
-def signal_skew(A: pd.Series | np.ndarray, axis=-1) -> float:
-    if isinstance(A, pd.Series):
-        P = stats.skew(A.values)
-    elif isinstance(A, np.ndarray):
-        P = stats.skew(A, axis=axis)
-    else:
-        raise TypeError('A must be pd.Series or np.ndarray.')
-    return P
+def n_edges(A: pd.Series | np.ndarray, sd: float = 5, k: int = 2, uniform=True):
+    """counts the number of abrupt jumps in a signal.
 
+    Args:
+        A (pd.Series | np.ndarray): the input data
+        sd (float, optional): the number of standard deviations to use as a
+        threshold, defaults to 5
+        k (int, optional): the half-length of the Sobel filter applied to the
+        signal, larger values will consider more points to estimate the signal
+        gradient
+        uniform (bool, optional): whether the Sobel filter should uniformly
+        weight all points or give a higher weight to more distant points,
+        defaults to True
 
-def n_unique_samples(A: pd.Series | np.ndarray) -> int:
-    """number of unique samples in the signal. Low values indicate that the signal during acquisition was not within the range of the digitizer."""
+    Returns:
+        n_edges (int): the number of abrupt jumps in the signal
+    """
     a = A.values if isinstance(A, pd.Series) else A
-    return np.unique(a).shape[0]
 
+    # Detect edges using a sobel filter
+    a_sobel = sobel(a, k, uniform)
+    median = np.median(a_sobel)
+    mad = np.median(np.abs(median - a_sobel))
+    dy_threshold = sd * mad / 0.67  # mad / 0.67 approximates 1 s.d. in a normal distribution
+    jumps = (a_sobel > (median + dy_threshold)) | (a_sobel < (median - dy_threshold))
 
-def n_spikes(A: pd.Series | np.ndarray, sd: int = 5):
-    """count the number of spike artifacts in the recording."""
-    a = A.values if isinstance(A, pd.Series) else A
-    return detect_spikes(a, sd=sd).shape[0]
+    # Detect outliers based on local median and global deviance
+    mad = np.median(np.abs(np.median(a) - a))
+    y_threshold = sd * mad / 0.67  # mad / 0.67 approximates 1 s.d. in a normal distribution
+    # a_avg = np.convolve(a, np.ones(2 * k + 1) / (2 * k + 1), mode='same')
+    a_median = np.roll(signal.medfilt(a, (2 * k + 1)), k)
+    outliers = (a > (a_median + y_threshold)) | (a < (a_median - y_threshold))
+
+    # Define edges as large jumps to values that deviate from the local median
+    edges = (jumps & outliers)[k:-k]
+    # N is the number of contiguous stretches of True
+    n_edges = sum([1 for val, group in groupby(edges) if val])
+
+    return n_edges
 
 
 def n_outliers(A: pd.Series | np.ndarray, w_size: int = 1000, alpha: float = 0.0005) -> int:
@@ -76,12 +149,167 @@ def n_outliers(A: pd.Series | np.ndarray, w_size: int = 1000, alpha: float = 0.0
     return detect_outliers(a, w_size=w_size, alpha=alpha).shape[0]
 
 
+def _expected_max_gauss(x):
+    """
+    https://math.stackexchange.com/questions/89030/expectation-of-the-maximum-of-gaussian-random-variables
+    """
+    return np.mean(x) + np.std(x) * np.sqrt(2 * np.log(len(x)))
+
+
+def n_expmax_violations(A: pd.Series | np.ndarray) -> int:
+    a = A.values if isinstance(A, pd.Series) else A
+    exp_max = _expected_max_gauss(a)
+    return sum(np.abs(a) > exp_max)
+
+
+def expmax_violation(A: pd.Series | np.ndarray) -> float:
+    a = A.values if isinstance(A, pd.Series) else A
+    exp_max = _expected_max_gauss(a)
+    n_violations = sum(np.abs(a) > exp_max)
+    if n_violations == 0:
+        return 0.0
+    else:
+        return np.sum(np.abs(a[np.abs(a) > exp_max]) - exp_max) / n_violations
+
+
 def bleaching_tau(A: pd.Series) -> float:
     """overall tau of bleaching."""
     y, t = A.values, A.index.values
     reg = Regression(model=ExponDecay())
     reg.fit(y, t)
     return reg.popt[1]
+
+
+def low_freq_power_ratio(A: pd.Series, f_cutoff: float = 3.18) -> float:
+    """
+    Fraction of the total signal power contained below a given cutoff frequency.
+
+    Parameters
+    ----------
+    A :
+        the signal time series with signal values in the columns and sample
+        times in the index
+    f_cutoff :
+        cutoff frequency, default value of 3.18 esitmated using the formula
+        1 / (2 * pi * tau) and an approximate tau_rise for GCaMP6f of 0.05s.
+    """
+    a = A.copy()
+    assert a.ndim == 1  # only 1D for now
+    # Get frequency bins
+    tpts = a.index.values
+    dt = np.median(np.diff(tpts))
+    n_pts = len(a)
+    freqs = np.fft.rfftfreq(n_pts, dt)
+    # Compute power spectral density
+    psd = np.abs(np.fft.rfft(a - a.mean())) ** 2
+    # Return the ratio of power contained in low freqs
+    return psd[freqs <= f_cutoff].sum() / psd.sum()
+
+
+def spectral_entropy(A: pd.Series, eps: float = np.finfo('float').eps) -> float:
+    """
+    Compute the normalized entropy of the signal power spectral density and
+    return a metric (1 - entropy) that is low (0) if all frequency components
+    have equal power, as for noise, and high (1) if all the power is
+    concentrated in a single component.
+
+    Parameters
+    ----------
+    A :
+        the signal time series with signal values in the columns and sample
+        times in the index
+    eps :
+        small number added to the PSD for numerical stability
+    """
+    a = A.copy()
+    assert a.ndim == 1  # only 1D for now
+    # Compute power spectral density
+    psd = np.abs(np.fft.rfft(a - a.mean())) ** 2
+    psd_norm = psd / np.sum(psd)
+    # Compute spectral entropy in bits
+    spectral_entropy = -1 * np.sum(psd_norm * np.log2(psd_norm + eps))
+    # Normalize by the maximum entropy (bits)
+    n_bins = len(psd)
+    max_entropy = np.log2(n_bins)
+    norm_entropy = spectral_entropy / max_entropy
+    return 1 - norm_entropy
+
+
+def ar_score(A: pd.Series | np.ndarray, order: int = 2) -> float:
+    """
+    R-squared from an AR(n) model fit to the signal as a measure of the temporal
+    structure present in the signal.
+
+    Parameters
+    ----------
+    A : pd.Series or np.ndarray
+        The signal time series with signal values in the columns and sample
+        times in the index.
+    order : int, optional
+        The order of the AR model. Default is 2.
+
+    Returns
+    -------
+    float
+        The R-squared value indicating the variance explained by the AR model.
+        Returns NaN if the signal is constant.
+    """
+    # Pull signal out of pandas Series if needed
+    a = A.values if isinstance(A, pd.Series) else A
+    assert a.ndim == 1, 'Signal must be 1-dimensional.'
+
+    # Handle constant signal case
+    if len(np.unique(a)) == 1:
+        return np.nan
+
+    # Create design matrix X and target vector y based on AR order
+    X = np.column_stack([a[i : len(a) - order + i] for i in range(order)])
+    y = a[order:]
+
+    try:
+        # Fit linear regression using least squares
+        _, residual, _, _ = np.linalg.lstsq(X, y)
+    except np.linalg.LinAlgError:
+        return np.nan
+
+    if residual:
+        # Calculate R-squared using residuals
+        ss_residual = residual[0]
+        ss_total = np.sum((y - np.mean(y)) ** 2)
+        r_squared = 1 - (ss_residual / ss_total)
+    else:
+        r_squared = np.nan
+
+    return r_squared
+
+
+## TODO: these should use psth functions found in analysis module
+def response_variability_ratio(A: pd.Series, events: np.ndarray, window: tuple = (0, 1)):
+    signal = A.values.squeeze()
+    assert signal.ndim == 1
+    tpts = A.index.values
+    dt = np.median(np.diff(tpts))
+    events = events[events + window[1] < tpts.max()]
+    event_inds = tpts.searchsorted(events)
+    i0s = event_inds - int(window[0] / dt)
+    i1s = event_inds + int(window[1] / dt)
+    responses = np.row_stack([signal[i0:i1] for i0, i1 in zip(i0s, i1s)])
+    responses = (responses.T - signal[event_inds]).T
+    return (responses).mean(axis=0).var() / (responses).var(axis=0).mean()
+
+
+def response_magnitude(A: pd.Series, events: np.ndarray, window: tuple = (0, 1)):
+    signal = A.values.squeeze()
+    assert signal.ndim == 1
+    tpts = A.index.values
+    dt = np.median(np.diff(tpts))
+    events = events[events + window[1] < tpts.max()]
+    event_inds = tpts.searchsorted(events)
+    i0s = event_inds - int(window[0] / dt)
+    i1s = event_inds + int(window[1] / dt)
+    responses = np.row_stack([signal[i0:i1] for i0, i1 in zip(i0s, i1s)])
+    responses = (responses.T - signal[event_inds]).T
+    return np.abs(responses.mean(axis=0)).sum()
 
 
 def ttest_pre_post(
@@ -171,79 +399,117 @@ def has_responses(
     return np.any(res)
 
 
-def low_freq_power_ratio(A: pd.Series, f_cutoff: float = 3.18) -> float:
+def eval_metric(
+    F: pd.Series,
+    metric: callable,
+    metric_kwargs: dict = {},
+    sliding_kwargs: dict = {},
+    detrend: bool = True,
+) -> dict:
     """
-    Fraction of the total signal power contained below a given cutoff frequency.
+    Evaluate a metric on a time series, optionally with sliding window analysis.
 
-    Parameters
-    ----------
-    A :
-        the signal time series with signal values in the columns and sample
-        times in the index
-    f_cutoff :
-        cutoff frequency, default value of 3.18 esitmated using the formula
-        1 / (2 * pi * tau) and an approximate tau_rise for GCaMP6f of 0.05s.
+    Parameters:
+    -----------
+    F : pd.Series
+        Input time series data
+    metric : Callable
+        Metric function to evaluate
+    metric_kwargs : dict, optional
+        Arguments to pass to the metric function
+    sliding_kwargs : dict, optional
+        Sliding window parameters. If None or empty, evaluates on full signal only.
+        Expected keys: 'w_len' (window length)
+    full_output : bool
+        Whether to include sliding values and timepoints in output
+
+    Returns:
+    --------
+    dict : Results dictionary with keys:
+        - 'value': metric evaluated on full signal
+        - 'sliding_values': metric values for each window (if full_output=True)
+        - 'sliding_timepoints': timepoints for each window (if full_output=True)
+        - 'r': correlation coefficient of sliding values vs time
+        - 'p': p-value for the correlation
     """
-    signal = A.copy()
-    assert signal.ndim == 1  # only 1D for now
-    # Get frequency bins
-    tpts = signal.index.values
-    dt = np.median(np.diff(tpts))
-    n_pts = len(signal)
-    freqs = np.fft.rfftfreq(n_pts, dt)
-    # Compute power spectral density
-    psd = np.abs(np.fft.rfft(signal - signal.mean())) ** 2
-    # Return the ratio of power contained in low freqs
-    return psd[freqs <= f_cutoff].sum() / psd.sum()
+
+    ## FIXME: do we want this for consistent output, or prefer missing keys?
+    results_vals = ['value', 'sliding_values', 'sliding_timepoints', 'r', 'p']
+    result = {k: np.nan for k in results_vals}
+
+    # Always calculate the full signal metric
+    result['value'] = metric(F.values, **metric_kwargs)
+
+    # Determine windowing parameters
+    if sliding_kwargs and 'w_len' in sliding_kwargs:
+        # Sliding window case
+        dt = np.median(np.diff(F.index))
+        w_len = sliding_kwargs['w_len']
+        w_size = int(w_len // dt)
+        step_size = int(w_size // 2)
+        n_windows = int((len(F) - w_size) // step_size + 1)
+
+        # Check if we have enough data for meaningful sliding analysis
+        if n_windows <= 2:
+            return result
+
+        # Create time indices for sliding windows
+        S_times = F.index.values[np.linspace(step_size, n_windows * step_size, n_windows).astype(int)]
+
+        # Create windowed view into array
+        a = F.values
+        windows = as_strided(
+            a,
+            shape=(n_windows, w_size),
+            strides=(step_size * a.strides[0], a.strides[0]),
+        )
+
+        if detrend:
+
+            def _metric(w, **metric_kwargs):
+                x = np.arange(len(w))
+                slope, intercept = stats.linregress(x, w)[:2]
+                w_detrended = w - (slope * x + intercept)
+                return metric(w_detrended, **metric_kwargs)
+        else:
+            _metric = metric
+        # Apply metric to each window
+        S_values = np.apply_along_axis(lambda w: _metric(w, **metric_kwargs), axis=1, arr=windows)
+
+        result['sliding_values'] = S_values
+        result['sliding_timepoints'] = S_times
+
+        # Calculate trend statistics
+        if n_windows > 1:
+            result['r'], result['p'] = stats.linregress(S_times, S_values)[2:4]
+
+    return result
 
 
-def spectral_entropy(A: pd.Series, eps: float = np.finfo('float').eps) -> float:
-    """
-    Compute the normalized entropy of the signal power spectral density and
-    return a metric (1 - entropy) that is low (0) if all frequency components
-    have equal power, as for noise, and high (1) if all the power is
-    concentrated in a single component.
+def qc_series(
+    F: pd.Series,
+    metrics: dict,
+    sliding_kwargs=None,  # if present, calculate everything in a sliding manner
+    trials=None,  # if present, put trials into params
+    eid: str = None,  # FIXME but left as is for now just to keep the logger happy
+    brain_region: str = None,  # FIXME but left as is for now just to keep the logger happy
+    detrend: bool = False,
+) -> dict:
+    if isinstance(F, pd.DataFrame):
+        raise TypeError('F can not be a dataframe')
 
-    Parameters
-    ----------
-    A :
-        the signal time series with signal values in the columns and sample
-        times in the index
-    eps :
-        small number added to the PSD for numerical stability
-    """
-    signal = A.copy()
-    assert signal.ndim == 1  # only 1D for now
-    # Compute power spectral density
-    psd = np.abs(np.fft.rfft(signal - signal.mean())) ** 2
-    psd_norm = psd / np.sum(psd)
-    # Compute spectral entropy in bits
-    spectral_entropy = -1 * np.sum(psd_norm * np.log2(psd_norm + eps))
-    # Normalize by the maximum entropy (bits)
-    n_bins = len(psd)
-    max_entropy = np.log2(n_bins)
-    norm_entropy = spectral_entropy / max_entropy
-    return 1 - norm_entropy
-
-
-def ar_score(A: pd.Series) -> float:
-    """
-    R-squared from an AR(1) model fit to the signal as a measure of the temporal
-    structure present in the signal.
-
-    Parameters
-    ----------
-    A :
-        the signal time series with signal values in the columns and sample
-        times in the index
-    """
-    # Pull signal out of pandas series
-    signal = A.values
-    assert signal.ndim == 1  # only 1D for now
-    X = signal[:-1]
-    y = signal[1:]
-    res = stats.linregress(X, y)
-    return res.rvalue**2
+    qc_results = {}
+    for metric, params in metrics.items():
+        # try:
+        if trials is not None:  # if trials are passed
+            params['trials'] = trials
+        qc_results[metric.__name__] = eval_metric(F, metric, params, sliding_kwargs, detrend=detrend)
+        # except Exception as e:
+        # continue
+        # logger.warning(
+        # f'{eid}, {brain_region}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
+        # )
+    return qc_results
 
 
 def noise_simulation(A: pd.Series, metric: callable, noise_sd: np.ndarray = np.logspace(-2, 1)) -> np.ndarray:
@@ -266,6 +532,6 @@ def noise_simulation(A: pd.Series, metric: callable, noise_sd: np.ndarray = np.l
     A_z = z(A)
     scores = np.full(len(noise_sd), np.nan)
     for i, sd in enumerate(noise_sd):
-        signal = A_z + np.random.normal(scale=sd, size=len(A))
-        scores[i] = metric(signal)
+        a = A_z + np.random.normal(scale=sd, size=len(A))
+        scores[i] = metric(a)
     return scores

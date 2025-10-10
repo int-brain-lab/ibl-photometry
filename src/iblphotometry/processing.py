@@ -95,6 +95,20 @@ def filt(
     return pd.Series(y_filt, index=t)
 
 
+"""
+# Orphaned function from preprocesing
+def low_pass_filter(raw_signal, fs):
+    params = {}
+    sos = scipy.signal.butter(
+        fs=fs,
+        output='sos',
+        **params.get('butterworth_lowpass', {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'}),
+    )
+    signal_lp = scipy.signal.sosfiltfilt(sos, raw_signal)
+    return signal_lp
+"""
+
+
 def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):
     """
     Computes the local correlation coefficient between two signals in sliding windows
@@ -112,6 +126,28 @@ def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):
     r = rcoeff(signal_a[iwin], signal_b[iwin])
     ix = first_samples + nswin // 2
     return ix, r
+
+
+def sobel(a: np.ndarray, k: int = 1, uniform=True):
+    """apply a Sobel operator to approxiamte the gradient of a signal.
+
+    Args:
+        a (np.ndarray): the input data
+        k (int, optional): the half-length of the Sobel kernel, defaults to 1
+        uniform (bool, optional): whether to uniformly weight all points in the
+        kernel, if False weights will be proportional to distance from the
+        center point, defaults to True
+
+    Returns:
+        np.ndarray: the filtered signal
+    """
+    # L1 normalized Sobel operator of 2k + 1 length
+    if uniform:  # uniform weighting
+        sobel_kernel = np.array(k * [-1] + [0] + k * [1]) / 2 * k
+    else:  # stronger weighting for points further away
+        sobel_kernel = np.arange(-k, k + 1) / (k * (k + 1))
+    # Apply Sobel filter using convolution
+    return signal.convolve(a, sobel_kernel, mode='same')
 
 
 """
@@ -653,6 +689,8 @@ def remove_outliers(
     return pd.Series(y, index=t)
 
 
+## TODO: Remove? This was previously here to detect channel swaps cause by NPM
+## sampling bug, which we now explicitly fix
 def detect_spikes(t: np.ndarray, sd: int = 5):
     dt = np.diff(t)
     bad_inds = dt < np.average(dt) - sd * np.std(dt)
@@ -660,6 +698,10 @@ def detect_spikes(t: np.ndarray, sd: int = 5):
 
 
 def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25) -> pd.Series:
+    """
+    FIXME: detect_spikes no longer exists, but this is still useful to fill in
+    other brief artifacts
+    """
     y, t = F.values, F.index.values
     y = copy(y)
     outliers = detect_spikes(y, sd=sd)

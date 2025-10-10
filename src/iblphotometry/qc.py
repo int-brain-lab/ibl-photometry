@@ -1,108 +1,12 @@
 # %%
 import gc
-from collections.abc import Callable
 from tqdm import tqdm
 import logging
 
-import numpy as np
-import pandas as pd
-from scipy.stats import linregress
-
-from iblphotometry.processing import make_sliding_window
+from iblphotometry.metrics import qc_series
 from iblphotometry.pipelines import run_pipeline
 
 logger = logging.getLogger()
-
-
-# %% # those could be in metrics
-def sliding_metric(
-    F: pd.Series,
-    w_len: float,
-    metric: Callable,
-    fs: float | None = None,
-    n_wins: int = -1,  # ??? wtf
-    metric_kwargs: dict | None = None,
-):
-    """applies a metric along time.
-
-    Args:
-        F (nap.Tsd): _description_
-        w_size (int): _description_
-        metric (callable, optional): _description_. Defaults to None.
-        n_wins (int, optional): _description_. Defaults to -1.
-
-    Returns:
-        _type_: _description_
-    """
-    y, t = F.values, F.index.values
-    fs = 1 / np.median(np.diff(t)) if fs is None else fs
-    w_size = int(w_len * fs)
-
-    yw = make_sliding_window(y, w_size)
-    if n_wins > 0:
-        n_samples = y.shape[0]
-        inds = np.linspace(0, n_samples - w_size, n_wins, dtype='int64')
-        yw = yw[inds, :]
-    else:
-        inds = np.arange(yw.shape[0], dtype='int64')
-
-    m = metric(yw, **metric_kwargs) if metric_kwargs is not None else metric(yw)
-
-    return pd.Series(m, index=t[inds + int(w_size / 2)])
-
-
-# eval pipleline will be here
-def eval_metric(
-    F: pd.Series,
-    metric: Callable,
-    metric_kwargs: dict | None = None,
-    sliding_kwargs: dict | None = None,
-    full_output=False,
-):
-    result = {}
-    m = metric(F, **metric_kwargs) if metric_kwargs is not None else metric(F)
-    result['value'] = m
-    if sliding_kwargs is not None:
-        S = sliding_metric(F, metric=metric, **sliding_kwargs, metric_kwargs=metric_kwargs)
-        r, p = linregress(S.index.values, S.values)[2:4]
-        if full_output:
-            result['sliding_values'] = S.values
-            result['sliding_timepoints'] = S.index.values
-
-    else:
-        r = np.nan
-        p = np.nan
-
-    result['r'] = r
-    result['p'] = p
-    return result
-
-
-def qc_series(
-    F: pd.Series,
-    qc_metrics: dict,
-    sliding_kwargs=None,  # if present, calculate everything in a sliding manner
-    trials=None,  # if present, put trials into params
-    eid: str = None,  # FIXME but left as is for now just to keep the logger happy
-    brain_region: str = None,  # FIXME but left as is for now just to keep the logger happy
-) -> dict:
-    if isinstance(F, pd.DataFrame):
-        raise TypeError('F can not be a dataframe')
-
-    # should cover all cases
-    qc_results = {}
-    for metric, params in qc_metrics:
-        try:
-            if trials is not None:  # if trials are passed
-                params['trials'] = trials
-            res = eval_metric(F, metric, params, sliding_kwargs)
-            qc_results[f'{metric.__name__}'] = res['value']
-            if sliding_kwargs:
-                qc_results[f'{metric.__name__}_r'] = res['rval']
-                qc_results[f'{metric.__name__}_p'] = res['pval']
-        except Exception as e:
-            logger.warning(f'{eid}, {brain_region}: metric {metric.__name__} failure: {type(e).__name__}:{e}')
-    return qc_results
 
 
 # %% main QC loop
