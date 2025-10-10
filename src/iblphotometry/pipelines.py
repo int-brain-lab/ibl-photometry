@@ -57,7 +57,7 @@ Definition of a pipeline:
         in case of multiple inputs (such as for isosbestic correction), need to be ordered accordingly
         the first input of the first function is either called 'signal' or 'reference'
     - output: the name of the output of the processing step (usually the input for the next step)
-
+        after all pipeline steps are done, 'result' will be returend
 """
 sliding_mad_pipeline = [
     dict(

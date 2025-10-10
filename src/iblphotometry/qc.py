@@ -20,7 +20,7 @@ def sliding_metric(
     w_len: float,
     metric: Callable,
     fs: float | None = None,
-    n_wins: int = -1,
+    n_wins: int = -1,  # ??? wtf
     metric_kwargs: dict | None = None,
 ):
     """applies a metric along time.
@@ -63,9 +63,7 @@ def eval_metric(
     m = metric(F, **metric_kwargs) if metric_kwargs is not None else metric(F)
     result['value'] = m
     if sliding_kwargs is not None:
-        S = sliding_metric(
-            F, metric=metric, **sliding_kwargs, metric_kwargs=metric_kwargs
-        )
+        S = sliding_metric(F, metric=metric, **sliding_kwargs, metric_kwargs=metric_kwargs)
         r, p = linregress(S.index.values, S.values)[2:4]
         if full_output:
             result['sliding_values'] = S.values
@@ -103,9 +101,7 @@ def qc_series(
                 qc_results[f'{metric.__name__}_r'] = res['rval']
                 qc_results[f'{metric.__name__}_p'] = res['pval']
         except Exception as e:
-            logger.warning(
-                f'{eid}, {brain_region}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
-            )
+            logger.warning(f'{eid}, {brain_region}: metric {metric.__name__} failure: {type(e).__name__}:{e}')
     return qc_results
 
 
@@ -141,9 +137,7 @@ def run_qc(
             for band in signal_bands:
                 raw_tf = raw_dfs[band]
                 for region in brain_regions:
-                    qc_result = qc_series(
-                        raw_tf[region], qc_metrics['raw'], sliding_kwargs=None, eid=eid
-                    )
+                    qc_result = qc_series(raw_tf[region], qc_metrics['raw'], sliding_kwargs=None, eid=eid)
                     qc_results.append(
                         dict(
                             eid=eid,

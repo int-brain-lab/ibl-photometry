@@ -1,13 +1,3 @@
-"""
-to define here:
-which parameters of a pipeline to be optimized
-datasets to include
-
-call signature will be something like
-
-"""
-
-# %%
 import pandas as pd
 import inspect
 from one.api import ONE
@@ -77,9 +67,7 @@ def loss(p, pipeline, param_map, signal, metric):
     # run pipeline
     signal_proc = run_pipeline(pipeline, signal)
     # eval
-    # TODO here - probably parameterize this
     res = metric(signal_proc)
-
     return -res
 
 
