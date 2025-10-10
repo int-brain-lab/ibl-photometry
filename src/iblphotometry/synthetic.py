@@ -31,10 +31,6 @@ def synthetic101(fs=30, rl=1000, event_rate=0.2):
     transients = np.convolve(transients, ric / np.max(ric), mode='full')
     isosbestic = photobleach * 0.78 + 1.2
     calcium = photobleach * 1.00 + 3.21 + transients[:ns] * 0.05
-    # plt.figure()
-    # # plt.plot(ric)
-    # plt.plot(isosbestic)
-    # plt.plot(calcium)
     return pd.DataFrame({'times': tscale, 'raw_isosbestic': isosbestic, 'raw_calcium': calcium}), event_times
 
 
