@@ -5,6 +5,7 @@ from iblphotometry.pipelines import run_pipeline
 from one.api import ONE
 from brainbox.io.one import PhotometrySessionLoader
 from tqdm import tqdm
+from scipy.stats import linregress
 
 
 def qc_signals(
@@ -93,6 +94,10 @@ def qc_signals(
                             signal.index.values < w_start_times[i] + w_size,
                         )
                         signal_ = signal.loc[ix]
+                        if sliding_kwargs['detrend']:
+                            res = linregress(signal_.index, signal.values)
+                            signal_.values -= signal_.index * res.slope + res.intercept
+
                         qc_result.append(
                             {
                                 'band': band,
@@ -159,7 +164,6 @@ def run_qc(
     pd.DataFrame
         the qc result in tidy data format
     """
-
     if n_jobs == 1:
         qc_results = []
         for eid in tqdm(eids):
