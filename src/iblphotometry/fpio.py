@@ -478,6 +478,32 @@ def from_session_path(
     )
 
 
+def restrict_to_session(
+    raw_dfs: list[dict],
+    trials_df: pd.DataFrame,
+    pre: float = -5.0,
+    post: float = 5.0,
+):
+    t_start = trials_df.iloc[0]['intervals_0']
+    t_stop = trials_df.iloc[-1]['intervals_1']
+
+    for band in raw_dfs.keys():
+        df = raw_dfs[band]
+        ix = np.logical_and(
+            df.index.values > t_start - pre,
+            df.index.values < t_stop + post,
+        )
+        raw_dfs[band] = df.loc[ix]
+
+    # the above indexing can lead to unevenly shaped bands.
+    # Cut to shortest
+    n = np.min([df.shape[0] for _, df in raw_dfs.items()])
+    for band in raw_dfs.keys():
+        raw_dfs[band] = raw_dfs[band].iloc[:n]
+
+    return raw_dfs
+
+
 """
 ########  ####  ######   #### ########    ###    ##          #### ##    ## ########  ##     ## ########  ######
 ##     ##  ##  ##    ##   ##     ##      ## ##   ##           ##  ###   ## ##     ## ##     ##    ##    ##    ##
