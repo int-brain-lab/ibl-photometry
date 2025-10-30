@@ -8,14 +8,38 @@ from tqdm import tqdm
 
 
 def qc_signals(
-    raw_dfs: dict,
+    raw_dfs: dict[pd.DataFrame],
     metrics: list[callable],
     metrics_kwargs: dict = {},
     signal_band: str | list[str] | None = None,
     brain_region: str | list[str] | None = None,
     pipeline: list[dict] | None = None,
     sliding_kwargs: dict | None = None,
-) -> dict:
+) -> pd.DataFrame:
+    """runs a set of qc metrics on a given photometry dataset
+
+    Parameters
+    ----------
+    raw_dfs : dict[pd.DataFrame]
+        Photometry data in the format of a dictionary, where the keys are the individual signal bands, and their respective values are pandas DataFrames, one column per fiber
+    metrics : list[callable]
+        A list of metrics (= callable functions taking pd.Series as the first argument)
+    metrics_kwargs : dict, optional
+        additional optional kwargs as passed to the metrics. keys are the .__name__ of the metric, values are the kwargs, by default {}
+    signal_band : str | list[str] | None, optional
+        if provided, restrict evaluation to this signal band, by default None
+    brain_region : str | list[str] | None, optional
+        if provided, restrict evaluation to this brain region, by default None
+    pipeline : list[dict] | None, optional
+        if provided, apply this processing pipeline before evaluation, by default None
+    sliding_kwargs : dict | None, optional
+        if provided, apply metrics evaluation in a number of windows of specified length along the time course of the signal, by default None
+
+    Returns
+    -------
+    pd.DataFrame
+        the qc result in tidy data format
+    """
     # which data to operate on
     if signal_band is None:
         signal_bands = raw_dfs.keys()
@@ -91,7 +115,10 @@ def qc_eid(
     brain_region: str | list[str] | None = None,
     pipeline: list[dict] | None = None,
     sliding_kwargs: dict | None = None,
-) -> dict:
+) -> pd.DataFrame:
+    """
+    Convenience function for running qc on a dataset as given by an eid. See qc_signals for a description of the individual parameters
+    """
     psl = PhotometrySessionLoader(eid=eid, one=one)
     psl.load_photometry()
     qc_result = qc_signals(
@@ -118,7 +145,21 @@ def run_qc(
     sliding_kwargs: dict | None = None,
     n_jobs: int = 1,
 ) -> pd.DataFrame:
-    # main loop to distribute metrics to datasets
+    """
+    Conveninece function to run qc on many datasets given by a list of eids. See qc_signals for a description of the individual parameters
+
+    Parameters
+    ----------
+
+    n_jobs : int, optional
+        if larger than 1, use joblib to process sessions in parallel, by default 1
+
+    Returns
+    -------
+    pd.DataFrame
+        the qc result in tidy data format
+    """
+
     if n_jobs == 1:
         qc_results = []
         for eid in tqdm(eids):
