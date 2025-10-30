@@ -227,6 +227,7 @@ def plot_psths_from_trace(
     split_by: str = 'feedbackType',
     align_on: str = 'feedback_times',
     axes: Axes | None = None,
+    **matshow_kwargs,
 ):
     # if axes is None:
     # _, axes = plt.subplots()
@@ -239,7 +240,7 @@ def plot_psths_from_trace(
         split_by=split_by,
         align_on=align_on,
     )
-    axes = plot_psths(psths, split_by=split_by, align_on=align_on)
+    axes = plot_psths(psths, split_by=split_by, align_on=align_on, **matshow_kwargs)
     return axes
 
 
@@ -260,17 +261,10 @@ def plot_psths_from_eid(
     brain_regions = raw_df.columns
     for brain_region in brain_regions:
         # run pipeline
-        signal = pipelines.run_pipeline(pipeline, raw_df[[brain_region]])
+        signal = pipelines.run_pipeline(pipeline, raw_df[brain_region])
         # and plot
         axes = plot_psths_from_trace(signal, trials_df, split_by=split_by, align_on=align_on)
         # add the brain region to the title
         fig = axes[0].figure
         fig.suptitle(f'{brain_region}: {fig.get_suptitle()}')
     return axes
-
-
-# eid = '7c67fbd4-18c1-42f2-b989-8cbfde0d2374'  # looks highly problematic
-# eid = '40909756-d0ce-4146-9588-249bf97f074b'
-# eid = '58861dac-4b4c-4f82-83fb-33d98d67df3a'
-# one = ONE()
-# axes = plot_photometry_traces_from_eid(eid, one)

@@ -58,7 +58,7 @@ def z(
 
 
 def mad(A: np.ndarray) -> np.ndarray:
-    """the MAD is defined as the median of the absolute deviations from the data's median
+    """the MAD is defined as the median of the absolute deviations from the data's median median distance from zero (data median centered)
     see https://en.wikipedia.org/wiki/Median_absolute_deviation
     """
     return np.median(np.absolute(A - np.median(A)), axis=-1)
@@ -831,6 +831,33 @@ def sliding_dFF(
         mus = np.average(B, axis=1)
         d = (y - mus) / mus
     return pd.Series(d, index=t)
+
+
+# def sliding_percentile(
+#     F: pd.Series,
+#     w_len: float,
+#     fs: float | None = None,
+#     percentile: float = 5,
+#     weights: np.ndarray | None = None,
+#     on_error: Literal['raise', 'pass'] = 'raise',
+# ):
+#     y, t = F.values, F.index.values
+#     fs = 1 / np.median(np.diff(t)) if fs is None else fs
+#     w_size = int(w_len * fs)
+
+#     if weights is not None:
+#         # note: passing weights makes the stride trick not possible, or only with allocating a matrix of shape (n_samples * w_size)
+#         # true sliding operation implemented, much slower
+#         weights /= weights.sum()
+#         n_samples = y.shape[0]
+#         wg = WindowGenerator(n_samples - 1, w_size, w_size - 1)
+#         # d = [np.sum(_dFF(F[first:last].values) * weights) for (first, last) in wg.firstlast]
+#     else:
+#         B = make_sliding_window(y, w_size, on_error=on_error)
+#         bg = np.percentile(B, percentile, axis=1)
+#         d = (y - bg) / bg
+
+#     return pd.Series(d, index=t)
 
 
 def sliding_z(

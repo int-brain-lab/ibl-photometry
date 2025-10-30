@@ -6,7 +6,7 @@ logger = logging.getLogger()
 
 
 def run_pipeline(
-    pipeline,
+    pipeline: list[dict],
     signal: pd.Series,
     reference: pd.Series | None = None,
     full_output: bool = False,

@@ -1,101 +1,110 @@
-# %%
-import gc
-from tqdm import tqdm
-import logging
+import numpy as np
+import pandas as pd
 
-from iblphotometry.metrics import qc_series
 from iblphotometry.pipelines import run_pipeline
+from one.api import ONE
+from brainbox.io.one import PhotometrySessionLoader
 
-logger = logging.getLogger()
+
+def qc_signals(
+    raw_dfs: dict,
+    metrics: list[callable],
+    metrics_kwargs: dict = {},
+    signal_band: str | list[str] | None = None,
+    brain_region: str | list[str] | None = None,
+    pipeline: list[dict] | None = None,
+    sliding_kwargs: dict | None = None,
+) -> dict:
+    # which data to operate on
+    if signal_band is None:
+        signal_bands = raw_dfs.keys()
+    else:
+        if type(signal_band) is str:
+            assert signal_band in raw_dfs.keys(), f'signal band {signal_band} not present in data'
+            signal_bands = [signal_band]
+    if brain_region is None:
+        brain_regions = raw_dfs[list(signal_bands)[0]].columns
+    else:
+        if type(brain_region) is str:
+            assert brain_region in raw_dfs[list(signal_bands)[0]].columns, f'brain region {brain_region} not present in data'
+            brain_regions = [brain_region]
+
+    # the main qc loop
+    qc_result = []
+    for band in signal_bands:
+        for brain_region in brain_regions:
+            signal = raw_dfs[band][brain_region]
+
+            # if a pipeline is provided, run it here
+            if pipeline is not None:
+                # reference_band = reference_band or None
+                # pipelines that consume a reference band, not supported by this function
+                signal = run_pipeline(pipeline, signal)
+
+            for metric in metrics:
+                _metric_kwargs = metrics_kwargs.get(metric.__name__, {})
+                qc_result.append(
+                    {
+                        'band': band,
+                        'brain_region': brain_region,
+                        'metric': metric.__name__,
+                        'value': metric(signal, **_metric_kwargs),
+                    }
+                )
+                # I don't think we can rely on using stride tricks as the input into the
+                # metrics might be a restricted to a series
+                if sliding_kwargs is not None:
+                    # this is for creating n evently spaced windows of size w_len along the signal
+                    w_len = sliding_kwargs['w_len']
+                    dt = np.median(np.diff(signal.index))
+                    w_size = int(w_len // dt)
+                    n_windows = sliding_kwargs['n_windows']
+                    t_start = signal.index[0]
+                    t_stop = signal.index[-1] - w_size - dt  # one extra dt to be on the safe side
+                    w_start_times = np.linspace(t_start, t_stop, n_windows)
+                    for i in range(n_windows):
+                        ix = np.logical_and(
+                            signal.index.values > w_start_times[i],
+                            signal.index.values < w_start_times[i] + w_size,
+                        )
+                        signal_ = signal.loc[ix]
+                        qc_result.append(
+                            {
+                                'band': band,
+                                'brain_region': brain_region,
+                                'metric': metric.__name__,
+                                'value': metric(signal_),
+                                'window': i,
+                            },
+                        )
+
+    return pd.DataFrame(qc_result)
 
 
-# %% main QC loop
 def run_qc(
-    data_loader,
     eids: list[str],
-    pipelines_reg,  # registered pipelines
-    qc_metrics: dict,  # metrics. keys: raw, processed, repsonse, sliding_kwargs
-    sigref_mapping: dict = None,  # think about this one - the mapping of signal and reference # dict(signal=signal_band_name, reference=ref_band_name)
-):
+    one: ONE,
+    metrics: list[callable],
+    metrics_kwargs: dict = {},
+    signal_band: str | list[str] | None = None,
+    brain_region: str | list[str] | None = None,
+    pipeline: list[dict] | None = None,
+    sliding_kwargs: dict | None = None,
+) -> pd.DataFrame:
+    # main loop to distribute metrics to datasets
     qc_results = []
-    for eid in tqdm(eids):
-        print(eid)
-        try:
-            # get photometry data
-            raw_dfs = data_loader.load_photometry_data(eid=eid)
-            signal_bands = list(raw_dfs.keys())
-            brain_regions = raw_dfs[signal_bands[0]]
-
-            # get behavioral data
-            # TODO this should be provided
-            # sl = SessionLoader(eid=eid, one=data_loader.one)
-            # for caroline
-            # trials = sl.load_trials(
-            #     collection='alf/task_00'
-            # )  # this is necessary fo caroline
-            # trials = sl.load_trials()  # should be good for all others
-
-            # the old way
-            trials = data_loader.one.load_dataset(eid, '*trials.table.pqt')
-
-            for band in signal_bands:
-                raw_tf = raw_dfs[band]
-                for region in brain_regions:
-                    qc_result = qc_series(raw_tf[region], qc_metrics['raw'], sliding_kwargs=None, eid=eid)
-                    qc_results.append(
-                        dict(
-                            eid=eid,
-                            pipeline='raw',
-                            band=band,
-                            region=region,
-                            **qc_result,
-                        )
-                    )
-
-            # run the pipelines and qc on the processed data
-            # here it needs to be specified if one band is a reference of the other
-            for pipeline_name, pipeline in pipelines_reg.items():
-                if 'reference' in sigref_mapping:  # this is for isosbestic pipelines
-                    proc_tf = run_pipeline(
-                        pipeline,
-                        raw_dfs[sigref_mapping['signal']],
-                        raw_dfs[sigref_mapping['reference']],
-                    )
-                else:
-                    # FIXME this fails for true-multiband
-                    # this hack works for single-band
-                    # possible fix could be that signal could be a list
-                    proc_tf = run_pipeline(pipeline, raw_dfs[sigref_mapping['signal']])
-
-                for region in brain_regions:
-                    # sliding qc of the processed data
-                    qc_proc = qc_series(
-                        proc_tf[region],
-                        qc_metrics=qc_metrics['processed'],
-                        sliding_kwargs=qc_metrics['sliding_kwargs'],
-                        eid=eid,
-                        brain_region=region,
-                    )
-
-                    # qc with metrics that use behavior
-                    qc_resp = qc_series(
-                        proc_tf[region],
-                        qc_metrics['response'],
-                        trials=trials,
-                        eid=eid,
-                        brain_region=region,
-                    )
-                    qc_result = qc_proc | qc_resp
-                    qc_results.append(
-                        dict(
-                            eid=eid,
-                            pipeline=pipeline_name,
-                            region=region,
-                            **qc_result,
-                        )
-                    )
-        except Exception as e:
-            logger.warning(f'{eid}: failure: {type(e).__name__}:{e}')
-
-        gc.collect()
-    return qc_results
+    for eid in eids:
+        psl = PhotometrySessionLoader(eid=eid, one=one)
+        psl.load_photometry()
+        qc_result_ = qc_signals(
+            psl.photometry,
+            metrics=metrics,
+            metrics_kwargs=metrics_kwargs,
+            signal_band=signal_band,
+            brain_region=brain_region,
+            pipeline=pipeline,
+            sliding_kwargs=sliding_kwargs,
+        )
+        qc_result_['eid'] = eid
+        qc_results.append(qc_result_)
+    return pd.concat(qc_results)
