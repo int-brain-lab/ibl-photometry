@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
-
+from joblib import Parallel, delayed
 from iblphotometry.pipelines import run_pipeline
 from one.api import ONE
 from brainbox.io.one import PhotometrySessionLoader
+from tqdm import tqdm
 
 
 def qc_signals(
@@ -81,6 +82,31 @@ def qc_signals(
     return pd.DataFrame(qc_result)
 
 
+def qc_eid(
+    eid: str,
+    one: ONE,
+    metrics: list[callable],
+    metrics_kwargs: dict = {},
+    signal_band: str | list[str] | None = None,
+    brain_region: str | list[str] | None = None,
+    pipeline: list[dict] | None = None,
+    sliding_kwargs: dict | None = None,
+) -> dict:
+    psl = PhotometrySessionLoader(eid=eid, one=one)
+    psl.load_photometry()
+    qc_result = qc_signals(
+        psl.photometry,
+        metrics=metrics,
+        metrics_kwargs=metrics_kwargs,
+        signal_band=signal_band,
+        brain_region=brain_region,
+        pipeline=pipeline,
+        sliding_kwargs=sliding_kwargs,
+    )
+    qc_result['eid'] = eid
+    return qc_result
+
+
 def run_qc(
     eids: list[str],
     one: ONE,
@@ -90,21 +116,36 @@ def run_qc(
     brain_region: str | list[str] | None = None,
     pipeline: list[dict] | None = None,
     sliding_kwargs: dict | None = None,
+    n_jobs: int = 1,
 ) -> pd.DataFrame:
     # main loop to distribute metrics to datasets
-    qc_results = []
-    for eid in eids:
-        psl = PhotometrySessionLoader(eid=eid, one=one)
-        psl.load_photometry()
-        qc_result_ = qc_signals(
-            psl.photometry,
-            metrics=metrics,
-            metrics_kwargs=metrics_kwargs,
-            signal_band=signal_band,
-            brain_region=brain_region,
-            pipeline=pipeline,
-            sliding_kwargs=sliding_kwargs,
+    if n_jobs == 1:
+        qc_results = []
+        for eid in tqdm(eids):
+            qc_result_ = qc_eid(
+                eid,
+                one,
+                metrics,
+                metrics_kwargs=metrics_kwargs,
+                signal_band=signal_band,
+                brain_region=brain_region,
+                pipeline=pipeline,
+                sliding_kwargs=sliding_kwargs,
+            )
+            qc_results.append(qc_result_)
+    else:
+        qc_results = Parallel(n_jobs=n_jobs)(
+            delayed(qc_eid)(
+                eid,
+                one,
+                metrics,
+                metrics_kwargs=metrics_kwargs,
+                signal_band=signal_band,
+                brain_region=brain_region,
+                pipeline=pipeline,
+                sliding_kwargs=sliding_kwargs,
+            )
+            for eid in eids
         )
-        qc_result_['eid'] = eid
-        qc_results.append(qc_result_)
+
     return pd.concat(qc_results)
