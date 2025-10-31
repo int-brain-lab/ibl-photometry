@@ -94,6 +94,8 @@ def qc_signals(
                             signal.index.values < w_start_times[i] + w_size,
                         )
                         signal_ = signal.loc[ix]
+                        if 'detrend' not in sliding_kwargs.keys():
+                            sliding_kwargs['detrend'] = False
                         if sliding_kwargs['detrend']:
                             res = linregress(signal_.index, signal.values)
                             signal_.values -= signal_.index * res.slope + res.intercept
