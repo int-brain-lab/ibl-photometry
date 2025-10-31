@@ -86,12 +86,12 @@ def qc_signals(
                     w_size = int(w_len // dt)
                     n_windows = sliding_kwargs['n_windows']
                     t_start = signal.index[0]
-                    t_stop = signal.index[-1] - w_size - dt  # one extra dt to be on the safe side
+                    t_stop = signal.index[-1] - w_len - dt  # one extra dt to be on the safe side
                     w_start_times = np.linspace(t_start, t_stop, n_windows)
                     for i in range(n_windows):
                         ix = np.logical_and(
                             signal.index.values > w_start_times[i],
-                            signal.index.values < w_start_times[i] + w_size,
+                            signal.index.values < w_start_times[i] + w_len,
                         )
                         signal_ = signal.loc[ix]
                         if 'detrend' not in sliding_kwargs.keys():
