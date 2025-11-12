@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
+import traceback
 from iblphotometry.pipelines import run_pipeline
 from one.api import ONE
 from brainbox.io.one import PhotometrySessionLoader
@@ -126,18 +127,26 @@ def qc_eid(
     """
     Convenience function for running qc on a dataset as given by an eid. See qc_signals for a description of the individual parameters
     """
-    psl = PhotometrySessionLoader(eid=eid, one=one)
-    psl.load_photometry()
-    qc_result = qc_signals(
-        psl.photometry,
-        metrics=metrics,
-        metrics_kwargs=metrics_kwargs,
-        signal_band=signal_band,
-        brain_region=brain_region,
-        pipeline=pipeline,
-        sliding_kwargs=sliding_kwargs,
-    )
-    qc_result['eid'] = eid
+    try:
+        psl = PhotometrySessionLoader(eid=eid, one=one)
+        psl.load_photometry()
+        qc_result = qc_signals(
+            psl.photometry,
+            metrics=metrics,
+            metrics_kwargs=metrics_kwargs,
+            signal_band=signal_band,
+            brain_region=brain_region,
+            pipeline=pipeline,
+            sliding_kwargs=sliding_kwargs,
+        )
+    except Exception as e:
+        # Collect exception info
+        qc_result = pd.DataFrame([{  # dataframe for downstream compatibility
+            'eid': eid,
+            'exception_type': type(e).__name__,
+            'exception_message': str(e),
+            'traceback': traceback.format_exc()
+        }])
     return qc_result
 
 
