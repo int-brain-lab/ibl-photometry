@@ -490,7 +490,7 @@ def restrict_to_session(
     for band in raw_dfs.keys():
         df = raw_dfs[band]
         ix = np.logical_and(
-            df.index.values > t_start - pre,
+            df.index.values > t_start + pre,
             df.index.values < t_stop + post,
         )
         raw_dfs[band] = df.loc[ix]
