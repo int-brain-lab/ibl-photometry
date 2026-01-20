@@ -31,6 +31,7 @@ Keyboard Shortcuts:
 """
 
 import argparse
+import enum
 from pathlib import Path
 from typing import Optional
 
