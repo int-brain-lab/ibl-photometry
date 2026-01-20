@@ -168,6 +168,24 @@ def psth(signal, times, t_events, fs=None, event_window=np.array([-1, 2])):
     return psth, idx_psth
 
 
+def resample(signals: dict) -> dict:
+    signals_resampled = {}
+    for band, signal_ in signals.items():
+        signals_resampled[band] = resample_signal(signal_)
+    return signals_resampled
+
+
+def resample_signal(signal: pd.DataFrame) -> pd.DataFrame:
+    times = signal.index
+    dt = np.median(np.diff(times))
+    times_interp = np.arange(times[0], times[-1], dt)
+    signal_interp = {}
+    for col in signal.columns:
+        signal_interp[col] = np.interp(times_interp, times, signal[col])
+
+    return pd.DataFrame(signal_interp, index=times_interp)
+
+
 """
 ##        #######   ######   ######     ######## ##     ## ##    ##  ######  ######## ####  #######  ##    ##  ######
 ##       ##     ## ##    ## ##    ##    ##       ##     ## ###   ## ##    ##    ##     ##  ##     ## ###   ## ##    ##

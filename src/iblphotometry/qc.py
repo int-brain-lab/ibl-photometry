@@ -139,14 +139,19 @@ def qc_eid(
             pipeline=pipeline,
             sliding_kwargs=sliding_kwargs,
         )
+        qc_result['eid'] = eid
     except Exception as e:
         # Collect exception info
-        qc_result = pd.DataFrame([{  # dataframe for downstream compatibility
-            'eid': eid,
-            'exception_type': type(e).__name__,
-            'exception_message': str(e),
-            'traceback': traceback.format_exc()
-        }])
+        qc_result = pd.DataFrame(
+            [
+                {  # dataframe for downstream compatibility
+                    'eid': eid,
+                    'exception_type': type(e).__name__,
+                    'exception_message': str(e),
+                    'traceback': traceback.format_exc(),
+                }
+            ]
+        )
     return qc_result
 
 
