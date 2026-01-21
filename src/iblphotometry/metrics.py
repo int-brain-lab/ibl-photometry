@@ -2,7 +2,7 @@ from itertools import groupby
 import numpy as np
 import pandas as pd
 from scipy import stats, signal
-from iblphotometry.preprocessing import find_early_samples
+from iblphotometry.preprocessing import find_early_samples, has_gaps, find_gaps, fill_gaps
 from iblphotometry.processing import z, Regression, ExponDecay, detect_outliers, sobel
 
 
@@ -21,6 +21,9 @@ def n_early_samples(A: pd.DataFrame | pd.Series, dt_tol: float = 0.001) -> int:
     """
     return find_early_samples(A, dt_tol=dt_tol).sum()
 
+def n_band_inversions(A: pd.DataFrame | pd.Series) -> int:
+    A = fill_gaps(A, find_gaps(A)) if has_gaps(A) else A
+    return np.sum(A['color'].values[:-1] == A['color'].values[1:])
 
 def n_unique_samples(A: pd.Series | np.ndarray) -> int:
     """number of unique samples in the signal. Low values indicate that the
