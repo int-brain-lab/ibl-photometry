@@ -33,7 +33,7 @@ def n_unique_samples(A: pd.Series | np.ndarray) -> int:
 
     """
     a = A.values if isinstance(A, pd.Series) else A
-    return np.unique(a).shape[0]
+    return np.unique(a).shape[0] / len(a)
 
 
 def median_absolute_deviance(A: pd.Series | np.ndarray) -> float:
