@@ -27,6 +27,12 @@ def find_gaps(photometry_df: pd.DataFrame) -> list[np.ndarray]:
 
 
 def fill_gaps(photometry_df: pd.DataFrame, gaps: list[np.ndarray]) -> pd.DataFrame:
+    # HOTFIX: Handle 'times' being either a column or the index.
+    # TODO: Decide on canonical df format for preprocessing functions.
+    times_in_index = photometry_df.index.name == 'times'
+    if times_in_index:
+        photometry_df = photometry_df.reset_index()
+
     photometry_df['dt'] = photometry_df['times'].diff()
     mu = photometry_df['dt'].mean()
 
@@ -45,6 +51,9 @@ def fill_gaps(photometry_df: pd.DataFrame, gaps: list[np.ndarray]) -> pd.DataFra
             # TODO should have a logger warning or similar
             print('bad gap')
 
+    if times_in_index:
+        photometry_df = photometry_df.set_index('times')
+
     return photometry_df
 
 
@@ -53,7 +62,7 @@ def has_band_inversion(raw_df, check_col='color'):
     # valid only if measurement is dual band
     # first frame is not all led on
     col = raw_df[check_col]
-    return np.any(col.values == np.roll(col.values, 1))
+    return np.any(col.values[:-1] == col.values[1:])
 
 
 ## FIXME: we now have two ways to check for the same NPH sampling error!!
