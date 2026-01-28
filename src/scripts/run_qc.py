@@ -5,6 +5,7 @@ from one.api import ONE
 from iblphotometry.qc import run_qc
 from tqdm import tqdm
 from brainbox.io.one import PhotometrySessionLoader
+from iblphotometry.pipelines import sliding_mad_pipeline
 
 # %%
 one = ONE()
@@ -25,7 +26,8 @@ for eid in tqdm(eids):
     try:
         psl = PhotometrySessionLoader(eid=eid, one=one)
         psl.load_photometry()
-    except:
+    except Exception as e:
+        print(e)
         bad_eids.append(eid)
 
 eids = set(eids) - set(bad_eids)
@@ -48,7 +50,6 @@ raw_qc.to_csv(Path(__file__).parent / 'raw_qc.csv')
 
 
 # %% processed qc
-from iblphotometry.pipelines import sliding_mad_pipeline
 
 
 processed_metrics = [

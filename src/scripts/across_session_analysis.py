@@ -7,7 +7,6 @@ import pynapple as nap
 import pandas as pd
 import matplotlib.pyplot as plt
 from one.api import ONE
-import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import seaborn as sns
 from trial_type_definitions import add_info_to_trials_table, event_definitions_biasedCW

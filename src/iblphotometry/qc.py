@@ -84,7 +84,7 @@ def qc_signals(
                     # this is for creating n evently spaced windows of size w_len along the signal
                     w_len = sliding_kwargs['w_len']
                     dt = np.median(np.diff(signal.index))
-                    w_size = int(w_len // dt)
+                    # w_size = int(w_len // dt)
                     n_windows = sliding_kwargs['n_windows']
                     t_start = signal.index[0]
                     t_stop = signal.index[-1] - w_len - dt  # one extra dt to be on the safe side
