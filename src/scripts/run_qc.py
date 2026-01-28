@@ -3,7 +3,6 @@ from pathlib import Path
 from iblphotometry import metrics
 from one.api import ONE
 from iblphotometry.qc import run_qc
-import sys
 from tqdm import tqdm
 from brainbox.io.one import PhotometrySessionLoader
 
