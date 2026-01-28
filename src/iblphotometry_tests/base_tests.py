@@ -4,6 +4,4 @@ import unittest
 
 class PhotometryDataTestCase(unittest.TestCase):
     def setUp(self):
-        self.versions_path = (
-            Path(__file__).parent / 'data' / 'neurophotometrics' / 'versions'
-        )
+        self.versions_path = Path(__file__).parent / 'data' / 'neurophotometrics' / 'versions'
