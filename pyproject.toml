@@ -19,7 +19,6 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "pytest",
     "numpy",
     "scipy",
     "pandas",
@@ -44,6 +43,12 @@ path = 'src/iblphotometry/__init__.py'
 
 [options.packages.find]
 where = "src"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "ruff>=0.14.0",
+]
 
 [tool.ruff]
 indent-width = 4

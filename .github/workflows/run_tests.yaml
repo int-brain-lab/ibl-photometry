@@ -14,11 +14,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v3
-        with:
-          version-file: 'pyproject.toml'
-          args: 'check --output-format=github'
-      - run: 'ruff format --check --diff'
+      - uses: astral-sh/setup-uv@v6
+      - name: sync dependencies
+        run: uv sync
+      - name: ruff format
+        run: uv ruff format --check --preview --output-format=github
+      - name: ruff check
+        run: uv ruff check --output-format=github
   tests:
     name: unit tests (${{ matrix.python-version }}, ${{ matrix.os }})
     runs-on:  ${{ matrix.os }}
@@ -30,15 +32,12 @@ jobs:
         python-version: ["3.10", "3.12"]
     steps:
     - uses: actions/checkout@v4
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+    - uses: astral-sh/setup-uv@v6
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install deps
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -e .
+    - name: sync dependencies
+      run: uv sync
     - name: Test with pytest
       run: |
+        uv pip install pytest-github-actions-annotate-failures
         pytest -k 'test_'
