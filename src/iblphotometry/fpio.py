@@ -4,6 +4,7 @@ from pathlib import Path
 import pandera.pandas as pa
 from pandera.errors import SchemaError
 from one.api import ONE
+from typing import Optional, Dict, List
 
 from iblphotometry.neurophotometrics import (
     LIGHT_SOURCE_MAP,
@@ -101,14 +102,14 @@ def _infer_data_columns(df: pd.DataFrame) -> list[str]:
 
 def validate_photometry_df(
     photometry_df: pd.DataFrame,
-    data_columns: list[str] | None = None,
+    data_columns: Optional[List[str]] = None,
 ) -> pd.DataFrame:
     """
     Validate the photometry DataFrame against the schema.
 
     Args:
         photometry_df (pd.DataFrame): Input DataFrame.
-        data_columns (list[str] | None): List of data columns to validate. If None, inferred automatically.
+        data_columns (Optional[List[str]]): List of data columns to validate. If None, inferred automatically.
 
     Returns:
         pd.DataFrame: Validated DataFrame.
@@ -163,9 +164,9 @@ def read_neurophotometrics_file(path: str | Path) -> pd.DataFrame:
 
 def from_neurophotometrics_df_to_photometry_df(
     raw_df: pd.DataFrame,
-    version: str | None = None,
+    version: Optional[str] = None,
     validate: bool = True,
-    data_columns: list[str] | None = None,
+    data_columns: Optional[List[str]] = None,
     drop_first: bool = True,
 ) -> pd.DataFrame:
     """
@@ -175,7 +176,7 @@ def from_neurophotometrics_df_to_photometry_df(
         raw_df (pd.DataFrame): Raw neurophotometrics DataFrame.
         version (str | None): Version string. If None, inferred automatically.
         validate (bool): Whether to validate the output DataFrame.
-        data_columns (list[str] | None): List of data columns. If None, inferred automatically.
+        data_columns (Optional[List[str]]): List of data columns. If None, inferred automatically.
         drop_first (bool): Whether to drop the first frame.
 
     Returns:
@@ -274,9 +275,9 @@ def from_neurophotometrics_df_to_photometry_df(
 
 def from_neurophotometrics_file_to_photometry_df(
     path: str | Path,
-    version: str | None = None,
+    version: Optional[str] = None,
     validate: bool = True,
-    data_columns: list[str] | None = None,
+    data_columns: Optional[List[str]] = None,
     drop_first: bool = True,
 ) -> pd.DataFrame:
     """
@@ -286,7 +287,7 @@ def from_neurophotometrics_file_to_photometry_df(
         path (str | Path): Path to the file.
         version (str | None): Version string. If None, inferred automatically.
         validate (bool): Whether to validate the output DataFrame.
-        data_columns (list[str] | None): List of data columns. If None, inferred automatically.
+        data_columns (Optional[List[str]]): List of data columns. If None, inferred automatically.
         drop_first (bool): Whether to drop the first frame.
 
     Returns:
@@ -306,9 +307,9 @@ def from_neurophotometrics_file_to_photometry_df(
 
 def from_photometry_df(
     photometry_df: pd.DataFrame,
-    data_columns: list[str] | None = None,
-    channel_names: list[str] | None = None,
-    rename: dict | None = None,  # the dict to rename the data_columns -> Region?G | G? -> brain_region
+    data_columns: Optional[List[str]] = None,
+    channel_names: Optional[List[str]] = None,
+    rename: Optional[Dict] = None,  # the dict to rename the data_columns -> Region?G | G? -> brain_region
     validate: bool = True,
     drop_first: bool = True,
 ) -> dict[pd.DataFrame]:
@@ -317,8 +318,8 @@ def from_photometry_df(
 
     Args:
         photometry_df (pd.DataFrame): Input photometry DataFrame.
-        data_columns (list[str] | None): List of data columns. If None, inferred automatically.
-        channel_names (list[str] | None): List of channel names. If None, inferred automatically.
+        data_columns (Optional[List[str]]): List of data columns. If None, inferred automatically.
+        channel_names (Optional[List[str]]): List of channel names. If None, inferred automatically.
         rename (dict | None): Mapping to rename data columns.
         validate (bool): Whether to validate the DataFrame.
         drop_first (bool): Whether to drop the first frame.
@@ -358,7 +359,7 @@ def from_photometry_df(
 
 def from_photometry_pqt(
     photometry_pqt_path: str | Path,
-    locations_pqt_path: str | Path | None = None,
+    locations_pqt_path: Optional[str | Path] = None,
     drop_first=True,
 ) -> dict[pd.DataFrame]:
     """
@@ -395,8 +396,8 @@ def from_neurophotometrics_file(
     path: str | Path,
     drop_first: bool = True,
     validate: bool = True,
-    version: str | None = None,
-) -> dict:
+    version: Optional[str] = None,
+) -> Dict[str, pd.DataFrame]:
     """
     Read a neurophotometrics file and split into channel DataFrames.
 
@@ -424,7 +425,7 @@ def from_eid(
     collection: str = 'photometry',
     drop_first: bool = True,
     revision: str | None = None,
-) -> list[dict]:
+) -> List[Dict[str, pd.DataFrame]]:
     """
     Load photometry data for a session ID (eid) using ONE.
 
@@ -451,8 +452,8 @@ def from_session_path(
     session_path: str | Path,
     collection: str = 'photometry',
     drop_first: bool = True,
-    revision: str | None = None,
-) -> list[dict]:
+    revision: Optional[str] = None,
+) -> List[Dict[str, pd.DataFrame]]:
     """
     Load photometry data from a locally present session path.
 
@@ -586,10 +587,10 @@ def infer_neurophotometrics_version_from_digital_inputs(df: pd.DataFrame) -> str
 
 def read_digital_inputs_file(
     path: str | Path,
-    version: str | None = None,
+    version: Optional[str] = None,
     validate: bool = True,
-    channel: int | None = None,
-    timestamps_colname: str | None = None,
+    channel: Optional[int] = None,
+    timestamps_colname: Optional[str] = None,
 ) -> pd.DataFrame:
     path = Path(path) if isinstance(path, str) else path
     match path.suffix:
@@ -612,10 +613,10 @@ def read_digital_inputs_file(
 
 def validate_digital_inputs_df(
     df: pd.DataFrame,
-    version: str | None = None,
+    version: Optional[str] = None,
     validate: bool = True,
-    channel: int | None = None,
-    timestamps_colname: str | None = None,
+    channel: Optional[int] = None,
+    timestamps_colname: Optional[str] = None,
 ) -> pd.DataFrame:
     if version is None:
         version = infer_neurophotometrics_version_from_digital_inputs(df)

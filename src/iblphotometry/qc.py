@@ -1,22 +1,25 @@
-import numpy as np
-import pandas as pd
 from joblib import Parallel, delayed
 import traceback
-from iblphotometry.pipelines import run_pipeline
+from tqdm import tqdm
+from typing import List, Optional, Dict, Literal
+
+import numpy as np
+from scipy.stats import linregress
+import pandas as pd
+
 from one.api import ONE
 from brainbox.io.one import PhotometrySessionLoader
-from tqdm import tqdm
-from scipy.stats import linregress
+from iblphotometry.pipelines import run_pipeline
 
 
 def qc_signals(
-    raw_dfs: dict[pd.DataFrame],
-    metrics: list[callable],
-    metrics_kwargs: dict = {},
-    signal_band: str | list[str] | None = None,
-    brain_region: str | list[str] | None = None,
-    pipeline: list[dict] | None = None,
-    sliding_kwargs: dict | None = None,
+    raw_dfs: Dict[str, pd.DataFrame],
+    metrics: List[callable],
+    metrics_kwargs: Dict = {},
+    signal_band: Optional[str | List[str]] = None,
+    brain_region: Optional[str | List[str]] = None,
+    pipeline: Optional[List[Dict]] = None,
+    sliding_kwargs: Optional[Dict] = None,
 ) -> pd.DataFrame:
     """runs a set of qc metrics on a given photometry dataset
 
@@ -24,15 +27,15 @@ def qc_signals(
     ----------
     raw_dfs : dict[pd.DataFrame]
         Photometry data in the format of a dictionary, where the keys are the individual signal bands, and their respective values are pandas DataFrames, one column per fiber
-    metrics : list[callable]
-        A list of metrics (= callable functions taking pd.Series as the first argument)
+    metrics : List[callable]
+        A List of metrics (= callable functions taking pd.Series as the first argument)
     metrics_kwargs : dict, optional
         additional optional kwargs as passed to the metrics. keys are the .__name__ of the metric, values are the kwargs, by default {}
-    signal_band : str | list[str] | None, optional
+    signal_band : str | List[str] | None, optional
         if provided, restrict evaluation to this signal band, by default None
-    brain_region : str | list[str] | None, optional
+    brain_region : str | List[str] | None, optional
         if provided, restrict evaluation to this brain region, by default None
-    pipeline : list[dict] | None, optional
+    pipeline : List[dict] | None, optional
         if provided, apply this processing pipeline before evaluation, by default None
     sliding_kwargs : dict | None, optional
         if provided, apply metrics evaluation in a number of windows of specified length along the time course of the signal, by default None
@@ -117,12 +120,13 @@ def qc_signals(
 def qc_eid(
     eid: str,
     one: ONE,
-    metrics: list[callable],
-    metrics_kwargs: dict = {},
-    signal_band: str | list[str] | None = None,
-    brain_region: str | list[str] | None = None,
-    pipeline: list[dict] | None = None,
-    sliding_kwargs: dict | None = None,
+    metrics: List[callable],
+    metrics_kwargs: Dict = {},
+    signal_band: Optional[str | List[str]] = None,
+    brain_region: Optional[str | List[str]] = None,
+    pipeline: Optional[List[Dict]] = None,
+    sliding_kwargs: Optional[Dict] = None,
+    on_error: Literal['log', 'raise'] = 'log',
 ) -> pd.DataFrame:
     """
     Convenience function for running qc on a dataset as given by an eid. See qc_signals for a description of the individual parameters
@@ -141,30 +145,34 @@ def qc_eid(
         )
         qc_result['eid'] = eid
     except Exception as e:
-        # Collect exception info
-        qc_result = pd.DataFrame(
-            [
-                {  # dataframe for downstream compatibility
-                    'eid': eid,
-                    'exception_type': type(e).__name__,
-                    'exception_message': str(e),
-                    'traceback': traceback.format_exc(),
-                }
-            ]
-        )
+        if on_error == 'log':
+            # Collect exception info
+            qc_result = pd.DataFrame(
+                [
+                    {  # dataframe for downstream compatibility
+                        'eid': eid,
+                        'exception_type': type(e).__name__,
+                        'exception_message': str(e),
+                        'traceback': traceback.format_exc(),
+                    }
+                ]
+            )
+        else:
+            raise e
     return qc_result
 
 
 def run_qc(
-    eids: list[str],
+    eids: List[str],
     one: ONE,
-    metrics: list[callable],
+    metrics: List[callable],
     metrics_kwargs: dict = {},
-    signal_band: str | list[str] | None = None,
-    brain_region: str | list[str] | None = None,
-    pipeline: list[dict] | None = None,
-    sliding_kwargs: dict | None = None,
+    signal_band: Optional[str | List[str]] = None,
+    brain_region: Optional[str | List[str]] = None,
+    pipeline: Optional[List[dict]] = None,
+    sliding_kwargs: Optional[Dict] = None,
     n_jobs: int = 1,
+    on_error: Literal['log', 'raise'] = 'log',
 ) -> pd.DataFrame:
     """
     Conveninece function to run qc on many datasets given by a list of eids. See qc_signals for a description of the individual parameters
@@ -192,6 +200,7 @@ def run_qc(
                 brain_region=brain_region,
                 pipeline=pipeline,
                 sliding_kwargs=sliding_kwargs,
+                on_error=on_error,
             )
             qc_results.append(qc_result_)
     else:
@@ -205,6 +214,7 @@ def run_qc(
                 brain_region=brain_region,
                 pipeline=pipeline,
                 sliding_kwargs=sliding_kwargs,
+                on_error=on_error,
             )
             for eid in eids
         )
