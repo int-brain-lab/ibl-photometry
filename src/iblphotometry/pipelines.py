@@ -34,7 +34,8 @@ def run_pipeline(
         # resolving inputs
         inputs = [res[inp] for inp in step['inputs']]
         # calling the steps sequentially
-        res[step['output']] = step['function'](*inputs, **step['parameters'])
+        params = step['parameters'] if 'parameters' in step else {}  # optional parameters
+        res[step['output']] = step['function'](*inputs, **params)
         # passing metadata through - taking the name of the first
         res[step['output']].name = inputs[0].name
         res[step['output']].index.name = inputs[0].index.name

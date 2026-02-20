@@ -167,6 +167,8 @@ def plot_psths(
         axes[i] = plot_psth(psth, axes=axes[i], **matshow_kwargs)
         axes[i].set_ylabel(f'{split_by}={outcome}')
         axes[i].grid(False)
+        if i != len(outcomes) - 1:
+            axes[i].set_xlabel('')
 
     if align_on is not None:
         fig.suptitle(f'aligned on {align_on}')
@@ -185,6 +187,7 @@ def plot_photometry_df_from_eid(
     photometry_df = fpio.from_neurophotometrics_df_to_photometry_df(raw_df)
 
     if preprocess:
+        # TODO we probably want to replace this with resampling
         gaps = preprocessing.find_gaps(photometry_df)
         photometry_df = preprocessing.fill_gaps(photometry_df, gaps)
 
@@ -240,7 +243,10 @@ def plot_psths_from_trace(
         split_by=split_by,
         align_on=align_on,
     )
-    axes = plot_psths(psths, split_by=split_by, align_on=align_on, **matshow_kwargs)
+    if type(psths) is dict:
+        axes = plot_psths(psths, split_by=split_by, align_on=align_on, **matshow_kwargs)
+    else:
+        axes = plot_psth(psths, **matshow_kwargs)
     return axes
 
 
@@ -265,6 +271,6 @@ def plot_psths_from_eid(
         # and plot
         axes = plot_psths_from_trace(signal, trials_df, split_by=split_by, align_on=align_on)
         # add the brain region to the title
-        fig = axes[0].figure
+        fig = plt.gcf()
         fig.suptitle(f'{brain_region}: {fig.get_suptitle()}')
     return axes

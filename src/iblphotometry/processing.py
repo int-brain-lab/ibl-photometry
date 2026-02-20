@@ -23,10 +23,7 @@ eps = np.finfo(np.float64).eps
 
 """
 some notes for definitions here
-a pipeline function takes a pd.Series and outputs a pd.Series
-OR
-if it consumes a reference:
-if takes a pd.DataFrame and outputs a pd.Series
+a pipeline function takes one or more pd.Series and outputs a pd.Series
 
 parameters:
 everything has to be a kwarg
@@ -830,6 +827,7 @@ def sliding_dFF(
     weights: np.ndarray | None = None,
     on_error: Literal['raise', 'pass'] = 'raise',
 ) -> pd.Series:
+    """TODO docme!"""
     y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)
