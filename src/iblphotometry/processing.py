@@ -667,6 +667,11 @@ def grubbs_test(
 def detect_outliers(y: np.ndarray, w_size: int = 1000, alpha: float = 0.005):
     # sliding grubbs test for a np.ndarray
     n_samples = y.shape[0]
+
+    # Handle case where we have fewer samples than window size
+    if n_samples < w_size:
+        return grubbs_test(y, alpha=alpha).astype('int64')
+
     wg = WindowGenerator(n_samples - (n_samples % w_size), w_size, 0)
     dtype = np.dtype((np.float64, w_size))
     B = np.fromiter(wg.slice_array(y), dtype=dtype)
