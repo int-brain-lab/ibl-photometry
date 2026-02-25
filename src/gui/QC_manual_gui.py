@@ -32,6 +32,7 @@ Keyboard Shortcuts:
 
 import argparse
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -53,28 +54,42 @@ on_error = 'raise'  # or 'log'
 # PASS = 3
 
 
+# QC_COLORS = {
+#     '1': '#EF6F6C',
+#     '2': '#fcf15d',
+#     '3': '#56E370',
+#     '0': '#FFFFFF',
+# }
+
 QC_COLORS = {
-    '1': '#EF6F6C',
-    '2': '#fcf15d',
-    '3': '#56E370',
-    '0': '#FFFFFF',
+    'CRITICAL': '#EF6F6C',
+    'FAIL': '#fcf15d',
+    'PASS': '#56E370',
+    'UNSET': '#FFFFFF',
 }
 
 
 class PhotometryDatasetQCViewer:
     def __init__(
         self,
-        eids_file: str,
-        index: int | None = None,
-        restrict_to_label: str | None = None,
+        eids_file: Optional[str] = None,
+        csv_file: Optional[str] = None,
+        index: Optional[int] = None,
+        restrict_to_label: Optional[str] = None,
         one=None,
     ):
         self.one = ONE() if one is None else one
 
-        # load the eids from an eid file, and generate the output csv
-        self.QC_df = self._load_or_generate_QC_df(eids_file)
+        if eids_file is None and csv_file is None:
+            raise ValueError
 
-        #
+        # load the eids from an eid file, and generate the output csv
+        if eids_file:
+            self.QC_df = self._generate_QC_df(Path(eids_file))
+
+        if csv_file:
+            self.QC_df = self._load_QC_df(Path(csv_file))
+
         self.restrict_to_label = restrict_to_label
         self.current_index = index
         self.one = ONE()
@@ -84,7 +99,7 @@ class PhotometryDatasetQCViewer:
         self.init_plot()
         self.update_plot()
 
-    def _load_or_generate_QC_df(self, eids_file: Path):
+    def _generate_QC_df(self, eids_file: Path):
         # get eids from file
         self.qc_file = eids_file.with_suffix('.qc.csv')
         if not self.qc_file.exists():
@@ -99,11 +114,34 @@ class PhotometryDatasetQCViewer:
             QC_df = self.expand_eids_brain_regions(QC_df)
             QC_df['label'] = '0'
             QC_df.to_csv(self.qc_file)
-        else:
-            QC_df = pd.read_csv(self.qc_file, index_col=0, na_filter=False)
-            QC_df['label'] = QC_df['label'].astype(str)
-
         return QC_df
+
+    def _load_QC_df(self, csv_path: Path):
+        self.qc_file = csv_path
+        QC_df = pd.read_csv(self.qc_file, index_col=0, na_filter=False)
+        QC_df['label'] = QC_df['label'].astype(str)
+        return QC_df
+
+    # def _load_or_generate_QC_df(self, eids_file: Path):
+    #     # get eids from file
+    #     self.qc_file = eids_file.with_suffix('.qc.csv')
+    #     if not self.qc_file.exists():
+    #         with open(eids_file, 'r') as fH:
+    #             eids = [eid.strip() for eid in fH.readlines()]
+    #         validator = PhotometryDataValidator()
+
+    #         df = pd.DataFrame(index=eids)
+    #         df.index.name = 'eid'
+    #         df = validator.validate_dataframe(df)
+    #         QC_df = df.reset_index()
+    #         QC_df = self.expand_eids_brain_regions(QC_df)
+    #         QC_df['label'] = '0'
+    #         QC_df.to_csv(self.qc_file)
+    #     else:
+    #         QC_df = pd.read_csv(self.qc_file, index_col=0, na_filter=False)
+    #         QC_df['label'] = QC_df['label'].astype(str)
+
+    #     return QC_df
 
     def expand_eids_brain_regions(self, df: pd.DataFrame) -> pd.DataFrame:
         # add brain region to the rows, duplicate eids when necessary
@@ -251,7 +289,10 @@ class PhotometryDatasetQCViewer:
 
 def main():
     parser = argparse.ArgumentParser(description='Interactive photometry dataset QC viewer.')
-    parser.add_argument('--eids-file', type=str, required=True, help='Path to file containing line-separated eids to QC.')
+    parser.add_argument('--eids-file', type=str, required=False, help='Path to file containing line-separated eids to QC.')
+    parser.add_argument(
+        '--csv-file', type=str, required=False, help='Path to file containtin the QC df (previous output of this app).'
+    )
     parser.add_argument('--index', type=int, default=0, required=False, help='Start index.')
     parser.add_argument(
         '--restrict-to-label',
@@ -262,11 +303,14 @@ def main():
     )
     args = parser.parse_args()
 
-    path = Path(args.eids_file)
-    index = args.index
-    restrict_to_label = args.restrict_to_label
+    # if
+    # eids_path = Path(args.eids_file)
+    # csv_path = Path(args.csv_file)
+    # index = args.index
+    # restrict_to_label = args.restrict_to_label
 
-    viewer = PhotometryDatasetQCViewer(path, index=index, restrict_to_label=restrict_to_label)
+    viewer = PhotometryDatasetQCViewer(**vars(args))
+    # viewer = PhotometryDatasetQCViewer(eids_file=eids_path, csv_file=csv_path, index=index, restrict_to_label=restrict_to_label)
     viewer.show()
 
 
