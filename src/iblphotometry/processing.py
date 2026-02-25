@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import warnings
+from typing import Literal
 
 import numpy as np
 from scipy import signal
@@ -13,7 +14,6 @@ from scipy.stats.distributions import norm
 from scipy.stats import gaussian_kde, t
 from scipy.special import pseudo_huber
 
-from iblphotometry.behavior import psth
 from inspect import signature
 from copy import copy
 
@@ -21,6 +21,15 @@ from copy import copy
 # machine resolution
 eps = np.finfo(np.float64).eps
 
+"""
+some notes for definitions here
+a pipeline function takes one or more pd.Series and outputs a pd.Series
+
+parameters:
+everything has to be a kwarg
+parameters that have default values will _not_ be objected to optimization
+this will take care of all the Literals
+"""
 
 """
 ######## ##     ## ##    ##  ######  ######## ####  #######  ##    ##  ######
@@ -33,47 +42,46 @@ eps = np.finfo(np.float64).eps
 """
 
 
-def z(A: np.ndarray, mode='classic'):
-    """classic z-score. Deviation from sample mean in units of sd
-
-    :param A: _description_
-    :type A: np.ndarray
-    :param mode: _description_, defaults to 'classic'
-    :type mode: str, optional
-    :return: _description_
-    :rtype: _type_
-    """
-    if mode == 'classic':
-        return (A - np.average(A)) / np.std(A)
-    if mode == 'median':
-        return (A - np.median(A)) / np.std(A)
+def z(
+    A: np.ndarray,
+    mode: Literal['classic', 'median'] = 'classic',
+) -> np.ndarray:
+    """classic z-score. Deviation from sample mean in units of sd"""
+    match mode:
+        case 'classic':
+            return (A - np.average(A)) / np.std(A)
+        case 'median':
+            return (A - np.median(A)) / np.std(A)
 
 
-def mad(A: np.ndarray):
-    """the MAD is defined as the median of the absolute deviations from the data's median
+def mad(A: np.ndarray) -> np.ndarray:
+    """the MAD is defined as the median of the absolute deviations from the data's median median distance from zero (data median centered)
     see https://en.wikipedia.org/wiki/Median_absolute_deviation
-
-    :param A: _description_
-    :type A: np.ndarray
-    :return: _description_
-    :rtype: _type_
     """
     return np.median(np.absolute(A - np.median(A)), axis=-1)
 
 
-def madscore(F: pd.Series):
+def madscore(F: pd.Series) -> pd.Series:
     # TODO overloading of mad?
     y, t = F.values, F.index.values
     return pd.Series(mad(y), index=t)
 
 
-def zscore(F: pd.Series, mode='classic'):
+def zscore(
+    F: pd.Series,
+    mode: Literal['classic', 'median'] = 'classic',
+) -> pd.Series:
     y, t = F.values, F.index.values
-    # mu, sig = np.average(y), np.std(y)
     return pd.Series(z(y, mode=mode), index=t)
 
 
-def filt(F: pd.Series, N: int, Wn: float, fs: float | None = None, btype='low'):
+def filt(
+    F: pd.Series,
+    N: int,
+    Wn: float,
+    fs: float | None = None,
+    btype: str = 'low',
+):
     """a wrapper for scipy.signal.butter and sosfiltfilt"""
     y, t = F.values, F.index.values
     if fs is None:
@@ -83,7 +91,12 @@ def filt(F: pd.Series, N: int, Wn: float, fs: float | None = None, btype='low'):
     return pd.Series(y_filt, index=t)
 
 
-def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):
+def sliding_rcoeff(
+    signal_a: np.ndarray,
+    signal_b: np.ndarray,
+    nswin: int,
+    overlap: int = 0,
+):
     """
     Computes the local correlation coefficient between two signals in sliding windows
     :param signal_a:
@@ -100,6 +113,74 @@ def sliding_rcoeff(signal_a, signal_b, nswin, overlap=0):
     r = rcoeff(signal_a[iwin], signal_b[iwin])
     ix = first_samples + nswin // 2
     return ix, r
+
+
+def sobel(a: np.ndarray, k: int = 1, uniform: bool = True):
+    """apply a Sobel operator to approxiamte the gradient of a signal.
+
+    Args:
+        a (np.ndarray): the input data
+        k (int, optional): the half-length of the Sobel kernel, defaults to 1
+        uniform (bool, optional): whether to uniformly weight all points in the
+        kernel, if False weights will be proportional to distance from the
+        center point, defaults to True
+
+    Returns:
+        np.ndarray: the filtered signal
+    """
+    # L1 normalized Sobel operator of 2k + 1 length
+    if uniform:  # uniform weighting
+        sobel_kernel = np.array(k * [-1] + [0] + k * [1]) / 2 * k
+    else:  # stronger weighting for points further away
+        sobel_kernel = np.arange(-k, k + 1) / (k * (k + 1))
+    # Apply Sobel filter using convolution
+    return signal.convolve(a, sobel_kernel, mode='same')
+
+
+# currently here now so analysis.py is optional
+def psth(signal, times, t_events, fs=None, event_window=np.array([-1, 2])):
+    """
+    Compute the peri-event time histogram of a calcium signal
+    :param signal:
+    :param times:
+    :param t_events:
+    :param fs:
+    :param event_window:
+    :return:
+    """
+    if fs is None:
+        fs = 1 / np.nanmedian(np.diff(times))
+    # compute a vector of indices corresponding to the perievent window at the given sampling rate
+    sample_window = np.round(np.arange(event_window[0] * fs, event_window[1] * fs + 1)).astype(int)
+    # we inflate this vector to a 2d array where each column corresponds to an event
+    idx_psth = np.tile(sample_window[:, np.newaxis], (1, t_events.size))
+    # we add the index of each event too their respective column
+    idx_event = np.searchsorted(times, t_events)
+    idx_psth += idx_event
+    i_out_of_bounds = np.logical_or(idx_psth > (signal.size - 1), idx_psth < 0)
+    idx_psth[i_out_of_bounds] = -1
+    psth = signal[idx_psth]  # psth is a 2d array (ntimes, nevents)
+    psth[i_out_of_bounds] = np.nan  # remove events that are out of bounds
+
+    return psth, idx_psth
+
+
+def resample(signals: dict) -> dict:
+    signals_resampled = {}
+    for band, signal_ in signals.items():
+        signals_resampled[band] = resample_signal(signal_)
+    return signals_resampled
+
+
+def resample_signal(signal: pd.DataFrame) -> pd.DataFrame:
+    times = signal.index
+    dt = np.median(np.diff(times))
+    times_interp = np.arange(times[0], times[-1], dt)
+    signal_interp = {}
+    for col in signal.columns:
+        signal_interp[col] = np.interp(times_interp, times, signal[col])
+
+    return pd.DataFrame(signal_interp, index=times_interp)
 
 
 """
@@ -217,13 +298,16 @@ class Regression:
         #     self.popt = (self.reg.coef_, self.reg.intercept_)
         #     print(self.popt)
 
-    def predict(self, x: np.ndarray, return_type='numpy'):
+    def predict(self, x: np.ndarray, return_type: Literal['numpy', 'pandas'] = 'numpy'):
         x = np.sort(x)  # just in case
         y_hat = self.model.eq(x, *self.popt)
-        if return_type == 'numpy':
-            return y_hat
-        if return_type == 'pandas':
-            return pd.Series(y_hat, index=x)
+        match return_type:
+            case 'numpy':
+                return y_hat
+            case 'pandas':
+                return pd.Series(y_hat, index=x)
+            case _:
+                raise ValueError(f'unknown return type {return_type}')
 
 
 """
@@ -246,9 +330,7 @@ class BleachCorrection:
         correction_method: str = 'subtract',
     ):
         self.model = model
-        self.regression = Regression(
-            model=model, method=regression_method, method_params=regression_params
-        )
+        self.regression = Regression(model=model, method=regression_method, method_params=regression_params)
         self.correction_method = correction_method
 
     def correct(self, F: pd.Series):
@@ -266,7 +348,7 @@ class LowpassBleachCorrection:
         self.filter_params = filter_params
         self.correction_method = correction_method
 
-    def correct(self, F: pd.Series):
+    def correct(self, F: pd.Series) -> pd.Series:
         F_filt = filt(F, **self.filter_params)
         return correct(F, F_filt, mode=self.correction_method)
 
@@ -277,24 +359,19 @@ class IsosbesticCorrection:
         regression_method: str = 'mse',
         regression_params: dict | None = None,
         correction_method: str = 'subtract-divide',
-        lowpass_isosbestic: dict | None = None,
     ):
         self.reg = Regression(
             model=LinearModel(),
             method=regression_method,
             method_params=regression_params,
         )
-        self.lowpass_isosbestic = lowpass_isosbestic
         self.correction_method = correction_method
 
     def correct(
         self,
         F_ca: pd.Series,
         F_iso: pd.Series,
-    ):
-        if self.lowpass_isosbestic is not None:
-            F_iso = filt(F_iso, **self.lowpass_isosbestic)
-
+    ) -> pd.Series:
         self.reg.fit(F_iso.values, F_ca.values)
         F_iso_fit = self.reg.predict(F_iso.values, return_type='pandas')
 
@@ -302,9 +379,11 @@ class IsosbesticCorrection:
 
 
 def correct(
-    signal: pd.Series, reference: pd.Series, mode: str = 'subtract'
+    signal: pd.Series,
+    reference: pd.Series,
+    mode: Literal['subtract', 'divide', 'subtract-divide'] = 'subtract',
 ) -> pd.Series:
-    """the main function that applies the correction of a signal with a reference. Correcions can be applied in 3 principle ways:
+    """the main function that applies the correction of a signal with a reference. Corrections can be applied in 3 principle ways:
     - The reference can be subtracted from the signal
     - the signal can be divided by the reference
     - both of the above (first subtraction, then division) - this is akin to df/f
@@ -318,12 +397,15 @@ def correct(
     :return: _description_
     :rtype: pd.Series
     """
-    if mode == 'subtract':
-        signal_corrected = signal.values - reference.values
-    if mode == 'divide':
-        signal_corrected = signal.values / reference.values
-    if mode == 'subtract-divide':
-        signal_corrected = (signal.values - reference.values) / reference.values
+    match mode:
+        case 'subtract':
+            signal_corrected = signal.values - reference.values
+        case 'divide':
+            signal_corrected = signal.values / reference.values
+        case 'subtract-divide':
+            signal_corrected = (signal.values - reference.values) / reference.values
+        case _:
+            raise ValueError(f'unknown correction mode: {mode}')
     return pd.Series(signal_corrected, index=signal.index.values)
 
 
@@ -361,9 +443,7 @@ class AbstractModel(ABC):
         if use_kde is True:
             # explicit estimation of the distribution of residuals
             if n_samples == -1:
-                warnings.warn(
-                    f'calculating KDE on {y.values.shape[0]} samples. This might be slow'
-                )
+                warnings.warn(f'calculating KDE on {y.values.shape[0]} samples. This might be slow')
             dist = gaussian_kde(rs)
         else:
             # using RSME
@@ -442,9 +522,7 @@ class TripleExponDecay(AbstractModel):
     )
 
     def eq(self, t, A1, tau1, A2, tau2, A3, tau3, b):
-        return (
-            A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2) + A3 * np.exp(-t / tau3) + b
-        )
+        return A1 * np.exp(-t / tau1) + A2 * np.exp(-t / tau2) + A3 * np.exp(-t / tau3) + b
 
     def est_p0(self, t: np.ndarray, y: np.ndarray):
         A_est = y[0]
@@ -474,19 +552,56 @@ class TripleExponDecay(AbstractModel):
 # these are the convenience functions that are called in pipelines
 
 
-def lowpass_bleachcorrect(F: pd.Series, **kwargs):
-    bc = LowpassBleachCorrection(**kwargs)
+def lowpass_bleachcorrect(
+    F: pd.Series,
+    N: int = 3,
+    Wn: float = 0.01,
+    correction_method: Literal['subract', 'divide', 'subtract-divide'] = 'subtract-divide',
+) -> pd.Series:
+    bc = LowpassBleachCorrection(
+        correction_method=correction_method,
+        filter_params=dict(
+            N=N,
+            Wn=Wn,
+            btype='lowpass',
+        ),
+    )
     return bc.correct(F)
 
 
-def exponential_bleachcorrect(F: pd.Series, **kwargs):
-    model = DoubleExponDecay()
-    ec = BleachCorrection(model, **kwargs)
+# todo, also make order an argument
+def exponential_bleachcorrect(
+    F: pd.Series,
+    order: int,  # maybe better as a string, as this will be subjected to optimization
+    regression_method: str = 'mse',
+    correction_method: str = 'subtract',
+) -> pd.Series:
+    match order:
+        case 1:
+            model = ExponDecay()
+        case 2:
+            model = DoubleExponDecay()
+        case 3:
+            model = TripleExponDecay()
+    ec = BleachCorrection(
+        model,
+        regression_method=regression_method,
+        correction_method=correction_method,
+    )
     return ec.correct(F)
 
 
-def isosbestic_correct(F_sig: pd.DataFrame, F_ref: pd.DataFrame, **kwargs):
-    ic = IsosbesticCorrection(**kwargs)
+# todo fix
+def isosbestic_correct(
+    F_sig: pd.Series,
+    F_ref: pd.Series,
+    regression_method: str = 'mse',
+    correction_method: str = 'subtract-divide',
+) -> pd.Series:
+    ic = IsosbesticCorrection(
+        regression_method=regression_method,
+        correction_method=correction_method,
+    )
     return ic.correct(F_sig, F_ref)
 
 
@@ -501,17 +616,24 @@ def isosbestic_correct(F_sig: pd.DataFrame, F_ref: pd.DataFrame, **kwargs):
 """
 
 
-def _grubbs_single(y: np.ndarray, alpha: float = 0.005, mode: str = 'median') -> bool:
+def _grubbs_single(
+    y: np.ndarray,
+    alpha: float = 0.005,
+    mode: Literal['median', 'classic'] = 'median',
+) -> bool:
     # to apply a single pass of grubbs outlier detection
     # see https://en.wikipedia.org/wiki/Grubbs%27s_test
 
     N = y.shape[0]
-    if mode == 'classic':
-        # this is the formulation as from wikipedia
-        G = np.max(np.absolute(y - np.average(y))) / np.std(y)
-    if mode == 'median':
-        # this is more robust against outliers
-        G = np.max(np.absolute(y - np.median(y))) / np.std(y)
+    match mode:
+        case 'classic':
+            # this is the formulation as from wikipedia
+            G = np.max(np.absolute(y - np.average(y))) / np.std(y)
+        case 'median':
+            # this is more robust against outliers
+            G = np.max(np.absolute(y - np.median(y))) / np.std(y)
+        case _:
+            raise ValueError(f'unknown mode {mode}')
     tsq = t.ppf(1 - alpha / (2 * N), df=N - 2) ** 2
     g = (N - 1) / np.sqrt(N) * np.sqrt(tsq / (N - 2 + tsq))
 
@@ -521,15 +643,22 @@ def _grubbs_single(y: np.ndarray, alpha: float = 0.005, mode: str = 'median') ->
         return False
 
 
-def grubbs_test(y: np.ndarray, alpha: float = 0.005, mode: str = 'median'):
+def grubbs_test(
+    y: np.ndarray,
+    alpha: float = 0.005,
+    mode: Literal['median', 'classic'] = 'median',
+):
     # apply grubbs test iteratively until no more outliers are found
     outliers = []
     while _grubbs_single(y, alpha=alpha):
         # get the outlier index
-        if mode == 'classic':
-            ix = np.argmax(np.absolute(y - np.average(y)))
-        if mode == 'median':
-            ix = np.argmax(np.absolute(y - np.median(y)))
+        match mode:
+            case 'classic':
+                ix = np.argmax(np.absolute(y - np.average(y)))
+            case 'median':
+                ix = np.argmax(np.absolute(y - np.median(y)))
+            case _:
+                raise ValueError(f'unknown mode {mode}')
         outliers.append(ix)
         y[ix] = np.median(y)
     return np.sort(outliers)
@@ -538,6 +667,11 @@ def grubbs_test(y: np.ndarray, alpha: float = 0.005, mode: str = 'median'):
 def detect_outliers(y: np.ndarray, w_size: int = 1000, alpha: float = 0.005):
     # sliding grubbs test for a np.ndarray
     n_samples = y.shape[0]
+
+    # Handle case where we have fewer samples than window size
+    if n_samples < w_size:
+        return grubbs_test(y, alpha=alpha).astype('int64')
+
     wg = WindowGenerator(n_samples - (n_samples % w_size), w_size, 0)
     dtype = np.dtype((np.float64, w_size))
     B = np.fromiter(wg.slice_array(y), dtype=dtype)
@@ -549,9 +683,7 @@ def detect_outliers(y: np.ndarray, w_size: int = 1000, alpha: float = 0.005):
 
     # explicitly taking care of the remaining samples if they exist
     if y.shape[0] > np.prod(B.shape):
-        outlier_ix.append(
-            grubbs_test(y[np.prod(B.shape) :], alpha=alpha) + B.shape[0] * w_size
-        )
+        outlier_ix.append(grubbs_test(y[np.prod(B.shape) :], alpha=alpha) + B.shape[0] * w_size)
 
     outlier_ix = np.concatenate(outlier_ix).astype('int64')
     return np.unique(outlier_ix)
@@ -588,7 +720,7 @@ def remove_outliers(
     w: int = 25,
     fs=None,
     max_it=100,
-):
+) -> pd.Series:
     y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)
@@ -608,13 +740,19 @@ def remove_outliers(
     return pd.Series(y, index=t)
 
 
+## TODO: Remove? This was previously here to detect channel swaps cause by NPM
+## sampling bug, which we now explicitly fix
 def detect_spikes(t: np.ndarray, sd: int = 5):
     dt = np.diff(t)
     bad_inds = dt < np.average(dt) - sd * np.std(dt)
     return np.where(bad_inds)[0]
 
 
-def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25):
+def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25) -> pd.Series:
+    """
+    FIXME: detect_spikes no longer exists, but this is still useful to fill in
+    other brief artifacts
+    """
     y, t = F.values, F.index.values
     y = copy(y)
     outliers = detect_spikes(y, sd=sd)
@@ -648,9 +786,9 @@ def remove_spikes(F: pd.Series, sd: int = 5, w: int = 25):
 def make_sliding_window(
     A: np.ndarray,
     w_size: int,
-    pad_mode='edge',
-    method='stride_tricks',
-    warning=None,
+    pad_mode: str = 'edge',
+    method: Literal['stride_tricks', 'window_generator'] = 'stride_tricks',
+    on_error: Literal['raise', 'pass'] = 'raise',
 ):
     """use np.stride_tricks to make a sliding window view of a 1-d np.ndarray A
     full overlap, step size 1
@@ -671,9 +809,9 @@ def make_sliding_window(
 
     if method == 'stride_tricks':
         if w_size % 2 != 0:
-            if warning == 'raise_exception':
+            if on_error == 'raise':
                 raise ValueError('w_size needs to be an even number')
-            else:
+            if on_error == 'expand':
                 w_size += 1  # dangerous
         B = np.lib.stride_tricks.as_strided(A, ((n_samples - w_size), w_size), (8, 8))
 
@@ -687,7 +825,14 @@ def make_sliding_window(
     return B
 
 
-def sliding_dFF(F: pd.Series, w_len: float, fs=None, weights=None):
+def sliding_dFF(
+    F: pd.Series,
+    w_len: float,
+    fs: float | None = None,
+    weights: np.ndarray | None = None,
+    on_error: Literal['raise', 'pass'] = 'raise',
+) -> pd.Series:
+    """TODO docme!"""
     y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)
@@ -701,18 +846,48 @@ def sliding_dFF(F: pd.Series, w_len: float, fs=None, weights=None):
         weights /= weights.sum()
         n_samples = y.shape[0]
         wg = WindowGenerator(n_samples - 1, w_size, w_size - 1)
-        d = [
-            np.sum(_dFF(F[first:last].values) * weights)
-            for (first, last) in wg.firstlast
-        ]
+        d = [np.sum(_dFF(F[first:last].values) * weights) for (first, last) in wg.firstlast]
     else:
-        B = make_sliding_window(y, w_size)
+        B = make_sliding_window(y, w_size, on_error=on_error)
         mus = np.average(B, axis=1)
         d = (y - mus) / mus
     return pd.Series(d, index=t)
 
 
-def sliding_z(F: pd.Series, w_len: float, fs=None, weights=None):
+# def sliding_percentile(
+#     F: pd.Series,
+#     w_len: float,
+#     fs: float | None = None,
+#     percentile: float = 5,
+#     weights: np.ndarray | None = None,
+#     on_error: Literal['raise', 'pass'] = 'raise',
+# ):
+#     y, t = F.values, F.index.values
+#     fs = 1 / np.median(np.diff(t)) if fs is None else fs
+#     w_size = int(w_len * fs)
+
+#     if weights is not None:
+#         # note: passing weights makes the stride trick not possible, or only with allocating a matrix of shape (n_samples * w_size)
+#         # true sliding operation implemented, much slower
+#         weights /= weights.sum()
+#         n_samples = y.shape[0]
+#         wg = WindowGenerator(n_samples - 1, w_size, w_size - 1)
+#         # d = [np.sum(_dFF(F[first:last].values) * weights) for (first, last) in wg.firstlast]
+#     else:
+#         B = make_sliding_window(y, w_size, on_error=on_error)
+#         bg = np.percentile(B, percentile, axis=1)
+#         d = (y - bg) / bg
+
+#     return pd.Series(d, index=t)
+
+
+def sliding_z(
+    F: pd.Series,
+    w_len: float,
+    fs: float | None = None,
+    weights: np.ndarray | None = None,
+    on_error: Literal['raise', 'pass'] = 'raise',
+) -> pd.Series:
     """sliding window z-score of a pynapple time series with data with optional weighting
 
     Args:
@@ -728,22 +903,26 @@ def sliding_z(F: pd.Series, w_len: float, fs=None, weights=None):
     w_size = int(w_len * fs)
 
     if weights is not None:
-        # note: passing weights makes the stride trick not possible, or only with allocating a matrix of shape (n_samples * w_size)
-        # true sliding operation implemented, much slower
+        # note: passing weights makes the stride trick not possible, or only with
+        # allocating a matrix of shape (n_samples * w_size)
+        # hence, true sliding operation implemented, which is much slower
         weights /= weights.sum()
         n_samples = y.shape[0]
         wg = WindowGenerator(n_samples - 1, w_size, w_size - 1)
-        d = [
-            np.sum(z(F[first:last].values) * weights) for (first, last) in wg.firstlast
-        ]
+        d = [np.sum(z(F[first:last].values) * weights) for (first, last) in wg.firstlast]
     else:
-        B = make_sliding_window(y, w_size)
+        B = make_sliding_window(y, w_size, on_error=on_error)
         mus, sds = np.average(B, axis=1), np.std(B, axis=1)
         d = (y - mus) / sds
     return pd.Series(d, index=t)
 
 
-def sliding_mad(F: pd.Series, w_len: float = None, fs=None, overlap=90):
+def sliding_mad(
+    F: pd.Series,
+    w_len: float = None,
+    overlap: int = 90,
+    fs: float | None = None,
+) -> pd.Series:
     y, t = F.values, F.index.values
     fs = 1 / np.median(np.diff(t)) if fs is None else fs
     w_size = int(w_len * fs)

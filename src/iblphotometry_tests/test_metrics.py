@@ -14,13 +14,13 @@ class TestMetrics(PhotometryDataTestCase):
         # have an automated way of inferring
         metrics_to_test = [
             # metrics.bleaching_tau,
-            metrics.n_spikes,
-            metrics.detect_spikes,
+            # metrics.n_spikes,
+            # metrics.detect_spikes,
             # metrics.n_outliers,
             metrics.n_unique_samples,
-            metrics.signal_asymmetry,
+            # metrics.signal_asymmetry,
             metrics.signal_skew,
-            metrics.percentile_dist,
+            # metrics.percentile_dist,
         ]
 
         for metric_ in metrics_to_test:

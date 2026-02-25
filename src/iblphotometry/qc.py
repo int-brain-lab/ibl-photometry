@@ -1,203 +1,220 @@
-# %%
-import gc
-from collections.abc import Callable
+from joblib import Parallel, delayed
+import traceback
 from tqdm import tqdm
-import logging
+from typing import List, Optional, Dict, Literal
 
 import numpy as np
-import pandas as pd
 from scipy.stats import linregress
+import pandas as pd
 
-from iblphotometry.processing import make_sliding_window
+from one.api import ONE
+from brainbox.io.one import PhotometrySessionLoader
 from iblphotometry.pipelines import run_pipeline
 
-logger = logging.getLogger()
 
+def qc_signals(
+    raw_dfs: Dict[str, pd.DataFrame],
+    metrics: List[callable],
+    metrics_kwargs: Dict = {},
+    signal_band: Optional[str | List[str]] = None,
+    brain_region: Optional[str | List[str]] = None,
+    pipeline: Optional[List[Dict]] = None,
+    sliding_kwargs: Optional[Dict] = None,
+) -> pd.DataFrame:
+    """runs a set of qc metrics on a given photometry dataset
 
-# %% # those could be in metrics
-def sliding_metric(
-    F: pd.Series,
-    w_len: float,
-    metric: Callable,
-    fs: float | None = None,
-    n_wins: int = -1,
-    metric_kwargs: dict | None = None,
-):
-    """applies a metric along time.
+    Parameters
+    ----------
+    raw_dfs : dict[pd.DataFrame]
+        Photometry data in the format of a dictionary, where the keys are the individual signal bands, and their respective values are pandas DataFrames, one column per fiber
+    metrics : List[callable]
+        A List of metrics (= callable functions taking pd.Series as the first argument)
+    metrics_kwargs : dict, optional
+        additional optional kwargs as passed to the metrics. keys are the .__name__ of the metric, values are the kwargs, by default {}
+    signal_band : str | List[str] | None, optional
+        if provided, restrict evaluation to this signal band, by default None
+    brain_region : str | List[str] | None, optional
+        if provided, restrict evaluation to this brain region, by default None
+    pipeline : List[dict] | None, optional
+        if provided, apply this processing pipeline before evaluation, by default None
+    sliding_kwargs : dict | None, optional
+        if provided, apply metrics evaluation in a number of windows of specified length along the time course of the signal, by default None
 
-    Args:
-        F (nap.Tsd): _description_
-        w_size (int): _description_
-        metric (callable, optional): _description_. Defaults to None.
-        n_wins (int, optional): _description_. Defaults to -1.
-
-    Returns:
-        _type_: _description_
+    Returns
+    -------
+    pd.DataFrame
+        the qc result in tidy data format
     """
-    y, t = F.values, F.index.values
-    fs = 1 / np.median(np.diff(t)) if fs is None else fs
-    w_size = int(w_len * fs)
-
-    yw = make_sliding_window(y, w_size)
-    if n_wins > 0:
-        n_samples = y.shape[0]
-        inds = np.linspace(0, n_samples - w_size, n_wins, dtype='int64')
-        yw = yw[inds, :]
+    # which data to operate on
+    if signal_band is None:
+        signal_bands = raw_dfs.keys()
     else:
-        inds = np.arange(yw.shape[0], dtype='int64')
+        if type(signal_band) is str:
+            assert signal_band in raw_dfs.keys(), f'signal band {signal_band} not present in data'
+            signal_bands = [signal_band]
+    if brain_region is None:
+        brain_regions = raw_dfs[list(signal_bands)[0]].columns
+    else:
+        if type(brain_region) is str:
+            assert brain_region in raw_dfs[list(signal_bands)[0]].columns, f'brain region {brain_region} not present in data'
+            brain_regions = [brain_region]
 
-    m = metric(yw, **metric_kwargs) if metric_kwargs is not None else metric(yw)
+    # the main qc loop
+    qc_result = []
+    for band in signal_bands:
+        for brain_region in brain_regions:
+            signal = raw_dfs[band][brain_region]
 
-    return pd.Series(m, index=t[inds + int(w_size / 2)])
+            # if a pipeline is provided, run it here
+            if pipeline is not None:
+                # reference_band = reference_band or None
+                # pipelines that consume a reference band, not supported by this function
+                signal = run_pipeline(pipeline, signal)
+
+            for metric in metrics:
+                _metric_kwargs = metrics_kwargs.get(metric.__name__, {})
+                qc_result.append({
+                    'band': band,
+                    'brain_region': brain_region,
+                    'metric': metric.__name__,
+                    'value': metric(signal, **_metric_kwargs),
+                })
+                # I don't think we can rely on using stride tricks as the input into the
+                # metrics might be a restricted to a series
+                if sliding_kwargs is not None:
+                    # Using window length and step length (both in seconds)
+                    w_len = sliding_kwargs['w_len']
+                    step_len = sliding_kwargs['step_len']  # in seconds
+                    # dt = np.median(np.diff(signal.index))
+                    # w_size = int(w_len // dt)
+                    # step_size = int(step_len // dt)  # compute step size from step length
+                    t_start = signal.index[0]
+                    t_stop = signal.index[-1] - w_len
+
+                    # Generate window start times with step_size
+                    w_start_times = np.arange(t_start, t_stop, step_len)
+
+                    for w_start in w_start_times:
+                        ix = np.logical_and(
+                            signal.index.values >= w_start,
+                            signal.index.values < w_start + w_len,
+                        )
+                        signal_ = signal.loc[ix]
+                        if sliding_kwargs.get('detrend', False):
+                            res = linregress(signal_.index, signal_.values)
+                            signal_ -= signal_.index * res.slope + res.intercept
+
+                        qc_result.append(
+                            {
+                                'band': band,
+                                'brain_region': brain_region,
+                                'metric': metric.__name__,
+                                'value': metric(signal_),
+                                'window': w_start + w_len / 2,
+                            },
+                        )
+
+    return pd.DataFrame(qc_result)
 
 
-# eval pipleline will be here
-def eval_metric(
-    F: pd.Series,
-    metric: Callable,
-    metric_kwargs: dict | None = None,
-    sliding_kwargs: dict | None = None,
-    full_output=False,
-):
-    result = {}
-    m = metric(F, **metric_kwargs) if metric_kwargs is not None else metric(F)
-    result['value'] = m
-    if sliding_kwargs is not None:
-        S = sliding_metric(
-            F, metric=metric, **sliding_kwargs, metric_kwargs=metric_kwargs
+def qc_eid(
+    eid: str,
+    one: ONE,
+    metrics: List[callable],
+    metrics_kwargs: Dict = {},
+    signal_band: Optional[str | List[str]] = None,
+    brain_region: Optional[str | List[str]] = None,
+    pipeline: Optional[List[Dict]] = None,
+    sliding_kwargs: Optional[Dict] = None,
+    on_error: Literal['log', 'raise'] = 'log',
+) -> pd.DataFrame:
+    """
+    Convenience function for running qc on a dataset as given by an eid. See qc_signals for a description of the individual parameters
+    """
+    try:
+        psl = PhotometrySessionLoader(eid=eid, one=one)
+        psl.load_photometry()
+        qc_result = qc_signals(
+            psl.photometry,
+            metrics=metrics,
+            metrics_kwargs=metrics_kwargs,
+            signal_band=signal_band,
+            brain_region=brain_region,
+            pipeline=pipeline,
+            sliding_kwargs=sliding_kwargs,
         )
-        r, p = linregress(S.index.values, S.values)[2:4]
-        if full_output:
-            result['sliding_values'] = S.values
-            result['sliding_timepoints'] = S.index.values
-
-    else:
-        r = np.nan
-        p = np.nan
-
-    result['r'] = r
-    result['p'] = p
-    return result
-
-
-def qc_series(
-    F: pd.Series,
-    qc_metrics: dict,
-    sliding_kwargs=None,  # if present, calculate everything in a sliding manner
-    trials=None,  # if present, put trials into params
-    eid: str = None,  # FIXME but left as is for now just to keep the logger happy
-    brain_region: str = None,  # FIXME but left as is for now just to keep the logger happy
-) -> dict:
-    if isinstance(F, pd.DataFrame):
-        raise TypeError('F can not be a dataframe')
-
-    # should cover all cases
-    qc_results = {}
-    for metric, params in qc_metrics:
-        try:
-            if trials is not None:  # if trials are passed
-                params['trials'] = trials
-            res = eval_metric(F, metric, params, sliding_kwargs)
-            qc_results[f'{metric.__name__}'] = res['value']
-            if sliding_kwargs:
-                qc_results[f'{metric.__name__}_r'] = res['rval']
-                qc_results[f'{metric.__name__}_p'] = res['pval']
-        except Exception as e:
-            logger.warning(
-                f'{eid}, {brain_region}: metric {metric.__name__} failure: {type(e).__name__}:{e}'
-            )
-    return qc_results
+        qc_result['eid'] = eid
+    except Exception as e:
+        if on_error == 'log':
+            # Collect exception info
+            qc_result = pd.DataFrame([
+                {  # dataframe for downstream compatibility
+                    'eid': eid,
+                    'exception_type': type(e).__name__,
+                    'exception_message': str(e),
+                    'traceback': traceback.format_exc(),
+                }
+            ])
+        else:
+            raise e
+    return qc_result
 
 
-# %% main QC loop
 def run_qc(
-    data_loader,
-    eids: list[str],
-    pipelines_reg,  # registered pipelines
-    qc_metrics: dict,  # metrics. keys: raw, processed, repsonse, sliding_kwargs
-    sigref_mapping: dict = None,  # think about this one - the mapping of signal and reference # dict(signal=signal_band_name, reference=ref_band_name)
-):
-    qc_results = []
-    for eid in tqdm(eids):
-        print(eid)
-        try:
-            # get photometry data
-            raw_dfs = data_loader.load_photometry_data(eid=eid)
-            signal_bands = list(raw_dfs.keys())
-            brain_regions = raw_dfs[signal_bands[0]]
+    eids: List[str],
+    one: ONE,
+    metrics: List[callable],
+    metrics_kwargs: dict = {},
+    signal_band: Optional[str | List[str]] = None,
+    brain_region: Optional[str | List[str]] = None,
+    pipeline: Optional[List[dict]] = None,
+    sliding_kwargs: Optional[Dict] = None,
+    n_jobs: int = 1,
+    on_error: Literal['log', 'raise'] = 'log',
+) -> pd.DataFrame:
+    """
+    Conveninece function to run qc on many datasets given by a list of eids. See qc_signals for a description of the individual parameters
 
-            # get behavioral data
-            # TODO this should be provided
-            # sl = SessionLoader(eid=eid, one=data_loader.one)
-            # for caroline
-            # trials = sl.load_trials(
-            #     collection='alf/task_00'
-            # )  # this is necessary fo caroline
-            # trials = sl.load_trials()  # should be good for all others
+    Parameters
+    ----------
 
-            # the old way
-            trials = data_loader.one.load_dataset(eid, '*trials.table.pqt')
+    n_jobs : int, optional
+        if larger than 1, use joblib to process sessions in parallel, by default 1
 
-            for band in signal_bands:
-                raw_tf = raw_dfs[band]
-                for region in brain_regions:
-                    qc_result = qc_series(
-                        raw_tf[region], qc_metrics['raw'], sliding_kwargs=None, eid=eid
-                    )
-                    qc_results.append(
-                        dict(
-                            eid=eid,
-                            pipeline='raw',
-                            band=band,
-                            region=region,
-                            **qc_result,
-                        )
-                    )
+    Returns
+    -------
+    pd.DataFrame
+        the qc result in tidy data format
+    """
+    if n_jobs == 1:
+        qc_results = []
+        for eid in tqdm(eids):
+            qc_result_ = qc_eid(
+                eid,
+                one,
+                metrics,
+                metrics_kwargs=metrics_kwargs,
+                signal_band=signal_band,
+                brain_region=brain_region,
+                pipeline=pipeline,
+                sliding_kwargs=sliding_kwargs,
+                on_error=on_error,
+            )
+            qc_results.append(qc_result_)
+    else:
+        qc_results = Parallel(n_jobs=n_jobs)(
+            delayed(qc_eid)(
+                eid,
+                one,
+                metrics,
+                metrics_kwargs=metrics_kwargs,
+                signal_band=signal_band,
+                brain_region=brain_region,
+                pipeline=pipeline,
+                sliding_kwargs=sliding_kwargs,
+                on_error=on_error,
+            )
+            for eid in eids
+        )
 
-            # run the pipelines and qc on the processed data
-            # here it needs to be specified if one band is a reference of the other
-            for pipeline_name, pipeline in pipelines_reg.items():
-                if 'reference' in sigref_mapping:  # this is for isosbestic pipelines
-                    proc_tf = run_pipeline(
-                        pipeline,
-                        raw_dfs[sigref_mapping['signal']],
-                        raw_dfs[sigref_mapping['reference']],
-                    )
-                else:
-                    # FIXME this fails for true-multiband
-                    # this hack works for single-band
-                    # possible fix could be that signal could be a list
-                    proc_tf = run_pipeline(pipeline, raw_dfs[sigref_mapping['signal']])
-
-                for region in brain_regions:
-                    # sliding qc of the processed data
-                    qc_proc = qc_series(
-                        proc_tf[region],
-                        qc_metrics=qc_metrics['processed'],
-                        sliding_kwargs=qc_metrics['sliding_kwargs'],
-                        eid=eid,
-                        brain_region=region,
-                    )
-
-                    # qc with metrics that use behavior
-                    qc_resp = qc_series(
-                        proc_tf[region],
-                        qc_metrics['response'],
-                        trials=trials,
-                        eid=eid,
-                        brain_region=region,
-                    )
-                    qc_result = qc_proc | qc_resp
-                    qc_results.append(
-                        dict(
-                            eid=eid,
-                            pipeline=pipeline_name,
-                            region=region,
-                            **qc_result,
-                        )
-                    )
-        except Exception as e:
-            logger.warning(f'{eid}: failure: {type(e).__name__}:{e}')
-
-        gc.collect()
-    return qc_results
+    return pd.concat(qc_results)

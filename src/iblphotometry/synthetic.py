@@ -31,13 +31,7 @@ def synthetic101(fs=30, rl=1000, event_rate=0.2):
     transients = np.convolve(transients, ric / np.max(ric), mode='full')
     isosbestic = photobleach * 0.78 + 1.2
     calcium = photobleach * 1.00 + 3.21 + transients[:ns] * 0.05
-    # plt.figure()
-    # # plt.plot(ric)
-    # plt.plot(isosbestic)
-    # plt.plot(calcium)
-    return pd.DataFrame(
-        {'times': tscale, 'raw_isosbestic': isosbestic, 'raw_calcium': calcium}
-    ), event_times
+    return pd.DataFrame({'times': tscale, 'raw_isosbestic': isosbestic, 'raw_calcium': calcium}), event_times
 
 
 def generate_dataframe(sigma: float = 0.01):
@@ -50,12 +44,8 @@ def generate_dataframe(sigma: float = 0.01):
         df[['raw_calcium', 'raw_isosbestic']] += np.random.randn(*df.shape) * sigma
 
     raw_dfs = dict(
-        raw_calcium=pd.DataFrame(
-            df['raw_calcium'].values, index=df.index, columns=['Region01']
-        ),
-        raw_isosbestic=pd.DataFrame(
-            df['raw_isosbestic'].values, index=df.index, columns=['Region01']
-        ),
+        raw_calcium=pd.DataFrame(df['raw_calcium'].values, index=df.index, columns=['Region01']),
+        raw_isosbestic=pd.DataFrame(df['raw_isosbestic'].values, index=df.index, columns=['Region01']),
     )
 
     return raw_dfs

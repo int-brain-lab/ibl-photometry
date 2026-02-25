@@ -4,24 +4,25 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
 
 jobs:
   ruff:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: chartboost/ruff-action@v1
-        name: ruff check
-        with:
-          args: 'check --output-format=github'
-      - uses: chartboost/ruff-action@v1
-        name: ruff format
-        with:
-          args: 'format --check'
+      - uses: astral-sh/setup-uv@v6
+      - name: sync dependencies
+        run: uv sync
+      - name: ruff format
+        run: uv run ruff format --check --preview --output-format=github
+      - name: ruff check
+        if: always()
+        run: uv run ruff check --output-format=github
   tests:
     name: unit tests (${{ matrix.python-version }}, ${{ matrix.os }})
     runs-on:  ${{ matrix.os }}
@@ -33,15 +34,12 @@ jobs:
         python-version: ["3.10", "3.12"]
     steps:
     - uses: actions/checkout@v4
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+    - uses: astral-sh/setup-uv@v6
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install deps
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -e .
+    - name: sync dependencies
+      run: uv sync
     - name: Test with pytest
       run: |
-        pytest -k 'test_'
+        uv pip install pytest-github-actions-annotate-failures
+        uv run pytest -k 'test_'

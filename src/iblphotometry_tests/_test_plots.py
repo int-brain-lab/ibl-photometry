@@ -30,9 +30,7 @@ class TestPlotters(PhotometryDataTestCase):
         fs = 50
         df_nph, t_events = synthetic101(fs=50)
         # Get signal and process it
-        df_nph['signal_processed'] = ffpr.mad_raw_signal(
-            df_nph['raw_calcium'].values, fs=fs
-        )
+        df_nph['signal_processed'] = ffpr.mad_raw_signal(df_nph['raw_calcium'].values, fs=fs)
         return df_nph, t_events, fs
 
     def get_test_data(self):
@@ -62,9 +60,7 @@ class TestPlotters(PhotometryDataTestCase):
         fs = 1 / time_diffs.median()
 
         # Get signal and process it
-        df_nph['signal_processed'] = ffpr.mad_raw_signal(
-            df_nph['raw_calcium'].values, fs=fs
-        )
+        df_nph['signal_processed'] = ffpr.mad_raw_signal(df_nph['raw_calcium'].values, fs=fs)
 
         return df_nph, t_events, fs
 
@@ -180,9 +176,7 @@ class TestPlotters(PhotometryDataTestCase):
             times = df_nph['times'].values
 
             # Compute PSTH
-            psth_mat, _ = psth(
-                signal, times, t_events, fs=fs, event_window=event_window
-            )
+            psth_mat, _ = psth(signal, times, t_events, fs=fs, event_window=event_window)
             times = psth_times(fs, event_window)
             # Plot PSTH
             plots.plot_psth(psth_mat, times)
