@@ -87,9 +87,9 @@ def qc_signals(
                     # Using window length and step length (both in seconds)
                     w_len = sliding_kwargs['w_len']
                     step_len = sliding_kwargs['step_len']  # in seconds
-                    dt = np.median(np.diff(signal.index))
-                    w_size = int(w_len // dt)
-                    step_size = int(step_len // dt)  # compute step size from step length
+                    # dt = np.median(np.diff(signal.index))
+                    # w_size = int(w_len // dt)
+                    # step_size = int(step_len // dt)  # compute step size from step length
                     t_start = signal.index[0]
                     t_stop = signal.index[-1] - w_len
 
