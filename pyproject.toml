@@ -48,6 +48,9 @@ where = "src"
 [tool.ruff]
 indent-width = 4
 line-length = 130
+exclude =[
+    "src/examples"
+]
 
 [tool.ruff.lint.isort]
 known-first-party = [ "ibl*", "one*", "pybpod*" ]
