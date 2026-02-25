@@ -62,3 +62,9 @@ known-first-party = [ "ibl*", "one*", "pybpod*" ]
 
 [tool.ruff.format]
 quote-style = "single"
+
+[tool.uv]
+required-environments = [
+    "sys_platform == 'win32'",
+    "sys_platform == 'linux'"
+]
