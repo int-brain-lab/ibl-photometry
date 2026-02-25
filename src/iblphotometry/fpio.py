@@ -641,9 +641,10 @@ def validate_digital_inputs_df(
             df['channel_name'] = f'channel_{channel}'
             df['times'] = df[timestamps_colname]
             df = df.rename(columns={'Value.Value': 'polarity'})
-            df['polarity'] = df['polarity'].replace(
-                {True: 1, False: -1}
-            )  # FIXME causes downcasting warning, see https://github.com/pandas-dev/pandas/issues/57734
+            df['polarity'] = df['polarity'].replace({
+                True: 1,
+                False: -1,
+            })  # FIXME causes downcasting warning, see https://github.com/pandas-dev/pandas/issues/57734
             df = df.astype({'polarity': 'int8', 'channel': 'int64'})
             df = df.drop(['Timestamp', 'Value.Seconds'], axis=1)
 
