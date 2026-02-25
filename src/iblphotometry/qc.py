@@ -84,25 +84,27 @@ def qc_signals(
                 # I don't think we can rely on using stride tricks as the input into the
                 # metrics might be a restricted to a series
                 if sliding_kwargs is not None:
-                    # this is for creating n evently spaced windows of size w_len along the signal
+                    # Using window length and step length (both in seconds)
                     w_len = sliding_kwargs['w_len']
+                    step_len = sliding_kwargs['step_len']  # in seconds
                     dt = np.median(np.diff(signal.index))
-                    # w_size = int(w_len // dt)
-                    n_windows = sliding_kwargs['n_windows']
+                    w_size = int(w_len // dt)
+                    step_size = int(step_len // dt)  # compute step size from step length
                     t_start = signal.index[0]
-                    t_stop = signal.index[-1] - w_len - dt  # one extra dt to be on the safe side
-                    w_start_times = np.linspace(t_start, t_stop, n_windows)
-                    for i in range(n_windows):
+                    t_stop = signal.index[-1] - w_len
+
+                    # Generate window start times with step_size
+                    w_start_times = np.arange(t_start, t_stop, step_len)
+
+                    for w_start in w_start_times:
                         ix = np.logical_and(
-                            signal.index.values > w_start_times[i],
-                            signal.index.values < w_start_times[i] + w_len,
+                            signal.index.values >= w_start,
+                            signal.index.values < w_start + w_len,
                         )
                         signal_ = signal.loc[ix]
-                        if 'detrend' not in sliding_kwargs.keys():
-                            sliding_kwargs['detrend'] = False
-                        if sliding_kwargs['detrend']:
+                        if sliding_kwargs.get('detrend', False):
                             res = linregress(signal_.index, signal_.values)
-                            signal_.values -= signal_.index * res.slope + res.intercept
+                            signal_ -= signal_.index * res.slope + res.intercept
 
                         qc_result.append(
                             {
@@ -110,7 +112,7 @@ def qc_signals(
                                 'brain_region': brain_region,
                                 'metric': metric.__name__,
                                 'value': metric(signal_),
-                                'window': i,
+                                'window': w_start + w_len / 2,
                             },
                         )
 
