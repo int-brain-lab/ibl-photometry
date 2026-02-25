@@ -73,12 +73,14 @@ def qc_signals(
 
             for metric in metrics:
                 _metric_kwargs = metrics_kwargs.get(metric.__name__, {})
-                qc_result.append({
-                    'band': band,
-                    'brain_region': brain_region,
-                    'metric': metric.__name__,
-                    'value': metric(signal, **_metric_kwargs),
-                })
+                qc_result.append(
+                    {
+                        'band': band,
+                        'brain_region': brain_region,
+                        'metric': metric.__name__,
+                        'value': metric(signal, **_metric_kwargs),
+                    }
+                )
                 # I don't think we can rely on using stride tricks as the input into the
                 # metrics might be a restricted to a series
                 if sliding_kwargs is not None:
@@ -147,14 +149,16 @@ def qc_eid(
     except Exception as e:
         if on_error == 'log':
             # Collect exception info
-            qc_result = pd.DataFrame([
-                {  # dataframe for downstream compatibility
-                    'eid': eid,
-                    'exception_type': type(e).__name__,
-                    'exception_message': str(e),
-                    'traceback': traceback.format_exc(),
-                }
-            ])
+            qc_result = pd.DataFrame(
+                [
+                    {  # dataframe for downstream compatibility
+                        'eid': eid,
+                        'exception_type': type(e).__name__,
+                        'exception_message': str(e),
+                        'traceback': traceback.format_exc(),
+                    }
+                ]
+            )
         else:
             raise e
     return qc_result
