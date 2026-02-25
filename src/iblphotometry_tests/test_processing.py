@@ -16,7 +16,6 @@ class TestProcessing(PhotometryDataTestCase):
         # bleach corrections
         processing.lowpass_bleachcorrect(raw_df)
         processing.exponential_bleachcorrect(raw_df, 2)
-    
 
         # outlier removal
         processing.remove_outliers(raw_df)
