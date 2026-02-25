@@ -54,12 +54,12 @@ on_error = 'raise'  # or 'log'
 # PASS = 3
 
 
-QC_COLORS = {
-    '1': '#EF6F6C',
-    '2': '#fcf15d',
-    '3': '#56E370',
-    '0': '#FFFFFF',
-}
+# QC_COLORS = {
+#     '1': '#EF6F6C',
+#     '2': '#fcf15d',
+#     '3': '#56E370',
+#     '0': '#FFFFFF',
+# }
 
 QC_COLORS = {
     'CRITICAL': '#EF6F6C',
