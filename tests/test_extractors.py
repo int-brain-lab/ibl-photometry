@@ -44,33 +44,33 @@ class PhotometryExtractorTest(unittest.TestCase):
             task.run()
             assert task.status == 0
 
-    # def test_bpod_extractor(self):
-    #     if os.environ.get('RUN_HEAVY') != '1' and not FORCE_HEAVY_TESTS:
-    #         self.skipTest(
-    #             'this test will download large files via one and is not meant to be run in a CI, set env var RUN_HEAVY=1 to run'
-    #         )
+    def test_bpod_extractor(self):
+        if not RUN_EXTRACTOR_TESTS:
+            self.skipTest(
+                'this test will download large files via ONE and is not meant to be run in a CI, set env var RUN_EXTRACTOR_TESTS=1 to enable'
+            )
 
-    #     for eid in self.bpod_eids:
-    #         experiment_description = self.one.load_dataset(eid, '*experiment.description')
-    #         session_folder = self.one.eid2path(eid)
+        for eid in self.bpod_eids:
+            experiment_description = self.one.load_dataset(eid, '*experiment.description')
+            session_folder = self.one.eid2path(eid)
 
-    #         task = FibrePhotometryBpodSync(
-    #             session_folder,
-    #             one=self.one,
-    #             on_error='raise',
-    #             **experiment_description['devices']['neurophotometrics'],
-    #         )
-    #         task.get_signatures()
-    #         for signature in task.signature['input_files']:
-    #             file, collection, required, _ = signature
-    #             try:
-    #                 self.one.load_dataset(eid, file, collection=collection, download_only=True)
-    #             except ALFObjectNotFound:
-    #                 if required:
-    #                     raise
-    #                 else:
-    #                     print(f'optional file {file} not found, skipping')
+            task = FibrePhotometryBpodSync(
+                session_folder,
+                one=self.one,
+                on_error='raise',
+                **experiment_description['devices']['neurophotometrics'],
+            )
+            task.get_signatures()
+            for signature in task.signature['input_files']:
+                file, collection, required, _ = signature
+                try:
+                    self.one.load_dataset(eid, file, collection=collection, download_only=True)
+                except ALFObjectNotFound:
+                    if required:
+                        raise
+                    else:
+                        print(f'optional file {file} not found, skipping')
 
-    #         assert task.assert_expected_inputs()[0]
-    #         task.run()
-    #         assert task.status == 0
+            assert task.assert_expected_inputs()[0]
+            task.run()
+            assert task.status == 0
