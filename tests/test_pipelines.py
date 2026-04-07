@@ -4,7 +4,7 @@ from iblphotometry.pipelines import (
     isosbestic_correction_pipeline,
 )
 from iblphotometry.synthetic import generate_dataframe
-from iblphotometry_tests.base_tests import PhotometryDataTestCase
+from tests.base_tests import PhotometryDataTestCase
 
 
 class TestPipelines(PhotometryDataTestCase):

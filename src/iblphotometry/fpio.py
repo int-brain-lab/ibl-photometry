@@ -5,6 +5,8 @@ import pandera.pandas as pa
 from pandera.errors import SchemaError
 from one.api import ONE
 from typing import Optional, Dict, List
+from dataclasses import field
+from brainbox.io.one import SessionLoader
 
 from iblphotometry.neurophotometrics import (
     LIGHT_SOURCE_MAP,
@@ -479,7 +481,7 @@ def from_session_path(
     )
 
 
-def restrict_to_session(
+def restrict_to_session_time(
     raw_dfs: list[dict],
     trials_df: pd.DataFrame,
     pre: float = -5.0,
@@ -670,3 +672,61 @@ def validate_digital_inputs_df(
 
     df = pa.DataFrameSchema(columns=digital_input_schema).validate(df)
     return df
+
+
+"""
+ 
+  ######  ########  ######   ######   #######  #### ##    ## ##        #######     ###    ########  ######## ########  
+ ##    ## ##       ##    ## ##    ## ##     ##  ##  ###   ## ##       ##     ##   ## ##   ##     ## ##       ##     ## 
+ ##       ##       ##       ##       ##     ##  ##  ####  ## ##       ##     ##  ##   ##  ##     ## ##       ##     ## 
+  ######  ######    ######   ######  ##     ##  ##  ## ## ## ##       ##     ## ##     ## ##     ## ######   ########  
+       ## ##             ##       ## ##     ##  ##  ##  #### ##       ##     ## ######### ##     ## ##       ##   ##   
+ ##    ## ##       ##    ## ##    ## ##     ##  ##  ##   ### ##       ##     ## ##     ## ##     ## ##       ##    ##  
+  ######  ########  ######   ######   #######  #### ##    ## ########  #######  ##     ## ########  ######## ##     ## 
+ 
+"""
+
+
+class PhotometrySessionLoader(SessionLoader):
+    photometry: dict = field(default_factory=dict, repr=False)
+
+    def __init__(self, *args, photometry_collection: str = 'photometry', **kwargs):
+        self.photometry_collection = photometry_collection
+        self.revision = kwargs.get('revision', None)
+
+        # determine if loading by eid or session path
+        self.load_by_path = True if 'session_path' in kwargs else False
+
+        super().__init__(*args, **kwargs)
+
+    def load_session_data(self, **kwargs):
+        super().load_session_data(**kwargs)
+        self.load_photometry()
+
+    def load_photometry(
+        self,
+        restrict_to_session: bool = True,
+        pre: int = -5,
+        post: int = 5,
+    ):
+        # session path precedence over eid
+        if self.load_by_path:
+            raw_dfs = from_session_path(
+                self.session_path,
+                collection=self.photometry_collection,
+                revision=self.revision,
+            )
+        else:  # load by eid
+            raw_dfs = from_eid(
+                self.eid,
+                self.one,
+                collection=self.photometry_collection,
+                revision=self.revision,
+            )
+
+        if restrict_to_session:
+            if isinstance(self.trials, pd.DataFrame) and (self.trials.shape[0] == 0):
+                self.load_trials()
+            raw_dfs = restrict_to_session_time(raw_dfs, self.trials, pre, post)
+
+        self.photometry = raw_dfs
