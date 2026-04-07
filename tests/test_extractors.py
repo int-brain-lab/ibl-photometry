@@ -9,7 +9,6 @@ RUN_EXTRACTOR_TESTS = True if os.environ.get('RUN_EXTRACTOR_TESTS') == '1' else 
 
 class PhotometryExtractorTest(unittest.TestCase):
     def setUp(self):
-        self.one = ONE()
         self.daq_eids = [
             '34f55b3a-725e-4cc7-aed3-6e6338f573bf',  # Laura
             'b3b87ca9-2075-474b-b925-9fc824de85a5',  # Carolina
@@ -27,6 +26,7 @@ class PhotometryExtractorTest(unittest.TestCase):
                 'this test will download large files via ONE and is not meant to be run in a CI, set env var RUN_EXTRACTOR_TESTS=1 to enable'
             )
 
+        self.one = ONE()
         for eid in self.daq_eids:
             experiment_description = self.one.load_dataset(eid, '*experiment.description')
             session_folder = self.one.eid2path(eid)
@@ -50,6 +50,7 @@ class PhotometryExtractorTest(unittest.TestCase):
                 'this test will download large files via ONE and is not meant to be run in a CI, set env var RUN_EXTRACTOR_TESTS=1 to enable'
             )
 
+        self.one = ONE()
         for eid in self.bpod_eids:
             experiment_description = self.one.load_dataset(eid, '*experiment.description')
             session_folder = self.one.eid2path(eid)
