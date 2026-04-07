@@ -11,7 +11,7 @@ from matplotlib.axes import Axes
 import pynapple as nap
 from pynapple import TsdFrame
 
-from brainbox.io.one import PhotometrySessionLoader
+from iblphotometry.fpio import PhotometrySessionLoader
 
 
 # plotting helpers

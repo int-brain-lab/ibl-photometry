@@ -1,6 +1,6 @@
 from pathlib import Path
 import pandas as pd
-from brainbox.io.one import PhotometrySessionLoader
+from iblphotometry.fpio import PhotometrySessionLoader
 from one.api import ONE
 from typing import Optional, List
 

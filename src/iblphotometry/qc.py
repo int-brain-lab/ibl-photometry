@@ -8,7 +8,7 @@ from scipy.stats import linregress
 import pandas as pd
 
 from one.api import ONE
-from brainbox.io.one import PhotometrySessionLoader
+from iblphotometry.fpio import PhotometrySessionLoader
 from iblphotometry.pipelines import run_pipeline
 
 
