@@ -1,6 +1,6 @@
 from iblphotometry import metrics, fpio
 
-from iblphotometry_tests.base_tests import PhotometryDataTestCase
+from tests.base_tests import PhotometryDataTestCase
 
 
 class TestMetrics(PhotometryDataTestCase):

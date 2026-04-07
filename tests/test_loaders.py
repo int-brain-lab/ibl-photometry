@@ -1,5 +1,5 @@
 import iblphotometry.fpio as fpio
-from iblphotometry_tests.base_tests import PhotometryDataTestCase
+from tests.base_tests import PhotometryDataTestCase
 import pandas as pd
 
 
@@ -34,3 +34,11 @@ class TestLoaders(PhotometryDataTestCase):
             fpio.from_neurophotometrics_df_to_photometry_df(raw_df)
             # the chained version
             fpio.from_neurophotometrics_file(path)
+
+    # def test_PhotometrySessionLoader(self):
+    #     for version in ['version_1', 'version_2', 'version_5']:
+    #         path = self.versions_path / version
+    #         loader = fpio.PhotometrySessionLoader(path)
+    #         assert loader.version == version
+    #         assert loader.raw_data_path == path / '_neurophotometrics_fpData.raw.pqt'
+    #         assert loader.digital_inputs_path == path / '_neurophotometrics_fpData.digitalInputs.pqt'

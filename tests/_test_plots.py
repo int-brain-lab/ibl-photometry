@@ -11,7 +11,7 @@ import iblphotometry.plots as plots
 # from gui.rawdata_visualizer import BehaviorVisualizerGUI
 from iblphotometry.synthetic import synthetic101
 import iblphotometry.preprocessing as ffpr
-from iblphotometry_tests.base_tests import PhotometryDataTestCase
+from base_tests import PhotometryDataTestCase
 
 # Set the seed
 np.random.seed(seed=0)

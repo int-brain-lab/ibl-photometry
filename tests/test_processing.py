@@ -1,5 +1,5 @@
 from iblphotometry import fpio, processing
-from iblphotometry_tests.base_tests import PhotometryDataTestCase
+from tests.base_tests import PhotometryDataTestCase
 
 
 class TestProcessing(PhotometryDataTestCase):
