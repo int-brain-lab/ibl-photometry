@@ -19,10 +19,10 @@ jobs:
       - name: sync dependencies
         run: uv sync
       - name: ruff format
-        run: uv run ruff format --check --preview --output-format=github
+        run: uv run ruff format --check
       - name: ruff check
         if: always()
-        run: uv run ruff check --output-format=github
+        run: uv run ruff check
   tests:
     name: unit tests (${{ matrix.python-version }}, ${{ matrix.os }})
     runs-on:  ${{ matrix.os }}
