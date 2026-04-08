@@ -14,5 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pdm-project/setup-pdm@v4
+      - name: Build wheel
+        run: pdm build
       - name: Publish package
         run: pdm publish
