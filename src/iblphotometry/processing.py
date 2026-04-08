@@ -177,10 +177,13 @@ def resample_signal(signal: pd.DataFrame) -> pd.DataFrame:
     dt = np.median(np.diff(times))
     times_interp = np.arange(times[0], times[-1], dt)
     signal_interp = {}
-    for col in signal.columns:
-        signal_interp[col] = np.interp(times_interp, times, signal[col])
-
-    return pd.DataFrame(signal_interp, index=times_interp)
+    if type(signal) is pd.DataFrame:
+        for col in signal.columns:
+            signal_interp[col] = np.interp(times_interp, times, signal[col])
+        return pd.DataFrame(signal_interp, index=times_interp)
+    if type(signal) is pd.Series:
+        signal_interp = np.interp(times_interp, times, signal)
+        return pd.Series(signal_interp, index=times_interp)
 
 
 """

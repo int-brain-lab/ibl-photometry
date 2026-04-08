@@ -27,10 +27,10 @@ def psth_nap(
         for outcome, group in trials_df.groupby(split_by):
             tstamps = nap.Ts(group[align_on].values)
             tstamps = tstamps.get(signal.t[0] + pre, signal.t[-1] + post)
-            psth = nap.compute_perievent_continuous(signal, tstamps, (pre, post))
+            psth = nap.compute_perievent(signal, tstamps, (pre, post))
             psths[outcome] = psth
         return psths
     else:
         tstamps = nap.Ts(trials_df[align_on].values)
         tstamps = tstamps.get(signal.t[0] + pre, signal.t[-1] + post)
-        return nap.compute_perievent_continuous(signal, tstamps, (pre, post))
+        return nap.compute_perievent(signal, tstamps, (pre, post))

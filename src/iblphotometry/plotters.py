@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from one.api import ONE
-from iblphotometry import fpio, preprocessing, analysis, pipelines
+from iblphotometry import fpio, preprocessing, processing, analysis, pipelines
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -236,6 +236,7 @@ def plot_psths_from_trace(
     # _, axes = plt.subplots()
 
     # cast to pynapple
+    signal = processing.resample_signal(signal)
     signal = nap.Tsd(signal.index, signal.values)
     psths = analysis.psth_nap(
         signal,
