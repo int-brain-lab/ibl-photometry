@@ -41,5 +41,5 @@ jobs:
       run: uv sync
     - name: Test with pytest
       run: |
-        uv pip install pytest-github-actions-annotate-failures
+        uv pip install ".[analysis]" pytest-github-actions-annotate-failures
         uv run pytest -k 'test_'
