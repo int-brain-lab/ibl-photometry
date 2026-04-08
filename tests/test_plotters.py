@@ -1,7 +1,6 @@
 from iblphotometry import fpio, plotters
 from tests.base_tests import PhotometryDataTestCase
 import pandas as pd
-import pynapple as nap
 
 
 class TestPlotters(PhotometryDataTestCase):
