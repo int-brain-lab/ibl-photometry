@@ -1,4 +1,4 @@
-from iblphotometry import fpio, plotters
+from iblphotometry import fpio, plotters, neurophotometrics
 from tests.base_tests import PhotometryDataTestCase
 import pandas as pd
 
@@ -7,7 +7,7 @@ class TestPlotters(PhotometryDataTestCase):
     def setUp(self):
         super().setUp()
         path = self.versions_path / 'version_5' / '_neurophotometrics_fpData.raw.pqt'
-        self.photometry_df = fpio.from_neurophotometrics_file_to_photometry_df(path)
+        self.photometry_df = neurophotometrics.from_neurophotometrics_file_to_photometry_df(path)
         self.signals_dfs = fpio.from_photometry_df(self.photometry_df)
         self.trials_table = pd.read_parquet(self.versions_path / 'version_5' / '_ibl_trials.table.pqt')
 

@@ -12,7 +12,7 @@ class TestAnalysis(PhotometryDataTestCase):
         self.signals_dfs = fpio.from_photometry_df(self.photometry_df)
         self.trials_table = pd.read_parquet(self.versions_path / 'version_5' / '_ibl_trials.table.pqt')
 
-    def test_processing(self):
+    def test_analysis(self):
         raw_df = self.signals_dfs['GCaMP']
         df = processing.resample_signal(raw_df)
         signal = nap.Tsd(df['G0'])
