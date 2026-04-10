@@ -6,7 +6,7 @@ from typing import Tuple, Optional, List
 import pickle
 
 import ibldsp.utils
-import ibllib.io.session_params
+from ibllib.io import session_params as ibllib_session_params
 from ibllib.pipes import base_tasks
 from iblutil.io import jsonable
 
@@ -202,7 +202,7 @@ class FibrePhotometryBaseSync(base_tasks.DynamicTask):
 
         if self.task_collection is None:
             # if not provided, infer
-            self.task_collection = ibllib.io.session_params.get_task_collection(self.session_params, self.task_protocol)
+            self.task_collection = ibllib_session_params.get_task_collection(self.session_params, self.task_protocol)
 
         # configuring the sync: state names
         if sync_states_names is None:
@@ -821,13 +821,13 @@ class PhotometryQC(QC):
             revision=self.revision,
         )
         # get the task collection
-        session_params = ibllib.io.session_params.read_params(self.session_path)
+        session_params = ibllib_session_params.read_params(self.session_path)
         # if not provided, use the first protocol
         if self.task_protocol is None:
             for task in session_params['tasks']:
                 self.task_protocol = next(k for k in task)
                 break
-        self.task_collection = ibllib.io.session_params.get_task_collection(session_params, self.task_protocol)
+        self.task_collection = ibllib_session_params.get_task_collection(session_params, self.task_protocol)
 
         # FIXME this is probably not the proper way to do it
         number = self.task_collection[-2:]

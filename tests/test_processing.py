@@ -1,4 +1,4 @@
-from iblphotometry import fpio, processing
+from iblphotometry import fpio, processing, neurophotometrics
 from tests.base_tests import PhotometryDataTestCase
 
 
@@ -6,7 +6,7 @@ class TestProcessing(PhotometryDataTestCase):
     def setUp(self):
         super().setUp()
         path = self.versions_path / 'version_5' / '_neurophotometrics_fpData.raw.pqt'
-        self.photometry_df = fpio.from_neurophotometrics_file_to_photometry_df(path)
+        self.photometry_df = neurophotometrics.from_neurophotometrics_file_to_photometry_df(path)
         self.signals_dfs = fpio.from_photometry_df(self.photometry_df)
 
     def test_processing(self):

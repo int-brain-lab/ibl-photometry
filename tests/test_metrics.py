@@ -1,4 +1,4 @@
-from iblphotometry import metrics, fpio
+from iblphotometry import metrics, fpio, neurophotometrics
 
 from tests.base_tests import PhotometryDataTestCase
 
@@ -7,7 +7,7 @@ class TestMetrics(PhotometryDataTestCase):
     def setUp(self):
         super().setUp()
         path = self.versions_path / 'version_5' / '_neurophotometrics_fpData.raw.pqt'
-        self.photometry_df = fpio.from_neurophotometrics_file_to_photometry_df(path)
+        self.photometry_df = neurophotometrics.from_neurophotometrics_file_to_photometry_df(path)
         self.signals_dfs = fpio.from_photometry_df(self.photometry_df)
 
     def test_raw_signal_metrics(self):
