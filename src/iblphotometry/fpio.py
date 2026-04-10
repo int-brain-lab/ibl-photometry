@@ -8,7 +8,6 @@ from dataclasses import field
 from brainbox.io.one import SessionLoader
 import warnings
 from functools import wraps
-from iblphotometry import neurophotometrics
 
 
 """
@@ -329,7 +328,9 @@ def _deprecated_forward(target_func):
 
 
 # moved functions
-
+# very unelegant solution for the circular import but the alternative would be a temporary restructuring of the repo
+# which seems worse
+from iblphotometry import neurophotometrics
 
 infer_neurophotometrics_version_from_data = _deprecated_forward(neurophotometrics.infer_neurophotometrics_version_from_data)
 read_neurophotometrics_file = _deprecated_forward(neurophotometrics.read_neurophotometrics_file)
