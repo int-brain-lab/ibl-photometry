@@ -2,12 +2,13 @@ import numpy as np
 from pathlib import Path
 import pandas as pd
 import pandera.pandas as pa
-from pandera.errors import SchemaError
 from one.api import ONE
 from typing import Optional, Dict, List
 from dataclasses import field
 from brainbox.io.one import SessionLoader
-# from iblphotometry import neurophotometrics
+import warnings
+from functools import wraps
+from iblphotometry import neurophotometrics
 
 
 """
@@ -308,10 +309,6 @@ class PhotometrySessionLoader(SessionLoader):
         self.photometry = raw_dfs
 
 
-import warnings
-from functools import wraps
-
-
 def _deprecated_forward(target_func):
     """
     Return a wrapper that warns once and calls target_func.
@@ -332,7 +329,7 @@ def _deprecated_forward(target_func):
 
 
 # moved functions
-from iblphotometry import neurophotometrics
+
 
 infer_neurophotometrics_version_from_data = _deprecated_forward(neurophotometrics.infer_neurophotometrics_version_from_data)
 read_neurophotometrics_file = _deprecated_forward(neurophotometrics.read_neurophotometrics_file)
