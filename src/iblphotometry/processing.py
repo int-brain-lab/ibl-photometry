@@ -302,7 +302,6 @@ class Regression:
         #     print(self.popt)
 
     def predict(self, x: np.ndarray, return_type: Literal['numpy', 'pandas'] = 'numpy'):
-        x = np.sort(x)  # just in case
         y_hat = self.model.eq(x, *self.popt)
         match return_type:
             case 'numpy':
