@@ -301,8 +301,9 @@ class Regression:
         #     self.popt = (self.reg.coef_, self.reg.intercept_)
         #     print(self.popt)
 
-    def predict(self, x: np.ndarray, return_type: Literal['numpy', 'pandas'] = 'numpy'):
-        x = np.sort(x)  # just in case
+    def predict(self, x: np.ndarray, return_type: Literal['numpy', 'pandas'] = 'numpy', sort: bool = True):
+        if sort:  # optionally sorting the values
+            x = np.sort(x)
         y_hat = self.model.eq(x, *self.popt)
         match return_type:
             case 'numpy':
@@ -376,7 +377,7 @@ class IsosbesticCorrection:
         F_iso: pd.Series,
     ) -> pd.Series:
         self.reg.fit(F_iso.values, F_ca.values)
-        F_iso_fit = self.reg.predict(F_iso.values, return_type='pandas')
+        F_iso_fit = self.reg.predict(F_iso.values, return_type='pandas', sort=False)
 
         return correct(F_ca, F_iso_fit, mode=self.correction_method)
 
