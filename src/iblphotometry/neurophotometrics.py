@@ -1,4 +1,3 @@
-from typing import Optional, Dict, List
 import numpy as np
 from pathlib import Path
 import pandas as pd
@@ -171,9 +170,9 @@ def read_neurophotometrics_file(path: str | Path) -> pd.DataFrame:
 
 def from_neurophotometrics_df_to_photometry_df(
     raw_df: pd.DataFrame,
-    version: Optional[str] = None,
+    version: str | None = None,
     validate: bool = True,
-    data_columns: Optional[List[str]] = None,
+    data_columns: list[str] | None = None,
     drop_first: bool = True,
 ) -> pd.DataFrame:
     """
@@ -282,9 +281,9 @@ def from_neurophotometrics_df_to_photometry_df(
 
 def from_neurophotometrics_file_to_photometry_df(
     path: str | Path,
-    version: Optional[str] = None,
+    version: str | None = None,
     validate: bool = True,
-    data_columns: Optional[List[str]] = None,
+    data_columns: list[str] | None = None,
     drop_first: bool = True,
 ) -> pd.DataFrame:
     """
@@ -316,8 +315,8 @@ def from_neurophotometrics_file(
     path: str | Path,
     drop_first: bool = True,
     validate: bool = True,
-    version: Optional[str] = None,
-) -> Dict[str, pd.DataFrame]:
+    version: str | None = None,
+) -> dict[str, pd.DataFrame]:
     """
     Read a neurophotometrics file and split into channel DataFrames.
 
@@ -421,10 +420,10 @@ def infer_neurophotometrics_version_from_digital_inputs(df: pd.DataFrame) -> str
 
 def read_digital_inputs_file(
     path: str | Path,
-    version: Optional[str] = None,
+    version: str | None = None,
     validate: bool = True,
-    channel: Optional[int] = None,
-    timestamps_colname: Optional[str] = None,
+    channel: int | None = None,
+    timestamps_colname: str | None = None,
 ) -> pd.DataFrame:
     path = Path(path) if isinstance(path, str) else path
     match path.suffix:
@@ -447,10 +446,10 @@ def read_digital_inputs_file(
 
 def validate_digital_inputs_df(
     df: pd.DataFrame,
-    version: Optional[str] = None,
+    version: str | None = None,
     validate: bool = True,
-    channel: Optional[int] = None,
-    timestamps_colname: Optional[str] = None,
+    channel: int | None = None,
+    timestamps_colname: str | None = None,
 ) -> pd.DataFrame:
     if version is None:
         version = infer_neurophotometrics_version_from_digital_inputs(df)

@@ -29,12 +29,12 @@ def run_pipeline(
     _type_
         _description_
     """
-    res = dict(signal=signal, reference=reference)
+    res = {'signal': signal, 'reference': reference}
     for step in pipeline:
         # resolving inputs
         inputs = [res[inp] for inp in step['inputs']]
         # calling the steps sequentially
-        params = step['parameters'] if 'parameters' in step else {}  # optional parameters
+        params = step.get('parameters', {})
         res[step['output']] = step['function'](*inputs, **params)
         # passing metadata through - taking the name of the first
         res[step['output']].name = inputs[0].name
@@ -59,61 +59,61 @@ Definition of a pipeline:
         after all pipeline steps are done, 'result' will be returend
 """
 sliding_mad_pipeline = [
-    dict(
-        function=processing.lowpass_bleachcorrect,
-        parameters=dict(
-            correction_method='subtract-divide',
-            N=3,
-            Wn=0.01,
-        ),
-        inputs=('signal',),
-        output='bleach_corrected',
-    ),
-    dict(
-        function=processing.sliding_mad,
-        parameters=dict(
-            w_len=120,
-            overlap=90,
-        ),
-        inputs=('bleach_corrected',),
-        output='mad',
-    ),
-    dict(
-        function=processing.zscore,
-        parameters=dict(mode='median'),
-        inputs=('mad',),
-        output='result',
-    ),
+    {
+        'function': processing.lowpass_bleachcorrect,
+        'parameters': {
+            'correction_method': 'subtract-divide',
+            'N': 3,
+            'Wn': 0.01,
+        },
+        'inputs': ('signal',),
+        'output': 'bleach_corrected',
+    },
+    {
+        'function': processing.sliding_mad,
+        'parameters': {
+            'w_len': 120,
+            'overlap': 90,
+        },
+        'inputs': ('bleach_corrected',),
+        'output': 'mad',
+    },
+    {
+        'function': processing.zscore,
+        'parameters': {'mode': 'median'},
+        'inputs': ('mad',),
+        'output': 'result',
+    },
 ]
 
 isosbestic_correction_pipeline = [
-    dict(
-        function=processing.lowpass_bleachcorrect,
-        parameters=dict(
-            correction_method='subtract-divide',
-            N=3,
-            Wn=0.01,
-        ),
-        inputs=('signal',),
-        output='signal_bleach_corrected',
-    ),
-    dict(
-        function=processing.lowpass_bleachcorrect,
-        parameters=dict(
-            correction_method='subtract-divide',
-            N=3,
-            Wn=0.01,
-        ),
-        inputs=('reference',),
-        output='reference_bleach_corrected',
-    ),
-    dict(
-        function=processing.isosbestic_correct,
-        parameters=dict(
-            regression_method='mse',
-            correction_method='subtract',
-        ),
-        inputs=('signal_bleach_corrected', 'reference_bleach_corrected'),
-        output='result',
-    ),
+    {
+        'function': processing.lowpass_bleachcorrect,
+        'parameters': {
+            'correction_method': 'subtract-divide',
+            'N': 3,
+            'Wn': 0.01,
+        },
+        'inputs': ('signal',),
+        'output': 'signal_bleach_corrected',
+    },
+    {
+        'function': processing.lowpass_bleachcorrect,
+        'parameters': {
+            'correction_method': 'subtract-divide',
+            'N': 3,
+            'Wn': 0.01,
+        },
+        'inputs': ('reference',),
+        'output': 'reference_bleach_corrected',
+    },
+    {
+        'function': processing.isosbestic_correct,
+        'parameters': {
+            'regression_method': 'mse',
+            'correction_method': 'subtract',
+        },
+        'inputs': ('signal_bleach_corrected', 'reference_bleach_corrected'),
+        'output': 'result',
+    },
 ]

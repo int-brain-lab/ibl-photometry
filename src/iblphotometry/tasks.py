@@ -2,7 +2,6 @@ import logging
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from typing import Tuple, Optional, List
 import pickle
 
 import ibldsp.utils
@@ -62,7 +61,7 @@ def _int2digital_channels(values: np.ndarray) -> np.ndarray:
 
 def extract_timestamps_from_tdms_file(
     tdms_filepath: Path,
-    save_path: Optional[Path] = None,
+    save_path: Path | None = None,
     chunk_size=10000,
 ) -> dict:
     """extractor for tdms files as written by the daqami software, configured for neurophotometrics
@@ -83,7 +82,6 @@ def extract_timestamps_from_tdms_file(
         a dict with the tdms channel names as keys and 'positive' the timestamps of the rising edges
         'negative' the falling edges
     """
-    #
     _logger.info(f'extracting timestamps from tdms file: {tdms_filepath}')
 
     # this should be 10kHz
@@ -109,7 +107,7 @@ def extract_timestamps_from_tdms_file(
     # ini
     timestamps = {}
     for ch in digital_channel_names:
-        timestamps[ch] = dict(positive=[], negative=[])
+        timestamps[ch] = {'positive': [], 'negative': []}
 
     # chunked loop for memory efficiency
     if chunk_size is not None:
@@ -152,7 +150,7 @@ def extract_timestamps_from_tdms_file(
     return timestamps
 
 
-def extract_timestamps_from_bpod_jsonable(file_jsonable: str | Path, sync_states_names: List[str]):
+def extract_timestamps_from_bpod_jsonable(file_jsonable: str | Path, sync_states_names: list[str]):
     _, bpod_data = jsonable.load_task_jsonable(file_jsonable)
     timestamps = []
     for sync_name in sync_states_names:
@@ -238,7 +236,7 @@ class FibrePhotometryBaseSync(base_tasks.DynamicTask):
         # for daq based syncing, the timestamps are extracted from the tdms file
         ...
 
-    def _get_sync_function(self) -> Tuple[callable, list]:
+    def _get_sync_function(self) -> tuple[callable, list]:
         # returns the synchronization function
         # get the timestamps
         timestamps_bpod = self._get_bpod_timestamps()
@@ -248,7 +246,7 @@ class FibrePhotometryBaseSync(base_tasks.DynamicTask):
         for source, timestamps in zip(['bpod', 'neurophotometrics'], [timestamps_bpod, timestamps_nph]):
             assert len(timestamps) > 0, f'{source} sync timestamps are empty'
 
-        sync_nph_to_bpod_fcn, drift_ppm, ix_nph, ix_bpod = ibldsp.utils.sync_timestamps(
+        sync_nph_to_bpod_fcn, drift_ppm, _ix_nph, ix_bpod = ibldsp.utils.sync_timestamps(
             timestamps_nph, timestamps_bpod, return_indices=True, linear=True
         )
         if np.absolute(drift_ppm) > 20:
@@ -278,7 +276,7 @@ class FibrePhotometryBaseSync(base_tasks.DynamicTask):
         )
         return photometry_df
 
-    def _run(self, **kwargs) -> Tuple[Path, Path]:
+    def _run(self, **kwargs) -> tuple[Path, Path]:
         # 1) load photometry data
 
         # note: when loading daq based syncing, the SystemTimestamp column
@@ -500,11 +498,11 @@ class FibrePhotometryDAQSync(FibrePhotometryBaseSync):
         for i, ch in enumerate(['DI0', 'DI1', 'DI2', 'DI3']):
             timestamps_daq_ch = timestamps_daq[ch]['positive']
             try:
-                sync_fcn, drift_ppm, ix_daq, ix_bpod = ibldsp.utils.sync_timestamps(
+                _sync_fcn, _drift_ppm, _ix_daq, ix_bpod = ibldsp.utils.sync_timestamps(
                     timestamps_daq_ch, timestamps_bpod, return_indices=True, linear=True
                 )
                 if ix_bpod.shape[0] / timestamps_bpod.shape[0] > 0.95:
-                    matched_channels.append(dict(index=i, name=ch))
+                    matched_channels.append({'index': i, 'name': ch})
             except ValueError:
                 continue
 
@@ -557,7 +555,7 @@ class FibrePhotometryPassiveChoiceWorld(base_tasks.BehaviourTask):
         }
         return signature
 
-    def _run(self, **kwargs) -> Tuple[Path, Path, Path]:
+    def _run(self, **kwargs) -> tuple[Path, Path, Path]:
         # load the fixtures - from the relative delays between trials, an "absolute" time vector is
         # created that is used for the synchronization
         fixtures_path = (
@@ -580,12 +578,12 @@ class FibrePhotometryPassiveChoiceWorld(base_tasks.BehaviourTask):
         # e.g. state machine time, bonsai delay etc.
 
         # stimulus durations
-        stim_durations = dict(
-            T=task_settings['GO_TONE_DURATION'],
-            N=task_settings['WHITE_NOISE_DURATION'],
-            G=0.3,  # visual stimulus duration is hardcoded to 300ms
-            V=0.1,  # V=0.1102 from a a session # to be replaced later down
-        )
+        stim_durations = {
+            'T': task_settings['GO_TONE_DURATION'],
+            'N': task_settings['WHITE_NOISE_DURATION'],
+            'G': 0.3,  # visual stimulus duration is hardcoded to 300ms
+            'V': 0.1,  # V=0.1102 from a a session # to be replaced later down
+        }
         for s in fixtures_df['stim_type'].unique():
             fixtures_df.loc[fixtures_df['stim_type'] == s, 'delay'] = stim_durations[s]
 
@@ -735,14 +733,14 @@ class FibrePhotometryPassiveChoiceWorld(base_tasks.BehaviourTask):
         ttl_durations = self.timestamps[f'DI{sync_channel}']['negative'] - self.timestamps[f'DI{sync_channel}']['positive']
         valve_open_dur = np.median(ttl_durations[ix_daq])
         passiveStims_df = pd.DataFrame(
-            dict(
-                valveOn=fixtures_df.groupby('stim_type').get_group('V')['t_rel'],
-                valveOff=fixtures_df.groupby('stim_type').get_group('V')['t_rel'] + valve_open_dur,
-                toneOn=fixtures_df.groupby('stim_type').get_group('T')['t_rel'],
-                toneOff=fixtures_df.groupby('stim_type').get_group('T')['t_rel'] + task_settings['GO_TONE_DURATION'],
-                noiseOn=fixtures_df.groupby('stim_type').get_group('N')['t_rel'],
-                noiseOff=fixtures_df.groupby('stim_type').get_group('N')['t_rel'] + task_settings['WHITE_NOISE_DURATION'],
-            )
+            {
+                'valveOn': fixtures_df.groupby('stim_type').get_group('V')['t_rel'],
+                'valveOff': fixtures_df.groupby('stim_type').get_group('V')['t_rel'] + valve_open_dur,
+                'toneOn': fixtures_df.groupby('stim_type').get_group('T')['t_rel'],
+                'toneOff': fixtures_df.groupby('stim_type').get_group('T')['t_rel'] + task_settings['GO_TONE_DURATION'],
+                'noiseOn': fixtures_df.groupby('stim_type').get_group('N')['t_rel'],
+                'noiseOff': fixtures_df.groupby('stim_type').get_group('N')['t_rel'] + task_settings['WHITE_NOISE_DURATION'],
+            }
         )
         # convert all times from fixture time (=rel) to daq time
         passiveStims_df.iloc[:, :] = sync_fun_rel_to_daq(passiveStims_df.values)

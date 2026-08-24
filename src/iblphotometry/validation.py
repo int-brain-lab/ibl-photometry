@@ -2,19 +2,18 @@ from pathlib import Path
 import pandas as pd
 from iblphotometry.fpio import PhotometrySessionLoader
 from one.api import ONE
-from typing import Optional, List
 
 
 class PhotometryDataValidator:
-    def __init__(self, one: Optional[ONE] = None):
+    def __init__(self, one: ONE | None = None):
         self.one = ONE() if one is None else one
 
-    def validate_eids(self, eids: List) -> List[str]:
+    def validate_eids(self, eids: list) -> list[str]:
         return [self._validate(eid) for eid in eids]
 
-    def validate_file(self, eids_file: str | Path) -> List[str]:
+    def validate_file(self, eids_file: str | Path) -> list[str]:
         with open(eids_file, 'r') as fH:
-            eids = [eid.strip() for eid in fH.readlines()]
+            eids = [eid.strip() for eid in fH]
         return self.validate_eids(eids)
 
     def validate_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -26,6 +25,6 @@ class PhotometryDataValidator:
         try:
             psl = PhotometrySessionLoader(eid=eid, one=self.one)
             psl.load_photometry()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             return f'{type(e).__name__}:{e}'
         return ''

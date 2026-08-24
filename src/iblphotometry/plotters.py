@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from collections.abc import Sequence
 
 from one.api import ONE
 from iblphotometry import fpio, preprocessing, processing, analysis, pipelines
@@ -154,7 +155,7 @@ def plot_psths(
 
     fig, axes = plt.subplots(
         nrows=len(outcomes),
-        gridspec_kw=dict(height_ratios=[psths[o].shape[1] for o in outcomes]),
+        gridspec_kw={'height_ratios': [psths[o].shape[1] for o in outcomes]},
         sharex=True,
     )
     values = np.concatenate([psths[o].values.flatten() for o in outcomes])
@@ -180,7 +181,7 @@ def plot_psths(
 def plot_photometry_df_from_eid(
     eid: str,
     one: ONE,
-    channels: list[str] = ['GCaMP'],
+    channels: Sequence[str] = ('GCaMP',),
     preprocess: bool = True,
 ):
     raw_df = one.load_dataset(eid, 'raw_photometry_data/_neurophotometrics_fpData.raw.pqt')
