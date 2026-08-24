@@ -54,8 +54,12 @@ dev = [
 indent-width = 4
 line-length = 130
 exclude =[
-    "src/examples"
+    "src/examples",
+    "src/scripts"
 ]
+
+[tool.ruff.lint]
+ignore = ["I"]
 
 [tool.ruff.lint.isort]
 known-first-party = [ "ibl*", "one*", "pybpod*" ]

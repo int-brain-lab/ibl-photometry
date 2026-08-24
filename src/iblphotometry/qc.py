@@ -1,7 +1,7 @@
 from joblib import Parallel, delayed
 import traceback
 from tqdm import tqdm
-from typing import List, Optional, Dict, Literal
+from typing import Literal
 
 import numpy as np
 from scipy.stats import linregress
@@ -13,13 +13,13 @@ from iblphotometry.pipelines import run_pipeline
 
 
 def qc_signals(
-    raw_dfs: Dict[str, pd.DataFrame],
-    metrics: List[callable],
-    metrics_kwargs: Dict = {},
-    signal_band: Optional[str | List[str]] = None,
-    brain_region: Optional[str | List[str]] = None,
-    pipeline: Optional[List[Dict]] = None,
-    sliding_kwargs: Optional[Dict] = None,
+    raw_dfs: dict[str, pd.DataFrame],
+    metrics: list[callable],
+    metrics_kwargs: dict | None = None,
+    signal_band: str | list[str] | None = None,
+    brain_region: str | list[str] | None = None,
+    pipeline: list[dict] | None = None,
+    sliding_kwargs: dict | None = None,
 ) -> pd.DataFrame:
     """runs a set of qc metrics on a given photometry dataset
 
@@ -46,24 +46,25 @@ def qc_signals(
         the qc result in tidy data format
     """
     # which data to operate on
+    metrics_kwargs = {} if metrics_kwargs is None else metrics_kwargs
     if signal_band is None:
         signal_bands = raw_dfs.keys()
     else:
         if type(signal_band) is str:
-            assert signal_band in raw_dfs.keys(), f'signal band {signal_band} not present in data'
+            assert signal_band in raw_dfs, f'signal band {signal_band} not present in data'
             signal_bands = [signal_band]
     if brain_region is None:
-        brain_regions = raw_dfs[list(signal_bands)[0]].columns
+        brain_regions = raw_dfs[next(signal_bands)].columns
     else:
         if type(brain_region) is str:
-            assert brain_region in raw_dfs[list(signal_bands)[0]].columns, f'brain region {brain_region} not present in data'
+            assert brain_region in raw_dfs[next(signal_bands)].columns, f'brain region {brain_region} not present in data'
             brain_regions = [brain_region]
 
     # the main qc loop
     qc_result = []
     for band in signal_bands:
-        for brain_region in brain_regions:
-            signal = raw_dfs[band][brain_region]
+        for _brain_region in brain_regions:
+            signal = raw_dfs[band][_brain_region]
 
             # if a pipeline is provided, run it here
             if pipeline is not None:
@@ -76,7 +77,7 @@ def qc_signals(
                 qc_result.append(
                     {
                         'band': band,
-                        'brain_region': brain_region,
+                        'brain_region': _brain_region,
                         'metric': metric.__name__,
                         'value': metric(signal, **_metric_kwargs),
                     }
@@ -109,7 +110,7 @@ def qc_signals(
                         qc_result.append(
                             {
                                 'band': band,
-                                'brain_region': brain_region,
+                                'brain_region': _brain_region,
                                 'metric': metric.__name__,
                                 'value': metric(signal_),
                                 'window': w_start + w_len / 2,
@@ -122,17 +123,18 @@ def qc_signals(
 def qc_eid(
     eid: str,
     one: ONE,
-    metrics: List[callable],
-    metrics_kwargs: Dict = {},
-    signal_band: Optional[str | List[str]] = None,
-    brain_region: Optional[str | List[str]] = None,
-    pipeline: Optional[List[Dict]] = None,
-    sliding_kwargs: Optional[Dict] = None,
+    metrics: list[callable],
+    metrics_kwargs: dict | None = None,
+    signal_band: str | list[str] | None = None,
+    brain_region: str | list[str] | None = None,
+    pipeline: list[dict] | None = None,
+    sliding_kwargs: dict | None = None,
     on_error: Literal['log', 'raise'] = 'log',
 ) -> pd.DataFrame:
     """
     Convenience function for running qc on a dataset as given by an eid. See qc_signals for a description of the individual parameters
     """
+    metrics_kwargs = {} if metrics_kwargs is None else metrics_kwargs
     try:
         psl = PhotometrySessionLoader(eid=eid, one=one)
         psl.load_photometry()
@@ -160,19 +162,19 @@ def qc_eid(
                 ]
             )
         else:
-            raise e
+            raise
     return qc_result
 
 
 def run_qc(
-    eids: List[str],
+    eids: list[str],
     one: ONE,
-    metrics: List[callable],
-    metrics_kwargs: dict = {},
-    signal_band: Optional[str | List[str]] = None,
-    brain_region: Optional[str | List[str]] = None,
-    pipeline: Optional[List[dict]] = None,
-    sliding_kwargs: Optional[Dict] = None,
+    metrics: list[callable],
+    metrics_kwargs: dict | None = None,
+    signal_band: str | list[str] | None = None,
+    brain_region: str | list[str] | None = None,
+    pipeline: list[dict] | None = None,
+    sliding_kwargs: dict | None = None,
     n_jobs: int = 1,
     on_error: Literal['log', 'raise'] = 'log',
 ) -> pd.DataFrame:
@@ -190,6 +192,7 @@ def run_qc(
     pd.DataFrame
         the qc result in tidy data format
     """
+    metrics_kwargs = {} if metrics_kwargs is None else metrics_kwargs
     if n_jobs == 1:
         qc_results = []
         for eid in tqdm(eids):

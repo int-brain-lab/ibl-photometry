@@ -43,9 +43,9 @@ def generate_dataframe(sigma: float = 0.01):
     if sigma is not None:
         df[['raw_calcium', 'raw_isosbestic']] += np.random.randn(*df.shape) * sigma
 
-    raw_dfs = dict(
-        raw_calcium=pd.DataFrame(df['raw_calcium'].values, index=df.index, columns=['Region01']),
-        raw_isosbestic=pd.DataFrame(df['raw_isosbestic'].values, index=df.index, columns=['Region01']),
-    )
+    raw_dfs = {
+        'raw_calcium': pd.DataFrame(df['raw_calcium'].values, index=df.index, columns=['Region01']),
+        'raw_isosbestic': pd.DataFrame(df['raw_isosbestic'].values, index=df.index, columns=['Region01']),
+    }
 
     return raw_dfs

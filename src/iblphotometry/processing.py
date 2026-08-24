@@ -138,7 +138,7 @@ def sobel(a: np.ndarray, k: int = 1, uniform: bool = True):
 
 
 # currently here now so analysis.py is optional
-def psth(signal, times, t_events, fs=None, event_window=np.array([-1, 2])):
+def psth(signal, times, t_events, fs=None, event_window: np.ndarray | None = None):
     """
     Compute the peri-event time histogram of a calcium signal
     :param signal:
@@ -148,6 +148,7 @@ def psth(signal, times, t_events, fs=None, event_window=np.array([-1, 2])):
     :param event_window:
     :return:
     """
+    event_window = event_window or np.array([-1, 2])
     if fs is None:
         fs = 1 / np.nanmedian(np.diff(times))
     # compute a vector of indices corresponding to the perievent window at the given sampling rate
@@ -284,7 +285,7 @@ class Regression:
                 method=algorithm,
             )
         if not minimize_result.success:
-            raise Exception(f'Fitting failed. {minimize_result.message}')
+            raise ValueError(f'Fitting failed. {minimize_result.message}')
         else:
             self.popt = minimize_result.x
 
@@ -302,7 +303,6 @@ class Regression:
         #     print(self.popt)
 
     def predict(self, x: np.ndarray, return_type: Literal['numpy', 'pandas'] = 'numpy'):
-        x = np.sort(x)  # just in case
         y_hat = self.model.eq(x, *self.popt)
         match return_type:
             case 'numpy':
@@ -329,7 +329,7 @@ class BleachCorrection:
         self,
         model=None,  # TODO bring back type checking
         regression_method: str = 'mse',
-        regression_params: dict = None,
+        regression_params: dict | None = None,
         correction_method: str = 'subtract',
     ):
         self.model = model
@@ -345,10 +345,10 @@ class BleachCorrection:
 class LowpassBleachCorrection:
     def __init__(
         self,
-        filter_params=dict(N=3, Wn=0.01, btype='lowpass'),
-        correction_method='subtract-divide',
+        filter_params: dict | None = None,
+        correction_method: str = 'subtract-divide',
     ):
-        self.filter_params = filter_params
+        self.filter_params = {'N': 3, 'Wn': 0.01, 'btype': 'lowpass'} | (filter_params or {})
         self.correction_method = correction_method
 
     def correct(self, F: pd.Series) -> pd.Series:
@@ -464,7 +464,7 @@ class AbstractModel(ABC):
         ll = self._calc_likelihood(y, y_hat, n_samples, use_kde)
         k = len(signature(self.eq).parameters) - 1
         aic = self._calc_aic(ll, k)
-        return dict(r_sq=r_sq, ll=ll, aic=aic)
+        return {'r_sq': r_sq, 'll': ll, 'aic': aic}
 
 
 # the actual models
@@ -563,11 +563,11 @@ def lowpass_bleachcorrect(
 ) -> pd.Series:
     bc = LowpassBleachCorrection(
         correction_method=correction_method,
-        filter_params=dict(
-            N=N,
-            Wn=Wn,
-            btype='lowpass',
-        ),
+        filter_params={
+            'N': N,
+            'Wn': Wn,
+            'btype': 'lowpass',
+        },
     )
     return bc.correct(F)
 
@@ -640,10 +640,8 @@ def _grubbs_single(
     tsq = t.ppf(1 - alpha / (2 * N), df=N - 2) ** 2
     g = (N - 1) / np.sqrt(N) * np.sqrt(tsq / (N - 2 + tsq))
 
-    if G > g:  # if G > g, reject null hypothesis (of no outliers)
-        return True
-    else:
-        return False
+    # if G > g, reject null hypothesis (of no outliers)
+    return G > g
 
 
 def grubbs_test(
@@ -922,7 +920,7 @@ def sliding_z(
 
 def sliding_mad(
     F: pd.Series,
-    w_len: float = None,
+    w_len: float,
     overlap: int = 90,
     fs: float | None = None,
 ) -> pd.Series:

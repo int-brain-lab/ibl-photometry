@@ -1,3 +1,8 @@
+import unittest
+
+import numpy as np
+import pandas as pd
+
 from iblphotometry import fpio, processing, neurophotometrics
 from tests.base_tests import PhotometryDataTestCase
 
@@ -27,3 +32,33 @@ class TestProcessing(PhotometryDataTestCase):
         processing.sliding_dFF(raw_df, w_len=60, on_error='expand')
         processing.sliding_z(raw_df, w_len=60, on_error='expand')
         processing.sliding_mad(raw_df, w_len=60)
+
+
+class TestRegressionPredict(unittest.TestCase):
+    """Predictions must stay matched to the samples they were requested for."""
+
+    def setUp(self):
+        rng = np.random.default_rng(42)
+        self.x = rng.permutation(np.arange(16, dtype=float))
+        self.m, self.b = 3.0, 1.0
+        self.reg = processing.Regression(model=processing.LinearModel())
+        self.reg.fit(self.x, self.m * self.x + self.b)
+
+    def test_predict_preserves_sample_order(self):
+        for return_type in ('numpy', 'pandas'):
+            with self.subTest(return_type=return_type):
+                y_hat = self.reg.predict(self.x, return_type=return_type)
+                np.testing.assert_allclose(np.asarray(y_hat), self.m * self.x + self.b)
+
+    def test_isosbestic_correct_on_exactly_linear_signal(self):
+        # signal is an exact linear function of the reference, so the fit is
+        # exact and subtracting it must leave a flat, zero residual
+        t = np.arange(600) / 30.0
+        rng = np.random.default_rng(0)
+        reference = pd.Series(1.0 + np.cumsum(rng.normal(0, 0.05, t.size)), index=t)
+        signal = pd.Series(2.0 * reference.values + 0.5, index=t)
+
+        corrected = processing.isosbestic_correct(signal, reference, correction_method='subtract')
+
+        np.testing.assert_allclose(corrected.values, 0.0, atol=1e-6)
+        np.testing.assert_array_equal(corrected.index.values, t)

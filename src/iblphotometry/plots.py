@@ -14,7 +14,7 @@ def psth_times(fs, event_window):
     return psth_times
 
 
-def psth(signal, times, t_events, fs=None, event_window=np.array([-1, 2])):
+def psth(signal, times, t_events, fs=None, event_window: np.ndarray | None = None):
     """
     Compute the peri-event time histogram of a calcium signal
     :param signal:
@@ -24,6 +24,7 @@ def psth(signal, times, t_events, fs=None, event_window=np.array([-1, 2])):
     :param event_window:
     :return:
     """
+    event_window = event_window or np.array([-1, 2])
     if fs is None:
         fs = 1 / np.nanmedian(np.diff(times))
     # compute a vector of indices corresponding to the perievent window at the given sampling rate
@@ -46,7 +47,7 @@ def psth(signal, times, t_events, fs=None, event_window=np.array([-1, 2])):
 # -------------------------------------------------------------------------------------------------
 def _filter(obj, idx):
     obj = Bunch(copy.deepcopy(obj))
-    for key in obj.keys():
+    for key in obj:
         obj[key] = obj[key][idx]
 
     return obj
@@ -199,7 +200,8 @@ class PlotSignalResponse:
     def __init__(self):
         self.psth_dict = {}
 
-    def set_data(self, trials, processed_signal, times, fs=None, event_window=np.array([-1, 2])):
+    def set_data(self, trials, processed_signal, times, fs=None, event_window: np.ndarray | None = None):
+        event_window = event_window or np.array([-1, 2])
         self.trials = trials
         self.times = times
         self.processed_signal = processed_signal
@@ -211,8 +213,8 @@ class PlotSignalResponse:
         self.psth_dict = self.compute_events_psth()
 
     def compute_events_psth(self):
-        psth_dict = dict()
-        for event in PSTH_EVENTS.keys():
+        psth_dict = {}
+        for event in PSTH_EVENTS:
             try:
                 psth_dict[event], _ = psth(
                     self.processed_signal,
@@ -251,14 +253,14 @@ class PlotSignalResponse:
         return figure, axs
 
     def plot_trialsort_psth(self, axs):
-        signal_keys = [k for k in self.psth_dict.keys() if k != 'times']
+        signal_keys = [k for k in self.psth_dict if k != 'times']
         if axs.shape[1] < len(signal_keys):
             raise ValueError('Error, skipping PSTH plotting')
 
         for iaxs, event in enumerate(signal_keys):
             axs_plt = [axs[0, iaxs], axs[1, iaxs]]
             plot_psth(self.psth_dict[event], self.psth_dict['times'], axs=axs_plt)
-            if event in PSTH_EVENTS.keys():
+            if event in PSTH_EVENTS:
                 axs_plt[0].set_title(PSTH_EVENTS[event])
             else:
                 axs_plt[0].set_title(event)

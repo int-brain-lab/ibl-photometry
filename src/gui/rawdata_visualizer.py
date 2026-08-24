@@ -14,7 +14,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5 import NavigationToolbar2QT as NavigationToolbar
 
 from iblphotometry.fpio import from_raw_neurophotometrics_file
-import iblphotometry.plots as plots
+from iblphotometry import plots
 
 from iblphotometry.plots import mad_raw_signal
 import numpy as np
@@ -104,12 +104,12 @@ class DataFrameVisualizerApp(QWidget):
 
     def load_file(self, file_path):
         try:
-            if file_path.endswith('.csv') or file_path.endswith('.pqt') or file_path.endswith('.parquet'):
+            if file_path.endswith('.csv', '.pqt', '.parquet'):
                 self.dfs = from_raw_neurophotometrics_file(file_path)
             else:
                 raise ValueError('Unsupported file format')
 
-            if 'GCaMP' in self.dfs.keys():
+            if 'GCaMP' in self.dfs:
                 self.df = self.dfs['GCaMP']
                 self.times = self.dfs['GCaMP'].index.values
                 self.plot_time_index = np.arange(0, len(self.times))
@@ -117,7 +117,7 @@ class DataFrameVisualizerApp(QWidget):
             else:
                 raise ValueError('No GCaMP found')
 
-            if 'Isosbestic' in self.dfs.keys():
+            if 'Isosbestic' in self.dfs:
                 self.dfiso = self.dfs['Isosbestic']
 
             # Display the dataframe in the table
@@ -131,7 +131,7 @@ class DataFrameVisualizerApp(QWidget):
             # Set filter combo box
             self.filter_selector.setCurrentIndex(0)  # Reset to "Select Filter"
 
-        except Exception as e:
+        except Exception as e:  # noqa
             print(f'Error loading file: {e}')
 
     def open_dialog(self):
@@ -345,11 +345,11 @@ class BehaviorVisualizerGUI(QWidget):
     def load_file(self, file_path):
         # load a trial file
         try:
-            if file_path.endswith('.pqt') or file_path.endswith('.parquet'):
+            if file_path.endswith('.pqt', '.parquet'):
                 self.load_trials(pd.read_parquet(file_path))
             else:
                 raise ValueError('Unsupported file format')
-        except Exception as e:
+        except Exception as e:  # noqa
             print(f'Error loading file: {e}')
 
     def open_dialog(self):

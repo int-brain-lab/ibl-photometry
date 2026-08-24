@@ -3,7 +3,6 @@ from pathlib import Path
 import pandas as pd
 import pandera.pandas as pa
 from one.api import ONE
-from typing import Optional, Dict, List
 from dataclasses import field
 from brainbox.io.one import SessionLoader
 import warnings
@@ -32,16 +31,16 @@ photometry_df_schema = {
 
 def _infer_data_columns(df: pd.DataFrame) -> list[str]:
     # small helper, returns the data columns from a photometry dataframe
-    if any([col.startswith('Region') for col in df.columns]):
+    if any(col.startswith('Region') for col in df.columns):
         data_columns = [col for col in df.columns if col.startswith('Region')]
     else:
-        data_columns = [col for col in df.columns if col.startswith('R') or col.startswith('G')]
+        data_columns = [col for col in df.columns if col.startswith(('R', 'G'))]
     return data_columns
 
 
 def validate_photometry_df(
     photometry_df: pd.DataFrame,
-    data_columns: Optional[List[str]] = None,
+    data_columns: list[str] | None = None,
 ) -> pd.DataFrame:
     """
     Validate the photometry DataFrame against the schema.
@@ -79,9 +78,9 @@ def validate_photometry_df(
 
 def from_photometry_df(
     photometry_df: pd.DataFrame,
-    data_columns: Optional[List[str]] = None,
-    channel_names: Optional[List[str]] = None,
-    rename: Optional[Dict] = None,  # the dict to rename the data_columns -> Region?G | G? -> brain_region
+    data_columns: list[str] | None = None,
+    channel_names: list[str] | None = None,
+    rename: dict | None = None,  # the dict to rename the data_columns -> Region?G | G? -> brain_region
     validate: bool = True,
     drop_first: bool = True,
 ) -> dict[pd.DataFrame]:
@@ -131,7 +130,7 @@ def from_photometry_df(
 
 def from_photometry_pqt(
     photometry_pqt_path: str | Path,
-    locations_pqt_path: Optional[str | Path] = None,
+    locations_pqt_path: str | Path | None = None,
     drop_first=True,
 ) -> dict[pd.DataFrame]:
     """
@@ -170,7 +169,7 @@ def from_eid(
     collection: str = 'photometry',
     drop_first: bool = True,
     revision: str | None = None,
-) -> List[Dict[str, pd.DataFrame]]:
+) -> list[dict[str, pd.DataFrame]]:
     """
     Load photometry data for a session ID (eid) using ONE.
 
@@ -197,8 +196,8 @@ def from_session_path(
     session_path: str | Path,
     collection: str = 'photometry',
     drop_first: bool = True,
-    revision: Optional[str] = None,
-) -> List[Dict[str, pd.DataFrame]]:
+    revision: str | None = None,
+) -> list[dict[str, pd.DataFrame]]:
     """
     Load photometry data from a locally present session path.
 
@@ -233,7 +232,7 @@ def restrict_to_session_time(
     t_start = trials_df.iloc[0]['intervals_0']
     t_stop = trials_df.iloc[-1]['intervals_1']
 
-    for band in raw_dfs.keys():
+    for band in raw_dfs:
         df = raw_dfs[band]
         ix = np.logical_and(
             df.index.values > t_start + pre,
@@ -244,7 +243,7 @@ def restrict_to_session_time(
     # the above indexing can lead to unevenly shaped bands.
     # Cut to shortest
     n = np.min([df.shape[0] for _, df in raw_dfs.items()])
-    for band in raw_dfs.keys():
+    for band in raw_dfs:
         raw_dfs[band] = raw_dfs[band].iloc[:n]
 
     return raw_dfs
@@ -271,7 +270,7 @@ class PhotometrySessionLoader(SessionLoader):
         self.revision = kwargs.get('revision', None)
 
         # determine if loading by eid or session path
-        self.load_by_path = True if 'session_path' in kwargs else False
+        self.load_by_path = 'session_path' in kwargs
 
         super().__init__(*args, **kwargs)
 
@@ -330,6 +329,7 @@ def _deprecated_forward(target_func):
 # moved functions
 # very unelegant solution for the circular import but the alternative would be a temporary restructuring of the repo
 # which seems worse
+# ruff: ignore
 from iblphotometry import neurophotometrics
 
 infer_neurophotometrics_version_from_data = _deprecated_forward(neurophotometrics.infer_neurophotometrics_version_from_data)
