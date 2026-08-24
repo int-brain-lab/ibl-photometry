@@ -4,7 +4,6 @@ processing operates on the dict[pd.DataFrame] format (split by signal band) as r
 
 import pandas as pd
 import numpy as np
-from typing import Optional
 
 
 def has_gaps(photometry_df: pd.DataFrame) -> bool:
@@ -66,7 +65,7 @@ def has_band_inversion(raw_df, check_col='color'):
 
 
 ## FIXME: we now have two ways to check for the same NPH sampling error!!
-def find_early_samples(A: pd.Series, dt: Optional[float] = None, dt_tol: float = 0.001) -> np.ndarray:
+def find_early_samples(A: pd.Series, dt: float | None = None, dt_tol: float = 0.001) -> np.ndarray:
     """
     Find instances where the dt between samples is smaller than expected, given
     a certain tolerance. The expected dt is calculated as the median dt.
@@ -120,7 +119,7 @@ def _fill_missing_channel_names(A: np.ndarray) -> np.ndarray:
 
 def find_repeated_samples(
     A: pd.DataFrame,
-    dt: Optional[float] = None,
+    dt: float | None = None,
     dt_tol: float = 0.001,
 ) -> int:
     if any(A['name'] == ''):
@@ -128,7 +127,7 @@ def find_repeated_samples(
     repeated_sample_mask = A['name'].iloc[1:].values == A['name'].iloc[:-1].values
     repeated_samples = A.iloc[1:][repeated_sample_mask]
     early_samples = A[find_early_samples(A, dt=dt, dt_tol=dt_tol)]
-    if not all([idx in early_samples.index for idx in repeated_samples.index]):
+    if not repeated_samples.index.isin(early_samples.index).all():
         print('WARNING: repeated samples found without early sampling')
     return repeated_sample_mask
 

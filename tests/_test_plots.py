@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from iblphotometry.behavior import psth, psth_times
-import iblphotometry.plots as plots
+from iblphotometry import plots
 
 # from gui.rawdata_visualizer import BehaviorVisualizerGUI
 from iblphotometry.synthetic import synthetic101
@@ -72,7 +72,7 @@ class TestPlotters(PhotometryDataTestCase):
 
     def test_class_plotsignal(self):
         # --- Use real data for test ---
-        df_nph, _, fs = self.get_test_data()
+        df_nph, _, _ = self.get_test_data()
 
         raw_signal = df_nph['raw_calcium'].values
         raw_isosbestic = df_nph['raw_isosbestic'].values
@@ -86,7 +86,7 @@ class TestPlotters(PhotometryDataTestCase):
 
     def test_class_plotsignalresponse(self):
         # --- Use real data for test ---
-        df_nph, _, fs = self.get_test_data()
+        df_nph, _, _ = self.get_test_data()
         processed_signal = df_nph['signal_processed'].values
         times = df_nph['times'].values
         # Load trial from ONE
@@ -113,10 +113,10 @@ class TestPlotters(PhotometryDataTestCase):
             match test_case:
                 case 'synt':
                     # --- Use real data for test ---
-                    df_nph, _, fs = self.get_test_data()
+                    df_nph, _, _ = self.get_test_data()
                 case 'real':
                     # --- Use synthetic data for test ---
-                    df_nph, _, fs = self.get_synthetic_data()
+                    df_nph, _, _ = self.get_synthetic_data()
 
             raw_signal = df_nph['raw_calcium'].values
             raw_isosbestic = df_nph['raw_isosbestic'].values
@@ -127,7 +127,7 @@ class TestPlotters(PhotometryDataTestCase):
 
     def test_plot_processed_signal(self):
         # --- Use synthetic data for test ---
-        df_nph, _, fs = self.get_synthetic_data()
+        df_nph, _, _ = self.get_synthetic_data()
 
         signal = df_nph['signal_processed'].values
         times = df_nph['times'].values
@@ -184,7 +184,7 @@ class TestPlotters(PhotometryDataTestCase):
 
     def test_plot_event_tick(self):
         # --- Use synthetic data for test ---
-        df_nph, t_events, fs = self.get_synthetic_data()
+        _df_nph, t_events, _ = self.get_synthetic_data()
         plots.plot_event_tick(t_events)
         plt.close('all')
 

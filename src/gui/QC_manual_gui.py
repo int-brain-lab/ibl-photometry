@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# !/usr/bin/env python3
 """
 Photometry Dataset QC Viewer
 
@@ -32,7 +32,6 @@ Keyboard Shortcuts:
 
 import argparse
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -72,10 +71,10 @@ QC_COLORS = {
 class PhotometryDatasetQCViewer:
     def __init__(
         self,
-        eids_file: Optional[str] = None,
-        csv_file: Optional[str] = None,
-        index: Optional[int] = None,
-        restrict_to_label: Optional[str] = None,
+        eids_file: str | None = None,
+        csv_file: str | None = None,
+        index: int | None = None,
+        restrict_to_label: str | None = None,
         one=None,
     ):
         self.one = ONE() if one is None else one
@@ -104,7 +103,7 @@ class PhotometryDatasetQCViewer:
         self.qc_file = eids_file.with_suffix('.qc.csv')
         if not self.qc_file.exists():
             with open(eids_file, 'r') as fH:
-                eids = [eid.strip() for eid in fH.readlines()]
+                eids = [eid.strip() for eid in fH]
             validator = PhotometryDataValidator()
 
             df = pd.DataFrame(index=eids)
@@ -222,7 +221,7 @@ class PhotometryDatasetQCViewer:
 
         except Exception as e:
             if on_error == 'raise':
-                raise e
+                raise
             self.QC_df.loc[self.current_index, 'error'] = f'{type(e).__name__}:{e}'
 
     def update_plot_label(self):

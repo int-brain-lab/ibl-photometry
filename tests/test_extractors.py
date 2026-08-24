@@ -4,8 +4,9 @@ from iblphotometry.tasks import FibrePhotometryDAQSync, FibrePhotometryBpodSync
 import os
 from one.alf.exceptions import ALFObjectNotFound
 
-RUN_EXTRACTOR_TESTS = True if os.environ.get('RUN_EXTRACTOR_TESTS') == '1' else False
-RUN_EXTRACTOR_TESTS = True
+# TODO integrate here integration as on other repos
+RUN_EXTRACTOR_TESTS = os.environ.get('RUN_EXTRACTOR_TESTS') == '1'
+# RUN_EXTRACTOR_TESTS = True
 
 
 class PhotometryExtractorTest(unittest.TestCase):

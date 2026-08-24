@@ -90,7 +90,7 @@ def percentile_asymmetry(A: pd.Series | np.ndarray, pc_comp: int = 95, axis=-1) 
         float: the ratio of positive and negative percentile distances
     """
     # TODO embrace pydantic
-    if not (isinstance(A, pd.Series) or isinstance(A, np.ndarray)):
+    if not (isinstance(A, pd.Series, np.ndarray)):
         raise TypeError('A must be pd.Series or np.ndarray.')
 
     a = np.absolute(percentile_distance(A, (50, pc_comp), axis=axis))
@@ -287,7 +287,7 @@ def ar_score(A: pd.Series | np.ndarray, order: int = 2) -> float:
     return r_squared
 
 
-def noise_simulation(A: pd.Series, metric: callable, noise_sd: np.ndarray = np.logspace(-2, 1)) -> np.ndarray:
+def noise_simulation(A: pd.Series, metric: callable, noise_sd: np.ndarray | None = None) -> np.ndarray:
     """
     See how a quality metric changes when adding Gaussian noise to a signal.
     The signal will be z-scored before noise is added, so noise_sd should be
@@ -304,6 +304,7 @@ def noise_simulation(A: pd.Series, metric: callable, noise_sd: np.ndarray = np.l
         array of noise levels to add to the z-scored signal before computing the
         metric
     """
+    noise_sd = noise_sd or np.logspace(-2, 1)
     A_z = z(A)
     scores = np.full(len(noise_sd), np.nan)
     for i, sd in enumerate(noise_sd):

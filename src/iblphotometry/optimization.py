@@ -21,7 +21,7 @@ def introspect_processing_function(
             param_type = Literal
         else:
             options = []
-        args.append(dict(name=param_name, type=param_type, options=options))
+        args.append({'name': param_name, 'type': param_type, 'options': options})
     return args
 
 
