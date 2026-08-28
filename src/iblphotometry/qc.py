@@ -112,7 +112,7 @@ def qc_signals(
                                 'band': band,
                                 'brain_region': _brain_region,
                                 'metric': metric.__name__,
-                                'value': metric(signal_),
+                                'value': metric(signal_, **_metric_kwargs),
                                 'window': w_start + w_len / 2,
                             },
                         )
