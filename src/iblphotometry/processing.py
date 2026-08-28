@@ -12,6 +12,7 @@ from ibldsp.utils import WindowGenerator
 from scipy.optimize import minimize
 from scipy.stats.distributions import norm
 from scipy.stats import gaussian_kde, t
+from scipy.interpolate import PchipInterpolator
 from scipy.special import pseudo_huber
 
 from inspect import signature
@@ -173,18 +174,55 @@ def resample(signals: dict) -> dict:
     return signals_resampled
 
 
-def resample_signal(signal: pd.DataFrame) -> pd.DataFrame:
+INTERPOLATION_METHODS = {
+    'linear': lambda times, values, times_interp: np.interp(times_interp, times, values),
+    'pchip': lambda times, values, times_interp: PchipInterpolator(times, values)(times_interp),
+}
+
+
+def resample_signal(
+    signal: pd.DataFrame | pd.Series,
+    fs: float | None = None,
+    method: str = 'linear',
+) -> pd.DataFrame | pd.Series:
+    """Resample a signal onto a uniform time grid.
+
+    Parameters
+    ----------
+    signal : pd.DataFrame | pd.Series
+        Time-indexed signal; one column per channel for a DataFrame. Columns are
+        interpolated independently onto the shared grid.
+    fs : float | None
+        Grid rate in Hz. None (the default) keeps the signal's own rate, taken
+        as the median sample spacing, which regularizes a jittered index without
+        changing the sample count appreciably. Pass a rate to put signals from
+        different recordings on a common grid.
+    method : str
+        Interpolation, one of `INTERPOLATION_METHODS`. 'linear' (the default)
+        chords between samples; 'pchip' fits a shape-preserving cubic, which
+        follows curvature without the overshoot a plain cubic spline introduces.
+
+    Returns
+    -------
+    pd.DataFrame | pd.Series
+        The signal on the uniform grid, matching the input's type. The grid runs
+        from the first sample time up to but excluding the last, so it never
+        extrapolates.
+    """
+    if method not in INTERPOLATION_METHODS:
+        raise ValueError(f'method must be one of {sorted(INTERPOLATION_METHODS)}, got {method!r}')
+    interpolate = INTERPOLATION_METHODS[method]
+
     times = signal.index
-    dt = np.median(np.diff(times))
+    dt = np.median(np.diff(times)) if fs is None else 1 / fs
     times_interp = np.arange(times[0], times[-1], dt)
-    signal_interp = {}
     if type(signal) is pd.DataFrame:
-        for col in signal.columns:
-            signal_interp[col] = np.interp(times_interp, times, signal[col])
-        return pd.DataFrame(signal_interp, index=times_interp)
+        return pd.DataFrame(
+            {col: interpolate(times, signal[col], times_interp) for col in signal.columns},
+            index=times_interp,
+        )
     if type(signal) is pd.Series:
-        signal_interp = np.interp(times_interp, times, signal)
-        return pd.Series(signal_interp, index=times_interp)
+        return pd.Series(interpolate(times, signal, times_interp), index=times_interp)
 
 
 """
