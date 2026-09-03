@@ -41,3 +41,23 @@ class TestMetrics(PhotometryDataTestCase):
         # for event_name in BEHAV_EVENTS:
         #     metrics.ttest_pre_post(raw_tsd, trials, event_name)
         #     metrics.has_responses(raw_tsd, trials, BEHAV_EVENTS)
+
+    def test_percentile_asymmetry_accepts_series_and_array(self):
+        """The type guard admits both accepted types and rejects anything else."""
+        signal = self.signals_dfs['GCaMP']['G0']
+
+        self.assertAlmostEqual(
+            metrics.percentile_asymmetry(signal),
+            metrics.percentile_asymmetry(signal.values),
+        )
+        with self.assertRaises(TypeError):
+            metrics.percentile_asymmetry(list(signal.values))
+
+    def test_percentile_asymmetry_responds_to_pc_comp(self):
+        """Narrowing the compared percentiles moves the ratio."""
+        signal = self.signals_dfs['GCaMP']['G0']
+
+        self.assertNotAlmostEqual(
+            metrics.percentile_asymmetry(signal, pc_comp=95),
+            metrics.percentile_asymmetry(signal, pc_comp=75),
+        )

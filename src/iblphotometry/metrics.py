@@ -90,7 +90,7 @@ def percentile_asymmetry(A: pd.Series | np.ndarray, pc_comp: int = 95, axis=-1) 
         float: the ratio of positive and negative percentile distances
     """
     # TODO embrace pydantic
-    if not (isinstance(A, pd.Series, np.ndarray)):
+    if not (isinstance(A, (pd.Series, np.ndarray))):
         raise TypeError('A must be pd.Series or np.ndarray.')
 
     a = np.absolute(percentile_distance(A, (50, pc_comp), axis=axis))
