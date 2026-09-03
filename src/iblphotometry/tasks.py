@@ -168,6 +168,47 @@ def extract_timestamps_from_bpod_jsonable(file_jsonable: str | Path, sync_states
     return timestamps
 
 
+def infer_sync_mode(session_path: str | Path) -> str:
+    """infer whether the photometry of a session was synced via the bpod or via the DAQ.
+
+    Recent sessions state the sync mode in their experiment description. For older ones it is
+    inferred from the raw photometry data, as only DAQ based sessions record a tdms file.
+
+    Parameters
+    ----------
+    session_path : str | Path
+        path to the session
+
+    Returns
+    -------
+    str
+        'bpod' or 'daqami'
+    """
+    session_path = Path(session_path)
+    session_params = ibllib_session_params.read_params(session_path)
+    if session_params is None:
+        raise FileNotFoundError(f'no experiment description file found for session {session_path}')
+    if len(session_params) == 0:
+        raise ValueError(f'empty experiment description file for session {session_path}')
+
+    if 'neurophotometrics' in session_params.get('devices', {}):
+        neurophotometrics_params = session_params['devices']['neurophotometrics']
+    else:
+        _logger.warning(f'no neurophotometrics entry in the experiment description of {session_path}')
+        neurophotometrics_params = {}
+    photometry_collection = neurophotometrics_params.get('collection', 'raw_photometry_data')
+
+    sync_mode = neurophotometrics_params.get('sync_mode')
+    if sync_mode is not None:
+        return sync_mode
+
+    # the tdms file is written by the daqami software and only exists for DAQ based syncing
+    if any(session_path.joinpath(photometry_collection).glob('*_mcc_DAQdata.raw.tdms')):
+        return 'daqami'
+    _logger.warning(f'no sync mode in the experiment description of {session_path}, defaulting to bpod')
+    return 'bpod'
+
+
 class FibrePhotometryBaseSync(base_tasks.DynamicTask):
     # base clas for syncing fibre photometry
     # derived classes are: FibrePhotometryBpodSync and FibrePhotometryDAQSync
