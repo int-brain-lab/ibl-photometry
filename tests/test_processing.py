@@ -33,6 +33,42 @@ class TestProcessing(PhotometryDataTestCase):
         processing.sliding_z(raw_df, w_len=60, on_error='expand')
         processing.sliding_mad(raw_df, w_len=60)
 
+    def test_resample_signal_defaults_to_the_signals_own_rate(self):
+        """No fs means the median sample spacing, so the rate is preserved."""
+        signal = self.signals_dfs['GCaMP']['G0']
+        resampled = processing.resample_signal(signal)
+
+        dt = np.median(np.diff(signal.index))
+        np.testing.assert_allclose(np.diff(resampled.index), dt)
+
+    def test_resample_signal_honours_an_explicit_rate(self):
+        """fs puts the signal on a 1/fs grid regardless of its own rate."""
+        signal = self.signals_dfs['GCaMP']['G0']
+        resampled = processing.resample_signal(signal, fs=30)
+
+        np.testing.assert_allclose(np.diff(resampled.index), 1 / 30)
+        self.assertGreaterEqual(resampled.index[0], signal.index[0])
+        self.assertLessEqual(resampled.index[-1], signal.index[-1])
+
+    def test_resample_signal_pchip_differs_from_linear_on_a_curve(self):
+        """PCHIP follows curvature; linear chords cut under a convex signal."""
+        times = np.arange(0, 10, 0.1)
+        curved = pd.Series(np.sin(times), index=times)
+
+        linear = processing.resample_signal(curved, fs=7, method='linear')
+        pchip = processing.resample_signal(curved, fs=7, method='pchip')
+
+        np.testing.assert_allclose(linear.index, pchip.index)
+        self.assertFalse(np.allclose(linear.values, pchip.values))
+        # Both track the underlying function; PCHIP does it more closely.
+        truth = np.sin(pchip.index)
+        self.assertLess(np.abs(pchip.values - truth).max(), np.abs(linear.values - truth).max())
+
+    def test_resample_signal_rejects_an_unknown_method(self):
+        signal = self.signals_dfs['GCaMP']['G0']
+        with self.assertRaises(ValueError):
+            processing.resample_signal(signal, method='cubic')
+
 
 class TestRegressionPredict(unittest.TestCase):
     """Predictions must stay matched to the samples they were requested for."""
