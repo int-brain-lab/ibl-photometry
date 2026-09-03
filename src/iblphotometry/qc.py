@@ -54,10 +54,10 @@ def qc_signals(
             assert signal_band in raw_dfs, f'signal band {signal_band} not present in data'
             signal_bands = [signal_band]
     if brain_region is None:
-        brain_regions = raw_dfs[next(signal_bands)].columns
+        brain_regions = raw_dfs[next(iter(signal_bands))].columns
     else:
         if type(brain_region) is str:
-            assert brain_region in raw_dfs[next(signal_bands)].columns, f'brain region {brain_region} not present in data'
+            assert brain_region in raw_dfs[next(iter(signal_bands))].columns, f'brain region {brain_region} not present in data'
             brain_regions = [brain_region]
 
     # the main qc loop
@@ -112,7 +112,7 @@ def qc_signals(
                                 'band': band,
                                 'brain_region': _brain_region,
                                 'metric': metric.__name__,
-                                'value': metric(signal_),
+                                'value': metric(signal_, **_metric_kwargs),
                                 'window': w_start + w_len / 2,
                             },
                         )
