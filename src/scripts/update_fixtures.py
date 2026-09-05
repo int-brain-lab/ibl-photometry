@@ -23,8 +23,8 @@ looking like:
   stripped from the filenames on the way.
 
 Either way only the raw photometry collection and the raw task collection are staged, both
-looked up in the session's experiment description, along with the description file itself. After
-staging, the datasets the extractors read are reported as present or missing per session.
+looked up in the session's experiment description, along with the description file itself. Each
+file is reported as copied or skipped, and any dataset that could not be downloaded is named.
 """
 
 import logging
@@ -42,15 +42,6 @@ _logger = logging.getLogger(__name__)
 LOCATION = 'local'  # one of 'local', 'server', 'sdsc'
 
 SESSIONS_FOR_TESTS_FILE = Path(__file__).parents[2] / 'tests' / 'fixtures' / 'sessions_for_tests.yaml'
-
-# the datasets the extractor tasks read. Which of them a session needs depends on its sync
-# mode, so a missing one is not necessarily a problem - it is reported either way
-EXPECTED_FILES = (
-    '_neurophotometrics_fpData.raw.pqt',
-    '_neurophotometrics_fpData.digitalInputs.pqt',
-    '_mcc_DAQdata.raw.tdms',
-    '_iblrig_taskData.raw.jsonable',
-)
 
 
 def load_sessions_for_tests() -> list[dict]:
@@ -145,7 +136,18 @@ def gather_downloaded_files(eid: str, one: ONE) -> list[ALFPath]:
     files = [one.load_dataset(eid, '*experiment.description', download_only=True)]
     for collection in (photometry_collection, task_collection):
         _logger.info(f'downloading collection {collection}')
-        files.extend(one.load_collection(eid, collection, download_only=True))
+        downloaded = list(one.load_collection(eid, collection, download_only=True))
+
+        # load_collection drops every dataset it could not put on disk without raising, so a
+        # failed download is indistinguishable from a smaller collection - name them here
+        expected = set(one.list_datasets(eid, collection=collection))
+        missing = expected - {str(ALFPath(path).relative_to_session()) for path in downloaded}
+        if missing:
+            _logger.warning(f'{len(missing)} datasets of {collection} were not downloaded:')
+            for rel_path in sorted(missing):
+                _logger.warning(f'  not downloaded: {rel_path}')
+
+        files.extend(downloaded)
     return files
 
 
@@ -179,6 +181,9 @@ def gather_sdsc_files(eid: str, one: ONE) -> list[ALFPath]:
 def copy_to_fixture_root(files: list[ALFPath], destination_root: Path, location: str) -> None:
     """Copy files into the fixture root, keeping the session tree intact.
 
+    Every file is reported as either copied or skipped, the latter meaning it is already staged
+    and unchanged.
+
     Parameters
     ----------
     files : list[ALFPath]
@@ -189,32 +194,47 @@ def copy_to_fixture_root(files: list[ALFPath], destination_root: Path, location:
         Where the files come from. On SDSC the dataset UUID is part of the filename and is
         stripped on the way.
     """
+    n_copied, n_skipped = 0, 0
     for source_file in files:
         source_file = ALFPath(source_file)
         target_file = ALFPath(destination_root / source_file.session_path_short() / source_file.relative_to_session())
         if location == 'sdsc':
             target_file = target_file.without_uuid()
         target_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # an existing target is only kept when it still matches its source, so a partially
+        # written or outdated fixture is repaired by re-running this script
+        if is_up_to_date(source_file, target_file):
+            _logger.info(f'  skipped (unchanged): {target_file.relative_to_session()}')
+            n_skipped += 1
+            continue
         shutil.copy2(source_file, target_file)
+        _logger.info(f'  copied: {target_file.relative_to_session()}')
+        n_copied += 1
+
+    _logger.info(f'{n_copied} files copied, {n_skipped} unchanged')
 
 
-def report_staged_files(session_path: Path) -> dict[str, bool]:
-    """Report which of the datasets the extractors read are present in a staged session.
+def is_up_to_date(source_file: Path, target_file: Path) -> bool:
+    """Report whether a staged file still matches the source it was copied from.
 
     Parameters
     ----------
-    session_path : Path
-        The staged session, in the fixture root.
+    source_file : Path
+        The file in the ONE cache or on the SDSC filesystem.
+    target_file : Path
+        The staged file in the fixture root.
 
     Returns
     -------
-    dict[str, bool]
-        Presence of each entry of `EXPECTED_FILES`.
+    bool
+        True when the target exists and has the size and modification time of the source, which
+        `shutil.copy2` preserves.
     """
-    files_present = {filename: any(session_path.rglob(filename)) for filename in EXPECTED_FILES}
-    for filename, is_present in files_present.items():
-        _logger.info(f'  {"present" if is_present else "MISSING"}: {filename}')
-    return files_present
+    if not target_file.exists():
+        return False
+    source_stat, target_stat = source_file.stat(), target_file.stat()
+    return source_stat.st_size == target_stat.st_size and source_stat.st_mtime == target_stat.st_mtime
 
 
 def main() -> None:
@@ -222,18 +242,26 @@ def main() -> None:
     destination_root = get_destination_root()
     one = get_one()
 
+    failed_sessions = []
     for session in load_sessions_for_tests():
         eid, session_path = session['eid'], session['session_path']
         _logger.info(f'staging {session_path} ({session["comment"]}) from {LOCATION}')
-        if LOCATION == 'sdsc':
-            files = gather_sdsc_files(eid, one)
-        else:
-            files = gather_downloaded_files(eid, one)
-        copy_to_fixture_root(files, destination_root, LOCATION)
-        _logger.info(f'staged {len(files)} files')
-        report_staged_files(destination_root / session_path)
+        try:
+            if LOCATION == 'sdsc':
+                files = gather_sdsc_files(eid, one)
+            else:
+                files = gather_downloaded_files(eid, one)
+            copy_to_fixture_root(files, destination_root, LOCATION)
+        except Exception as exception:  # noqa: BLE001 - staging must survive any single session
+            # the remaining sessions are staged regardless, so one broken session does not
+            # leave the fixture root in a half updated state
+            _logger.error(f'failed to stage {session_path}: {exception!r}')
+            failed_sessions.append(session_path)
+            continue
 
     _logger.info(f'fixtures staged in {destination_root}')
+    if failed_sessions:
+        _logger.error(f'{len(failed_sessions)} sessions failed to stage: {", ".join(failed_sessions)}')
 
 
 if __name__ == '__main__':
