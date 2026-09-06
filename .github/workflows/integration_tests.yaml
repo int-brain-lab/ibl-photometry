@@ -1,0 +1,90 @@
+# Integration tests run against real sessions, which are too large for a GitHub runner. This
+# workflow therefore does not run them itself: it dispatches a Lightning AI job that mounts the
+# staged sessions as a data connection and runs the suite there.
+#
+# The unit tests in run_tests.yaml stay on the runner. Both legs run the same command - the
+# integration tests skip themselves whenever INTEGRATION_DATA_DIR is unset, which is the case
+# everywhere except inside the Lightning job.
+
+name: integration tests
+
+on:
+  push:
+    branches:
+      - main
+      - ci
+  workflow_dispatch:
+
+# no top level env: every step declares what it consumes
+
+jobs:
+  dispatch-tests:
+    name: integration tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # only bootstraps the dispatch script, the tests run on PY_VERSION inside the job
+          python-version: '3.12'
+
+      - name: install lightning-sdk
+        run: pip install "lightning-sdk==2026.6.8"
+
+      - name: dispatch lightning job (blocking)
+        env:
+          # lightning auth, read by lightning-sdk automatically
+          LIGHTNING_USER_ID: ${{ secrets.LIGHTNING_USER_ID }}
+          LIGHTNING_API_KEY: ${{ secrets.LIGHTNING_API_KEY }}
+          # consumed by dispatch.py
+          LIGHTNING_TEAMSPACE: ${{ vars.LIGHTNING_TEAMSPACE }}            # "owner/teamspace"
+          LIGHTNING_DATA_CONNECTION: ${{ vars.LIGHTNING_DATA_CONNECTION }}  # holds the staged sessions
+          INTEGRATION_DATA_DIR: ${{ vars.INTEGRATION_DATA_DIR }}          # where it is mounted, e.g. /data
+          REPO_URL: https://github.com/${{ github.repository }}.git
+          PY_VERSION: ${{ matrix.python-version }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          JOB_TIMEOUT_SECONDS: '7200'
+        run: |
+          lightning login
+          python .github/scripts/dispatch.py
+
+      - name: stop orphaned job
+        if: always()
+        env:
+          LIGHTNING_USER_ID: ${{ secrets.LIGHTNING_USER_ID }}
+          LIGHTNING_API_KEY: ${{ secrets.LIGHTNING_API_KEY }}
+          LIGHTNING_TEAMSPACE: ${{ vars.LIGHTNING_TEAMSPACE }}
+          PY_VERSION: ${{ matrix.python-version }}
+        run: |
+          lightning login
+          python - <<'PY'
+          import os
+          import re
+
+          from lightning_sdk import Job, Status
+
+          teamspace = os.environ['LIGHTNING_TEAMSPACE']
+          owner, _, teamspace_name = teamspace.partition('/')
+          repo_slug = re.sub(r'[^a-zA-Z0-9-]', '-', os.environ['GITHUB_REPOSITORY']).strip('-').lower()
+          job_name = (
+              f'{repo_slug}'
+              f'-py{os.environ["PY_VERSION"].replace(".", "")}'
+              f'-{os.environ["GITHUB_RUN_ID"]}'
+              f'-{os.environ.get("GITHUB_RUN_ATTEMPT", "1")}'
+          )
+          try:
+              job = Job(name=job_name, teamspace=teamspace_name, org=owner)
+              if job.status in (Status.Running, Status.Pending):
+                  print(f'stopping orphaned job {job_name}')
+                  job.stop()
+              else:
+                  print(f'job {job_name} already terminal: {job.status}')
+          except Exception as exception:
+              print(f'cleanup skipped: {exception}')
+          PY

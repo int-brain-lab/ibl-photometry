@@ -5,7 +5,7 @@ sessions to stage are declared in `tests/fixtures/sessions_for_tests.yaml`, the 
 integration tests iterate over, and each is placed under its session path, so the root ends up
 looking like:
 
-    $INTEGRATION_DATA_DIR/
+    $INTEGRATION_DATA_DIR/                      # tests/fixtures/photometry when unset
     ├── Subjects_init/                          # marker folder expected by ibllib's IntegrationTest
     ├── ZFM-03059/2021-08-27/001/
     │   ├── _ibl_experiment.description.yaml
@@ -43,6 +43,10 @@ LOCATION = 'local'  # one of 'local', 'server', 'sdsc'
 
 SESSIONS_FOR_TESTS_FILE = Path(__file__).parents[2] / 'tests' / 'fixtures' / 'sessions_for_tests.yaml'
 
+# where the sessions are staged when INTEGRATION_DATA_DIR is not set. A folder of its own, kept
+# out of version control, so the staged raw data stays separate from the fixtures next to it
+DEFAULT_DESTINATION_ROOT = SESSIONS_FOR_TESTS_FILE.parent / 'photometry'
+
 
 def load_sessions_for_tests() -> list[dict]:
     """Read the sessions to stage, the same ones the integration tests run against.
@@ -78,11 +82,10 @@ def get_destination_root() -> Path:
     Returns
     -------
     Path
-        The folder set by `INTEGRATION_DATA_DIR`, falling back to the fixtures folder that holds
-        the sessions file.
+        The folder set by `INTEGRATION_DATA_DIR`, falling back to `DEFAULT_DESTINATION_ROOT`.
     """
     integration_data_dir = os.environ.get('INTEGRATION_DATA_DIR')
-    destination_root = Path(integration_data_dir) if integration_data_dir else SESSIONS_FOR_TESTS_FILE.parent
+    destination_root = Path(integration_data_dir) if integration_data_dir else DEFAULT_DESTINATION_ROOT
     _logger.info(f'staging into {destination_root}')
 
     # ibllib's IntegrationTest validates a data root by the presence of this folder

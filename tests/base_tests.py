@@ -39,7 +39,7 @@ class PhotometryIntegrationTestCase(IntegrationTest):
     sessions: ClassVar[list[dict]] = load_sessions_for_tests()
 
     # the session paths in the syntax the parent class mirrors them by
-    # required_files: ClassVar[list[str]] = [session['session_path'] for session in sessions]
+    required_files: ClassVar[list[str]] = [session['session_path'] for session in sessions]
 
     # a mirror per test method, as the extractors write their outputs into the session
     _writable_scope = 'test'
