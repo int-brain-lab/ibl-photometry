@@ -2,24 +2,27 @@
 # workflow therefore does not run them itself: it dispatches a Lightning AI job that mounts the
 # staged sessions as a data connection and runs the suite there.
 #
-# The unit tests in run_tests.yaml stay on the runner. Both legs run the same command - the
+# The unit tests in unit_tests.yaml stay on the runner. Both legs run the same command - the
 # integration tests skip themselves whenever INTEGRATION_DATA_DIR is unset, which is the case
 # everywhere except inside the Lightning job.
 
 name: integration tests
 
 on:
-  push:
-    branches:
-      - main
-      - ci
   workflow_dispatch:
+  # a draft pull request never dispatches a job: 'ready_for_review' fires when one is taken out
+  # of draft, 'opened' and 'reopened' cover pull requests that were never drafts. Pushing more
+  # commits to an open pull request does not re-run it, use the manual trigger for that
+  pull_request:
+    types: [opened, reopened, ready_for_review]
 
 # no top level env: every step declares what it consumes
 
 jobs:
   dispatch-tests:
     name: integration tests (py${{ matrix.python-version }})
+    # the event types above still fire for drafts in some cases, so the state is checked directly
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 150
     strategy:
