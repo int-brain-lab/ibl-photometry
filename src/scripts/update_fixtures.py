@@ -203,8 +203,17 @@ def gather_sdsc_files(eid: str, one: ONE) -> list[ALFPath]:
         The files of the two raw data collections, plus the experiment description file.
     """
     session_path = one.eid2path(eid).session_path()
+    if not session_path.is_dir():
+        raise FileNotFoundError(f'session folder does not exist: {session_path}')
+
     # read_params globs for the description file, which on SDSC carries the dataset UUID
     experiment_description = session_params.read_params(session_path)
+    if experiment_description is None:
+        # read_params returns None rather than raising when it finds no file
+        raise FileNotFoundError(
+            f'no _ibl_experiment.description*.yaml in {session_path}, '
+            f'the folder holds: {sorted(path.name for path in session_path.iterdir())}'
+        )
     photometry_collection, task_collection = get_collections(experiment_description)
 
     files = list(session_path.glob('_ibl_experiment.description*.yaml'))
@@ -329,10 +338,11 @@ def main(location: str = 'local', dry: bool = False) -> None:
             else:
                 files = gather_downloaded_files(eid, one)
             copy_to_fixture_root(files, destination_root, location, dry=dry)
-        except Exception as exception:  # noqa: BLE001 - staging must survive any single session
+        except Exception:
             # the remaining sessions are staged regardless, so one broken session does not
-            # leave the fixture root in a half updated state
-            _logger.error(f'failed to stage {session_path}: {exception!r}')
+            # leave the fixture root in a half updated state. The traceback is logged with it,
+            # as the exception message alone rarely says which step failed
+            _logger.exception(f'failed to stage {session_path}')
             failed_sessions.append(session_path)
             continue
 
