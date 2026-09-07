@@ -8,6 +8,10 @@ from one.alf.path import ALFPath
 
 SESSIONS_FOR_TESTS_FILE = Path(__file__).parent / 'fixtures' / 'sessions_for_tests.yaml'
 
+# the folder the photometry sessions are staged into, below the data root that
+# INTEGRATION_DATA_DIR points at. Kept in sync with src/scripts/update_fixtures.py
+PHOTOMETRY_FOLDER = 'photometry'
+
 
 def load_sessions_for_tests() -> list[dict]:
     """Read the sessions the integration tests run against.
@@ -34,12 +38,17 @@ class PhotometryIntegrationTestCase(IntegrationTest):
     to stage them. The tests auto-skip when `INTEGRATION_DATA_DIR` is not set, and each test runs
     against a fresh symlink mirror of the sessions, so whatever a task writes into a session
     leaves the staged data alone.
+
+    `INTEGRATION_DATA_DIR` is the data root, which holds one folder per data type so that it can
+    be shared with the other IBL repositories. The photometry sessions sit in `PHOTOMETRY_FOLDER`
+    below it. Note that the folder cannot be applied by narrowing `data_path`, as ibllib documents:
+    the symlink mirror outranks an explicit assignment, so it is part of the paths instead.
     """
 
     sessions: ClassVar[list[dict]] = load_sessions_for_tests()
 
-    # the session paths in the syntax the parent class mirrors them by
-    required_files: ClassVar[list[str]] = [session['session_path'] for session in sessions]
+    # the session paths in the syntax the parent class mirrors them by, relative to the data root
+    required_files: ClassVar[list[str]] = [f'{PHOTOMETRY_FOLDER}/{session["session_path"]}' for session in sessions]
 
     # a mirror per test method, as the extractors write their outputs into the session
     _writable_scope = 'test'
@@ -57,4 +66,4 @@ class PhotometryIntegrationTestCase(IntegrationTest):
         ALFPath
             The session path inside the mirror.
         """
-        return ALFPath(self.data_path / session['session_path'])
+        return ALFPath(self.data_path / PHOTOMETRY_FOLDER / session['session_path'])

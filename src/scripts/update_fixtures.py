@@ -5,9 +5,9 @@ sessions to stage are declared in `tests/fixtures/sessions_for_tests.yaml`, the 
 integration tests iterate over, and each is placed under its session path, so the root ends up
 looking like:
 
-    <data root>/                                # chosen by --location, see below
+    <data root>/                                # chosen by --location, INTEGRATION_DATA_DIR
+    ├── Subjects_init/                          # marker folder expected by ibllib's IntegrationTest
     └── photometry/                             # one folder per data type below the data root
-        ├── Subjects_init/                      # marker folder expected by ibllib's IntegrationTest
         ├── ZFM-03059/2021-08-27/001/           # <subject>/<date>/<number>
         │   ├── _ibl_experiment.description.yaml
         │   ├── raw_photometry_data/
@@ -24,8 +24,9 @@ looking like:
   `/mnt/ibl/integration/photometry`. Dataset UUIDs are stripped from the filenames on the way.
 
 `INTEGRATION_DATA_DIR` plays no part in the staging - it is what the integration tests read to
-find the root, set by the CI workflow for the Lightning job and by the local .env file for a run
-on a developer machine.
+find the data root, set by the CI workflow for the Lightning job and by the local .env file for a
+run on a developer machine. It points at the data root, not at the photometry folder below it, so
+that one root can be shared with the other IBL repositories.
 
 Either way only the raw photometry collection and the raw task collection are staged, both
 looked up in the session's experiment description, along with the description file itself. Each
@@ -117,9 +118,11 @@ def get_destination_root(location: str = 'local', dry: bool = False) -> Path:
     destination_root = data_root / PHOTOMETRY_FOLDER
     _logger.info(f'staging into {destination_root}')
 
-    # ibllib's IntegrationTest validates a data root by the presence of this folder
     if not dry:
-        destination_root.joinpath('Subjects_init').mkdir(parents=True, exist_ok=True)
+        # ibllib's IntegrationTest validates a data root by the presence of this folder, and the
+        # root the tests are pointed at is the data root, not the folder below it
+        data_root.joinpath('Subjects_init').mkdir(parents=True, exist_ok=True)
+        destination_root.mkdir(parents=True, exist_ok=True)
     return destination_root
 
 
