@@ -26,7 +26,7 @@ dependencies = [
     "pywavelets",
     "matplotlib",
     "ibllib @ git+https://github.com/int-brain-lab/ibllib.git@ci",
-    "iblscripts @ git+https://https://github.com/int-brain-lab/iblscripts@OneSDSC_locations",
+    "iblscripts @ git+https://github.com/int-brain-lab/iblscripts@OneSDSC_locations",
     "ONE-api>=3.3.0",
 ]
 
