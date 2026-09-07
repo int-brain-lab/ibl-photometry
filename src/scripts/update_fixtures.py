@@ -92,7 +92,7 @@ def get_one(location: str) -> ONE:
         # only available on the SDSC infrastructure
         from deploy.iblsdsc import OneSdsc
 
-        return OneSdsc()
+        return OneSdsc(location='SDSC')
     return ONE()
 
 
