@@ -1,11 +1,11 @@
-"""Stage integration test data from real sessions into the folder set by `INTEGRATION_DATA_DIR`.
+"""Stage integration test data from real sessions into the integration data root.
 
 Run this to (re)populate the integration data root that the integration tests read from. The
 sessions to stage are declared in `tests/fixtures/sessions_for_tests.yaml`, the same file the
 integration tests iterate over, and each is placed under its session path, so the root ends up
 looking like:
 
-    $INTEGRATION_DATA_DIR/                      # tests/fixtures/photometry when unset
+    <root>/                                     # chosen by --location, see below
     ├── Subjects_init/                          # marker folder expected by ibllib's IntegrationTest
     ├── ZFM-03059/2021-08-27/001/
     │   ├── _ibl_experiment.description.yaml
@@ -17,10 +17,14 @@ looking like:
 `--location` selects where the data is taken from:
 
 - 'local' or 'server': a regular ONE instance downloads the two collections into the ONE cache,
-  from where they are copied into the fixture root. Both behave the same for now.
+  from where they are copied into `tests/fixtures/photometry`. Both behave the same for now.
 - 'sdsc': an `OneSdsc` instance resolves the session on the SDSC filesystem, where the data
-  already sits, and the two collections are copied straight from there. Dataset UUIDs are
-  stripped from the filenames on the way.
+  already sits, and the two collections are copied straight from there into
+  `/mnt/ibl/integration`. Dataset UUIDs are stripped from the filenames on the way.
+
+`INTEGRATION_DATA_DIR` plays no part in the staging - it is what the integration tests read to
+find the root, set by the CI workflow for the Lightning job and by the local .env file for a run
+on a developer machine.
 
 Either way only the raw photometry collection and the raw task collection are staged, both
 looked up in the session's experiment description, along with the description file itself. Each
@@ -33,7 +37,6 @@ the copy reads from - only the writes to the fixture root are suppressed.
 
 import argparse
 import logging
-import os
 import shutil
 from pathlib import Path
 
@@ -48,9 +51,12 @@ LOCATIONS = ('local', 'server', 'sdsc')
 
 SESSIONS_FOR_TESTS_FILE = Path(__file__).parents[2] / 'tests' / 'fixtures' / 'sessions_for_tests.yaml'
 
-# where the sessions are staged when INTEGRATION_DATA_DIR is not set. A folder of its own, kept
-# out of version control, so the staged raw data stays separate from the fixtures next to it
+# where the sessions are staged for the 'local' and 'server' locations. A folder of its own,
+# kept out of version control, so the staged raw data stays separate from the fixtures next to it
 DEFAULT_DESTINATION_ROOT = SESSIONS_FOR_TESTS_FILE.parent / 'photometry'
+
+# on SDSC the integration data has its own place on the shared filesystem
+SDSC_DESTINATION_ROOT = Path('/mnt/ibl/integration')
 
 
 def load_sessions_for_tests() -> list[dict]:
@@ -86,21 +92,25 @@ def get_one(location: str) -> ONE:
     return ONE()
 
 
-def get_destination_root(dry: bool = False) -> Path:
+def get_destination_root(location: str = 'local', dry: bool = False) -> Path:
     """Return the fixture root and make sure it is a valid ibllib integration data root.
+
+    The root follows from the location: the shared integration folder on SDSC, the folder next
+    to the fixtures everywhere else.
 
     Parameters
     ----------
+    location : str, optional
+        Where the data is taken from, one of `LOCATIONS`, by default 'local'.
     dry : bool, optional
         If True, report what would be done without writing anything, by default False.
 
     Returns
     -------
     Path
-        The folder set by `INTEGRATION_DATA_DIR`, falling back to `DEFAULT_DESTINATION_ROOT`.
+        The folder the sessions are staged into.
     """
-    integration_data_dir = os.environ.get('INTEGRATION_DATA_DIR')
-    destination_root = Path(integration_data_dir) if integration_data_dir else DEFAULT_DESTINATION_ROOT
+    destination_root = SDSC_DESTINATION_ROOT if location == 'sdsc' else DEFAULT_DESTINATION_ROOT
     _logger.info(f'staging into {destination_root}')
 
     # ibllib's IntegrationTest validates a data root by the presence of this folder
@@ -299,7 +309,7 @@ def main(location: str = 'local', dry: bool = False) -> None:
     """
     if dry:
         _logger.info('dry run: nothing will be written to the fixture root')
-    destination_root = get_destination_root(dry=dry)
+    destination_root = get_destination_root(location, dry=dry)
     one = get_one(location)
 
     failed_sessions = []
