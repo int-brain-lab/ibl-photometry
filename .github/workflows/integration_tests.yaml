@@ -1,13 +1,10 @@
 name: Integration Tests (Lightning)
 
 on:
-  workflow_dispatch:  # For manual triggering
-  # A draft pull request never dispatches a job: 'ready_for_review' fires when one is taken out
-  # of draft, 'opened' and 'reopened' cover pull requests that were never drafts. Pushing more
-  # commits to an open pull request does not re-run it, use the manual trigger for that.
   pull_request:
-    types: [opened, reopened, ready_for_review]
-
+    branches: [master, develop]
+    types: [ready_for_review]
+  workflow_dispatch:  # For manual triggering
 
 # No top-level env: each step declares exactly what it consumes (explicit wiring).
 
