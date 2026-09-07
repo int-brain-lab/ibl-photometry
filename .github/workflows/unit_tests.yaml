@@ -11,7 +11,10 @@ on:
   push:
     branches:
       - main
+  # 'ready_for_review' is not one of the default types, so it is listed explicitly: the unit
+  # tests re-run alongside the integration tests when a pull request is taken out of draft
   pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
 
 jobs:
   ruff:

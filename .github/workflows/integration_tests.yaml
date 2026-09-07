@@ -1,10 +1,13 @@
 name: Integration Tests (Lightning)
 
 on:
-  pull_request:
-    branches: [master, develop]
-    types: [ready_for_review]
   workflow_dispatch:  # For manual triggering
+  # Every change to a pull request that is in review dispatches a job: 'ready_for_review' fires
+  # on the draft -> ready conversion, 'synchronize' on every further push to it, and 'opened' /
+  # 'reopened' cover pull requests that were never drafts. Drafts are excluded by the job's `if`.
+  pull_request:
+    branches: [main]
+    types: [opened, reopened, ready_for_review, synchronize]
 
 # No top-level env: each step declares exactly what it consumes (explicit wiring).
 
