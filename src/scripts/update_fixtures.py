@@ -5,14 +5,15 @@ sessions to stage are declared in `tests/fixtures/sessions_for_tests.yaml`, the 
 integration tests iterate over, and each is placed under its session path, so the root ends up
 looking like:
 
-    <root>/                                     # chosen by --location, see below
-    ├── Subjects_init/                          # marker folder expected by ibllib's IntegrationTest
-    ├── ZFM-03059/2021-08-27/001/
-    │   ├── _ibl_experiment.description.yaml
-    │   ├── raw_photometry_data/
-    │   └── raw_task_data_00/
-    └── ZFM-08554/2025-02-26/001/
-        └── ...
+    <data root>/                                # chosen by --location, see below
+    └── photometry/                             # one folder per data type below the data root
+        ├── Subjects_init/                      # marker folder expected by ibllib's IntegrationTest
+        ├── ZFM-03059/2021-08-27/001/           # <subject>/<date>/<number>
+        │   ├── _ibl_experiment.description.yaml
+        │   ├── raw_photometry_data/
+        │   └── raw_task_data_00/
+        └── ZFM-08554/2025-02-26/001/
+            └── ...
 
 `--location` selects where the data is taken from:
 
@@ -20,7 +21,7 @@ looking like:
   from where they are copied into `tests/fixtures/photometry`. Both behave the same for now.
 - 'sdsc': an `OneSdsc` instance resolves the session on the SDSC filesystem, where the data
   already sits, and the two collections are copied straight from there into
-  `/mnt/ibl/integration`. Dataset UUIDs are stripped from the filenames on the way.
+  `/mnt/ibl/integration/photometry`. Dataset UUIDs are stripped from the filenames on the way.
 
 `INTEGRATION_DATA_DIR` plays no part in the staging - it is what the integration tests read to
 find the root, set by the CI workflow for the Lightning job and by the local .env file for a run
@@ -51,12 +52,14 @@ LOCATIONS = ('local', 'server', 'sdsc')
 
 SESSIONS_FOR_TESTS_FILE = Path(__file__).parents[2] / 'tests' / 'fixtures' / 'sessions_for_tests.yaml'
 
-# where the sessions are staged for the 'local' and 'server' locations. A folder of its own,
-# kept out of version control, so the staged raw data stays separate from the fixtures next to it
-DEFAULT_DESTINATION_ROOT = SESSIONS_FOR_TESTS_FILE.parent / 'photometry'
+# the integration data roots. Locally that is next to the fixtures, on SDSC the shared
+# integration folder on the filesystem
+LOCAL_DATA_ROOT = SESSIONS_FOR_TESTS_FILE.parent
+SDSC_DATA_ROOT = Path('/mnt/ibl/integration')
 
-# on SDSC the integration data has its own place on the shared filesystem
-SDSC_DESTINATION_ROOT = Path('/mnt/ibl/integration')
+# the sessions are staged one level below the data root, so that a root shared with other IBL
+# repositories keeps one folder per data type. Locally this folder is kept out of version control
+PHOTOMETRY_FOLDER = 'photometry'
 
 
 def load_sessions_for_tests() -> list[dict]:
@@ -95,8 +98,8 @@ def get_one(location: str) -> ONE:
 def get_destination_root(location: str = 'local', dry: bool = False) -> Path:
     """Return the fixture root and make sure it is a valid ibllib integration data root.
 
-    The root follows from the location: the shared integration folder on SDSC, the folder next
-    to the fixtures everywhere else.
+    The data root follows from the location: the shared integration folder on SDSC, the folder
+    next to the fixtures everywhere else. The sessions go into `PHOTOMETRY_FOLDER` below it.
 
     Parameters
     ----------
@@ -108,9 +111,10 @@ def get_destination_root(location: str = 'local', dry: bool = False) -> Path:
     Returns
     -------
     Path
-        The folder the sessions are staged into.
+        The folder the sessions are staged into, as `<data root>/<PHOTOMETRY_FOLDER>`.
     """
-    destination_root = SDSC_DESTINATION_ROOT if location == 'sdsc' else DEFAULT_DESTINATION_ROOT
+    data_root = SDSC_DATA_ROOT if location == 'sdsc' else LOCAL_DATA_ROOT
+    destination_root = data_root / PHOTOMETRY_FOLDER
     _logger.info(f'staging into {destination_root}')
 
     # ibllib's IntegrationTest validates a data root by the presence of this folder
