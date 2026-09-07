@@ -14,7 +14,7 @@ looking like:
     └── ZFM-08554/2025-02-26/001/
         └── ...
 
-`LOCATION` selects where the data is taken from:
+`--location` selects where the data is taken from:
 
 - 'local' or 'server': a regular ONE instance downloads the two collections into the ONE cache,
   from where they are copied into the fixture root. Both behave the same for now.
@@ -25,8 +25,13 @@ looking like:
 Either way only the raw photometry collection and the raw task collection are staged, both
 looked up in the session's experiment description, along with the description file itself. Each
 file is reported as copied or skipped, and any dataset that could not be downloaded is named.
+
+`--dry` reports what would be copied without writing anything to the fixture root. Note that in
+'local' and 'server' mode the datasets are still downloaded into the ONE cache, as that is where
+the copy reads from - only the writes to the fixture root are suppressed.
 """
 
+import argparse
 import logging
 import os
 import shutil
@@ -39,7 +44,7 @@ from one.api import ONE
 
 _logger = logging.getLogger(__name__)
 
-LOCATION = 'local'  # one of 'local', 'server', 'sdsc'
+LOCATIONS = ('local', 'server', 'sdsc')
 
 SESSIONS_FOR_TESTS_FILE = Path(__file__).parents[2] / 'tests' / 'fixtures' / 'sessions_for_tests.yaml'
 
@@ -60,15 +65,20 @@ def load_sessions_for_tests() -> list[dict]:
         return yaml.safe_load(file_handle)
 
 
-def get_one() -> ONE:
-    """Instantiate the ONE flavour matching `LOCATION`.
+def get_one(location: str) -> ONE:
+    """Instantiate the ONE flavour matching the location.
+
+    Parameters
+    ----------
+    location : str
+        Where the data is taken from, one of `LOCATIONS`.
 
     Returns
     -------
     ONE
         A regular ONE instance, or an `OneSdsc` instance when running on SDSC.
     """
-    if LOCATION == 'sdsc':
+    if location == 'sdsc':
         # only available on the SDSC infrastructure
         from deploy.iblsdsc import OneSdsc
 
@@ -76,8 +86,13 @@ def get_one() -> ONE:
     return ONE()
 
 
-def get_destination_root() -> Path:
+def get_destination_root(dry: bool = False) -> Path:
     """Return the fixture root and make sure it is a valid ibllib integration data root.
+
+    Parameters
+    ----------
+    dry : bool, optional
+        If True, report what would be done without writing anything, by default False.
 
     Returns
     -------
@@ -89,7 +104,8 @@ def get_destination_root() -> Path:
     _logger.info(f'staging into {destination_root}')
 
     # ibllib's IntegrationTest validates a data root by the presence of this folder
-    destination_root.joinpath('Subjects_init').mkdir(parents=True, exist_ok=True)
+    if not dry:
+        destination_root.joinpath('Subjects_init').mkdir(parents=True, exist_ok=True)
     return destination_root
 
 
@@ -181,7 +197,7 @@ def gather_sdsc_files(eid: str, one: ONE) -> list[ALFPath]:
     return files
 
 
-def copy_to_fixture_root(files: list[ALFPath], destination_root: Path, location: str) -> None:
+def copy_to_fixture_root(files: list[ALFPath], destination_root: Path, location: str, dry: bool = False) -> None:
     """Copy files into the fixture root, keeping the session tree intact.
 
     Every file is reported as either copied or skipped, the latter meaning it is already staged
@@ -196,6 +212,8 @@ def copy_to_fixture_root(files: list[ALFPath], destination_root: Path, location:
     location : str
         Where the files come from. On SDSC the dataset UUID is part of the filename and is
         stripped on the way.
+    dry : bool, optional
+        If True, report what would be copied without writing anything, by default False.
     """
     n_copied, n_skipped = 0, 0
     for source_file in files:
@@ -203,7 +221,8 @@ def copy_to_fixture_root(files: list[ALFPath], destination_root: Path, location:
         target_file = ALFPath(destination_root / source_file.session_path_short() / source_file.relative_to_session())
         if location == 'sdsc':
             target_file = target_file.without_uuid()
-        target_file.parent.mkdir(parents=True, exist_ok=True)
+        if not dry:
+            target_file.parent.mkdir(parents=True, exist_ok=True)
 
         # an existing target is only kept when it still matches its source, so a partially
         # written or outdated fixture is repaired by re-running this script
@@ -211,11 +230,16 @@ def copy_to_fixture_root(files: list[ALFPath], destination_root: Path, location:
             _logger.info(f'  skipped (unchanged): {target_file.relative_to_session()}')
             n_skipped += 1
             continue
-        shutil.copy2(source_file, target_file)
-        _logger.info(f'  copied: {target_file.relative_to_session()}')
-        n_copied += 1
+        if not dry:
+            shutil.copy2(source_file, target_file)
+            _logger.info(f'  copied: {target_file.relative_to_session()}')
+            n_copied += 1
+        else:
+            _logger.info(f'  would copy: {source_file} to: {target_file}')
+            # n_copied += 1
 
-    _logger.info(f'{n_copied} files copied, {n_skipped} unchanged')
+    if not dry:
+        _logger.info(f'{n_copied} files copied, {n_skipped} unchanged')
 
 
 def is_up_to_date(source_file: Path, target_file: Path) -> bool:
@@ -240,21 +264,54 @@ def is_up_to_date(source_file: Path, target_file: Path) -> bool:
     return source_stat.st_size == target_stat.st_size and source_stat.st_mtime == target_stat.st_mtime
 
 
-def main() -> None:
-    """Stage every session declared in the sessions file into the fixture root."""
-    destination_root = get_destination_root()
-    one = get_one()
+def parse_args() -> argparse.Namespace:
+    """Parse the command line arguments.
+
+    Returns
+    -------
+    argparse.Namespace
+        The parsed 'location' and 'dry' arguments.
+    """
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(
+        '--location',
+        choices=LOCATIONS,
+        default='local',
+        help="where the data is taken from ('local' and 'server' download, 'sdsc' reads the filesystem)",
+    )
+    parser.add_argument(
+        '--dry',
+        action='store_true',
+        help='report what would be copied without writing anything to the fixture root',
+    )
+    return parser.parse_args()
+
+
+def main(location: str = 'local', dry: bool = False) -> None:
+    """Stage every session declared in the sessions file into the fixture root.
+
+    Parameters
+    ----------
+    location : str, optional
+        Where the data is taken from, one of `LOCATIONS`, by default 'local'.
+    dry : bool, optional
+        If True, report what would be copied without writing anything, by default False.
+    """
+    if dry:
+        _logger.info('dry run: nothing will be written to the fixture root')
+    destination_root = get_destination_root(dry=dry)
+    one = get_one(location)
 
     failed_sessions = []
     for session in load_sessions_for_tests():
         eid, session_path = session['eid'], session['session_path']
-        _logger.info(f'staging {session_path} ({session["comment"]}) from {LOCATION}')
+        _logger.info(f'staging {session_path} ({session["comment"]}) from {location}')
         try:
-            if LOCATION == 'sdsc':
+            if location == 'sdsc':
                 files = gather_sdsc_files(eid, one)
             else:
                 files = gather_downloaded_files(eid, one)
-            copy_to_fixture_root(files, destination_root, LOCATION)
+            copy_to_fixture_root(files, destination_root, location, dry=dry)
         except Exception as exception:  # noqa: BLE001 - staging must survive any single session
             # the remaining sessions are staged regardless, so one broken session does not
             # leave the fixture root in a half updated state
@@ -269,4 +326,5 @@ def main() -> None:
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    main()
+    args = parse_args()
+    main(location=args.location, dry=args.dry)
