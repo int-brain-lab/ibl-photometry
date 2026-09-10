@@ -2,6 +2,11 @@ name: Integration Tests (Lightning)
 
 on:
   workflow_dispatch:  # For manual triggering
+  # Coveralls needs a build on the default branch to serve a badge and to diff pull requests
+  # against, and this workflow is the only leg that measures coverage, so every merge to main
+  # has to dispatch a run of its own.
+  push:
+    branches: [main]
   # Every change to a pull request that is in review dispatches a job: 'ready_for_review' fires
   # on the draft -> ready conversion, 'synchronize' on every further push to it, and 'opened' /
   # 'reopened' cover pull requests that were never drafts. Drafts are excluded by the job's `if`.
@@ -14,8 +19,9 @@ on:
 jobs:
   dispatch-tests:
     name: "py${{ matrix.python_version }}"
-    # the event types above can still fire for drafts, so the state is checked directly
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false
+    # the pull_request types above can still fire for drafts, so the state is checked directly;
+    # push and workflow_dispatch carry no pull request and always run
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 150
     strategy:
@@ -80,7 +86,9 @@ jobs:
   finalize-coveralls:
     name: Finalize Coveralls parallel build
     needs: dispatch-tests
-    if: always()
+    # 'always()' so a failing test leg still gets its partial reports merged, but a skipped leg
+    # (draft pull request) has uploaded nothing, and finishing a build that does not exist fails
+    if: always() && needs.dispatch-tests.result != 'skipped'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-python@v5
