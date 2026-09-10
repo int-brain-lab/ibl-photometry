@@ -168,6 +168,47 @@ def extract_timestamps_from_bpod_jsonable(file_jsonable: str | Path, sync_states
     return timestamps
 
 
+def infer_sync_mode(session_path: str | Path) -> str:
+    """infer whether the photometry of a session was synced via the bpod or via the DAQ.
+
+    Recent sessions state the sync mode in their experiment description. For older ones it is
+    inferred from the raw photometry data, as only DAQ based sessions record a tdms file.
+
+    Parameters
+    ----------
+    session_path : str | Path
+        path to the session
+
+    Returns
+    -------
+    str
+        'bpod' or 'daqami'
+    """
+    session_path = Path(session_path)
+    session_params = ibllib_session_params.read_params(session_path)
+    if session_params is None:
+        raise FileNotFoundError(f'no experiment description file found for session {session_path}')
+    if len(session_params) == 0:
+        raise ValueError(f'empty experiment description file for session {session_path}')
+
+    if 'neurophotometrics' in session_params.get('devices', {}):
+        neurophotometrics_params = session_params['devices']['neurophotometrics']
+    else:
+        _logger.warning(f'no neurophotometrics entry in the experiment description of {session_path}')
+        neurophotometrics_params = {}
+    photometry_collection = neurophotometrics_params.get('collection', 'raw_photometry_data')
+
+    sync_mode = neurophotometrics_params.get('sync_mode')
+    if sync_mode is not None:
+        return sync_mode
+
+    # the tdms file is written by the daqami software and only exists for DAQ based syncing
+    if any(session_path.joinpath(photometry_collection).glob('*_mcc_DAQdata.raw.tdms')):
+        return 'daqami'
+    _logger.warning(f'no sync mode in the experiment description of {session_path}, defaulting to bpod')
+    return 'bpod'
+
+
 class FibrePhotometryBaseSync(base_tasks.DynamicTask):
     # base clas for syncing fibre photometry
     # derived classes are: FibrePhotometryBpodSync and FibrePhotometryDAQSync
@@ -211,9 +252,11 @@ class FibrePhotometryBaseSync(base_tasks.DynamicTask):
         else:
             self.sync_states_names = sync_states_names
 
-        # configuring the sync: channel
+        # configuring the sync: channel. Note that this value is only used as a fallback
+        # and for verification - the channel that is actually used is inferred from the data
         if sync_channel is None:
-            self.sync_channel = kwargs.get('sync_channel', self.session_params['devices']['neurophotometrics']['sync_channel'])
+            neurophotometrics_params = self.session_params['devices']['neurophotometrics']
+            self.sync_channel = kwargs.get('sync_channel', neurophotometrics_params.get('sync_channel'))
         else:
             self.sync_channel = sync_channel
 
@@ -230,16 +273,105 @@ class FibrePhotometryBaseSync(base_tasks.DynamicTask):
         return [bpod_data[0]['Trial start timestamp'] - 2, bpod_data[-1]['Trial end timestamp'] + 2]
 
     @abstractmethod
-    def _get_neurophotometrics_timestamps(self) -> np.ndarray:
-        # this function needs to be implemented in the derived classes:
-        # for bpod based syncing, the timestamps are in the digial inputs file
-        # for daq based syncing, the timestamps are extracted from the tdms file
+    def _get_neurophotometrics_timestamps(self, sync_channel: int | None = None) -> np.ndarray:
+        """the timestamps of the rising edges of the sync signal, in the time of the
+        neurophotometrics system. Needs to be implemented in the derived classes:
+        for bpod based syncing, the timestamps are in the digital inputs file,
+        for daq based syncing, the timestamps are extracted from the tdms file.
+
+        Parameters
+        ----------
+        sync_channel : int | None, optional
+            the digital channel to read the timestamps from, by default None, in
+            which case self.sync_channel is used
+
+        Returns
+        -------
+        np.ndarray
+            the timestamps of the rising edges
+        """
         ...
+
+    @abstractmethod
+    def _get_candidate_sync_channels(self) -> list[int]:
+        """the digital channels that are present in the recording and could carry the
+        bpod sync signal. Needs to be implemented in the derived classes.
+
+        Returns
+        -------
+        list[int]
+            the candidate channel indices
+        """
+        ...
+
+    def infer_sync_channel(self, timestamps_bpod: np.ndarray) -> int:
+        """infer which digital channel carries the bpod sync signal by attempting to
+        sync each candidate channel to the bpod timestamps.
+
+        Parameters
+        ----------
+        timestamps_bpod : np.ndarray
+            the sync timestamps in bpod time
+
+        Returns
+        -------
+        int
+            the index of the channel that matches the bpod timestamps
+
+        Raises
+        ------
+        ValueError
+            if no channel or more than one channel matches
+        """
+        matched_channels = []
+        for sync_channel in self._get_candidate_sync_channels():
+            try:
+                timestamps_nph = self._get_neurophotometrics_timestamps(sync_channel)
+                _sync_fcn, _drift_ppm, _ix_nph, ix_bpod = ibldsp.utils.sync_timestamps(
+                    timestamps_nph, timestamps_bpod, return_indices=True, linear=True
+                )
+            except (ValueError, KeyError):
+                # channel is absent or does not contain a syncable signal
+                continue
+            if ix_bpod.shape[0] / timestamps_bpod.shape[0] > 0.95:
+                matched_channels.append(int(sync_channel))
+
+        match len(matched_channels):
+            case 0:
+                raise ValueError("can't infer sync channel: no matching channel found")
+            case 1:
+                return matched_channels[0]
+            case _:
+                raise ValueError(f"can't infer sync channel: {len(matched_channels)} channels matched")
+
+    def _resolve_sync_channel(self, timestamps_bpod: np.ndarray) -> int:
+        """determine the sync channel to be used. Fully relies on the inference, but
+        warns if the inferred channel differs from the one stated in the experiment
+        description file.
+
+        Parameters
+        ----------
+        timestamps_bpod : np.ndarray
+            the sync timestamps in bpod time
+
+        Returns
+        -------
+        int
+            the index of the sync channel
+        """
+        sync_channel_inferred = self.infer_sync_channel(timestamps_bpod)
+        if self.sync_channel is not None and int(self.sync_channel) != sync_channel_inferred:
+            _logger.warning(
+                f'inferred sync channel {sync_channel_inferred} != sync channel from '
+                f'experiment description file: {self.sync_channel} - using inferred'
+            )
+        return sync_channel_inferred
 
     def _get_sync_function(self) -> tuple[callable, list]:
         # returns the synchronization function
         # get the timestamps
         timestamps_bpod = self._get_bpod_timestamps()
+        self.sync_channel = self._resolve_sync_channel(timestamps_bpod)
         timestamps_nph = self._get_neurophotometrics_timestamps()
 
         # verify presence of sync timestamps
@@ -326,6 +458,7 @@ class FibrePhotometryBpodSync(FibrePhotometryBaseSync):
     ):
         super().__init__(*args, **kwargs)
         self.timestamps_colname = timestamps_colname
+        self._digital_inputs_df = None
 
     @property
     def signature(self):
@@ -343,21 +476,42 @@ class FibrePhotometryBpodSync(FibrePhotometryBaseSync):
         }
         return signature
 
-    def _get_neurophotometrics_timestamps(self) -> np.ndarray:
+    def _read_digital_inputs(self) -> pd.DataFrame:
+        """read (and cache) the digital inputs file
+
+        Returns
+        -------
+        pd.DataFrame
+            the digital inputs, with the columns times, polarity and channel
+        """
+        if self._digital_inputs_df is None:
+            raw_photometry_folder = self.session_path / self.photometry_collection
+            digital_inputs_filepath = raw_photometry_folder / '_neurophotometrics_fpData.digitalInputs.pqt'
+            # note: for the old file versions the channel is not stored in the file and
+            # is set from the value passed here
+            self._digital_inputs_df = fpio.read_digital_inputs_file(
+                digital_inputs_filepath, channel=self.sync_channel, timestamps_colname=self.timestamps_colname
+            )
+        return self._digital_inputs_df
+
+    def _get_neurophotometrics_timestamps(self, sync_channel: int | None = None) -> np.ndarray:
         # for bpod based syncing, the timestamps for syncing are in the digital inputs file
-        raw_photometry_folder = self.session_path / self.photometry_collection
-        digital_inputs_filepath = raw_photometry_folder / '_neurophotometrics_fpData.digitalInputs.pqt'
-        digital_inputs_df = fpio.read_digital_inputs_file(
-            digital_inputs_filepath, channel=self.sync_channel, timestamps_colname=self.timestamps_colname
-        )
+        sync_channel = self.sync_channel if sync_channel is None else sync_channel
+        digital_inputs_df = self._read_digital_inputs()
 
         # get the positive fronts
-        timestamps_nph = digital_inputs_df.groupby(['polarity', 'channel']).get_group((1, self.sync_channel))['times'].values
+        timestamps_nph = digital_inputs_df.groupby(['polarity', 'channel']).get_group((1, sync_channel))['times'].values
 
         # TODO replace this rudimentary spacer removal
         # to implement: detect spacer / remove spacer methods
         # timestamps_nph = timestamps_nph[15:]
         return timestamps_nph
+
+    def _get_candidate_sync_channels(self) -> list[int]:
+        # the channels that are present in the digital inputs file. Note that for the
+        # old file versions this is only the channel that was passed on loading
+        digital_inputs_df = self._read_digital_inputs()
+        return sorted(int(channel) for channel in digital_inputs_df['channel'].unique())
 
 
 class FibrePhotometryDAQSync(FibrePhotometryBaseSync):
@@ -384,8 +538,6 @@ class FibrePhotometryDAQSync(FibrePhotometryBaseSync):
             self.frameclock_channel_name = f'AI{frameclock_channel}'
         else:
             self.frameclock_channel_name = frameclock_channel
-
-        self.sync_channel = self.sync_channel or self.session_params['devices']['neurophotometrics']['sync_channel']
 
         # whether or not to reextract from tdms or attempt to load from .pkl
         self.load_timestamps = load_timestamps
@@ -421,10 +573,6 @@ class FibrePhotometryDAQSync(FibrePhotometryBaseSync):
         else:  # extract timestamps:
             tdms_filepath = self.session_path / self.photometry_collection / '_mcc_DAQdata.raw.tdms'
             self.timestamps = extract_timestamps_from_tdms_file(tdms_filepath, save_path=timestamps_filepath)
-
-        # verify that those timestamps
-        _timestamps_bpod = self._get_bpod_timestamps()
-        assert self.sync_channel == self.infer_sync_channel(self.timestamps, _timestamps_bpod)
 
         # timestamps of the frameclock in DAQ time
         frame_timestamps = self.timestamps[self.frameclock_channel_name]['positive']
@@ -484,38 +632,20 @@ class FibrePhotometryDAQSync(FibrePhotometryBaseSync):
 
         return photometry_df
 
-    def _get_neurophotometrics_timestamps(self) -> np.ndarray:
-        # get the sync channel and the corresponding timestamps
-        timestamps_nph = self.timestamps[f'DI{self.sync_channel}']['positive']
+    def _get_neurophotometrics_timestamps(self, sync_channel: int | None = None) -> np.ndarray:
+        # for daq based syncing, the timestamps are in the digital channels of the tdms file
+        sync_channel = self.sync_channel if sync_channel is None else sync_channel
+        timestamps_nph = self.timestamps[f'DI{sync_channel}']['positive']
 
         # TODO replace this rudimentary spacer removal
         # to implement: detect spacer / remove spacer methods
         # timestamps_nph = timestamps_nph[15: ]
         return timestamps_nph
 
-    def infer_sync_channel(self, timestamps_daq, timestamps_bpod, return_index=True):
-        matched_channels = []
-        for i, ch in enumerate(['DI0', 'DI1', 'DI2', 'DI3']):
-            timestamps_daq_ch = timestamps_daq[ch]['positive']
-            try:
-                _sync_fcn, _drift_ppm, _ix_daq, ix_bpod = ibldsp.utils.sync_timestamps(
-                    timestamps_daq_ch, timestamps_bpod, return_indices=True, linear=True
-                )
-                if ix_bpod.shape[0] / timestamps_bpod.shape[0] > 0.95:
-                    matched_channels.append({'index': i, 'name': ch})
-            except ValueError:
-                continue
-
-        match len(matched_channels):
-            case 0:
-                raise ValueError("can't infer sync channel: no matching channel found")
-            case 1:
-                if return_index:
-                    return int(matched_channels[0]['name'][-1])
-                else:
-                    return matched_channels[0]['name']
-            case _:
-                raise ValueError(f"can't infer sync channel: {len(matched_channels)} channels matched")
+    def _get_candidate_sync_channels(self) -> list[int]:
+        # all digital channels extracted from the tdms file, except the one carrying the frameclock
+        digital_channel_names = [name for name in self.timestamps if name.startswith('DI')]
+        return sorted(int(name[2:]) for name in digital_channel_names if name != self.frameclock_channel_name)
 
 
 class FibrePhotometryPassiveChoiceWorld(base_tasks.BehaviourTask):

@@ -1,0 +1,30 @@
+# The real sessions the integration tests run against.
+#
+# `src/scripts/update_fixtures.py` stages these into INTEGRATION_DATA_DIR, and the integration
+# tests iterate over every session listed here. Comment an entry out to take it out of both.
+
+# - eid: 0a64126d-a149-4d28-80d8-00a5ca60c681
+#   session_path: ZFM-06275/2024-01-16/001
+#   comment: version_2, "kcenia old"
+
+- eid: 288a54bc-483a-48e2-91d2-eefbb76dc43c
+  session_path: ZFM-08554/2025-02-26/001
+  comment: laura, bpod synced
+
+- eid: 34f55b3a-725e-4cc7-aed3-6e6338f573bf
+  session_path: ZFM-09044/2025-09-11/001
+  comment: laura, daq synced
+
+- eid: c7e9179c-b6e6-4fc6-a6f1-856989922f2b
+  session_path: CQ002/2024-09-18/001
+  comment: carolina, from sheet, bpod and wrong sync channel
+
+# version_1, "kcenia very old". Declares sync_mode bpod but has no digitalInputs file, which
+# bpod syncing needs for its timestamps, so the extractor cannot run on it yet
+# - eid: ba01bf35-8a0d-4ca3-a66e-b3a540b21128
+#   session_path: ZFM-03059/2021-08-27/001
+#   comment: version_1, "kcenia very old"
+
+# version_3, version_4 ("carolina") and version_5 (ZFM-08488/2025-03-05/001) have no eid
+# recorded in data/neurophotometrics/versions/version_descriptions.md yet.
+# `one.path2eid('ZFM-08488/2025-03-05/001')` resolves a session path to its eid

@@ -1,0 +1,53 @@
+# Unit tests, run on the GitHub runner itself.
+#
+# INTEGRATION_DATA_DIR is deliberately not set here, so ibllib's IntegrationTest skips every test
+# that needs real session data. Those run in integration_tests.yaml, which dispatches them to a
+# Lightning AI job with the sessions mounted. Both legs run the same discovery command.
+
+name: unit tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  # 'ready_for_review' is not one of the default types, so it is listed explicitly: the unit
+  # tests re-run alongside the integration tests when a pull request is taken out of draft
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: sync dependencies
+        run: uv sync
+      - name: ruff format
+        run: uv run ruff format --check
+      - name: ruff check
+        if: always()
+        run: uv run ruff check
+
+  unit-tests:
+    name: unit tests (${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        os: ["ubuntu-latest", "windows-latest"] #, "macos-latest"]
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: sync dependencies
+        run: uv sync
+      - name: install project
+        run: uv pip install ".[analysis]"
+      - name: run tests
+        # the integration tests skip themselves, INTEGRATION_DATA_DIR is not set on the runner
+        run: uv run python -m unittest discover -s tests -v -t . -p "test_*.py"

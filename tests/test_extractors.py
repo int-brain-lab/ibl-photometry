@@ -1,79 +1,45 @@
-import unittest
+"""Integration tests for the photometry sync tasks of `iblphotometry.tasks`.
+
+Every session declared in `fixtures/sessions_for_tests.yaml` is treated the same: the sync mode
+is inferred from the session, the matching task is built from the session's own experiment
+description and then run.
+"""
+
+from ibllib.io import session_params
+from ibllib.tests.base import TEST_DB
 from one.api import ONE
-from iblphotometry.tasks import FibrePhotometryDAQSync, FibrePhotometryBpodSync
-import os
-from one.alf.exceptions import ALFObjectNotFound
 
-# TODO integrate here integration as on other repos
-RUN_EXTRACTOR_TESTS = os.environ.get('RUN_EXTRACTOR_TESTS') == '1'
-# RUN_EXTRACTOR_TESTS = True
+from iblphotometry.tasks import FibrePhotometryBpodSync, FibrePhotometryDAQSync, infer_sync_mode
+from tests.base_tests import PhotometryIntegrationTestCase
+
+SYNC_TASKS = {
+    'bpod': FibrePhotometryBpodSync,
+    'daqami': FibrePhotometryDAQSync,
+}
 
 
-class PhotometryExtractorTest(unittest.TestCase):
-    def setUp(self):
-        self.daq_eids = [
-            '34f55b3a-725e-4cc7-aed3-6e6338f573bf',  # Laura
-            'b3b87ca9-2075-474b-b925-9fc824de85a5',  # Carolina
-        ]
+class TestPhotometryExtractors(PhotometryIntegrationTestCase):
+    def test_extractors(self):
+        """Run the sync task matching each session's sync mode."""
+        for session in self.sessions:
+            with self.subTest(session=session['session_path'], comment=session['comment']):
+                session_path = self.get_session_path(session)
+                sync_mode = infer_sync_mode(session_path)
+                task_class = SYNC_TASKS[sync_mode]
 
-        self.bpod_eids = [
-            'ba01bf35-8a0d-4ca3-a66e-b3a540b21128',
-            '7c67fbd4-18c1-42f2-b989-8cbfde0d2374',
-            'b1e38acd-f65f-4395-ae4f-8fee34ca40c9',
-        ]
+                # the task is configured by the session's own photometry device parameters
+                neurophotometrics_params = (
+                    session_params.read_params(session_path).get('devices', {}).get('neurophotometrics', {})
+                )
+                # the one instance is passed explicitly on every task creation: ibllib's Task
+                # falls back to a production ONE() in get_data_handler when it is not given one
+                task = task_class(
+                    session_path,
+                    one=ONE(**TEST_DB),
+                    on_error='raise',
+                    **neurophotometrics_params,
+                )
 
-    def test_daq_extractor(self):
-        if not RUN_EXTRACTOR_TESTS:
-            self.skipTest(
-                'this test will download large files via ONE and is not meant to be run in a CI, set env var RUN_EXTRACTOR_TESTS=1 to enable'
-            )
-
-        self.one = ONE()
-        for eid in self.daq_eids:
-            experiment_description = self.one.load_dataset(eid, '*experiment.description')
-            session_folder = self.one.eid2path(eid)
-
-            task = FibrePhotometryDAQSync(
-                session_folder,
-                one=self.one,
-                on_error='raise',
-                **experiment_description['devices']['neurophotometrics'],
-            )
-            task.get_signatures()
-            for file, collection, _, _ in task.signature['input_files']:
-                self.one.load_dataset(eid, file, collection=collection, download_only=True)
-            assert task.assert_expected_inputs()[0]
-            task.run()
-            assert task.status == 0
-
-    def test_bpod_extractor(self):
-        if not RUN_EXTRACTOR_TESTS:
-            self.skipTest(
-                'this test will download large files via ONE and is not meant to be run in a CI, set env var RUN_EXTRACTOR_TESTS=1 to enable'
-            )
-
-        self.one = ONE()
-        for eid in self.bpod_eids:
-            experiment_description = self.one.load_dataset(eid, '*experiment.description')
-            session_folder = self.one.eid2path(eid)
-
-            task = FibrePhotometryBpodSync(
-                session_folder,
-                one=self.one,
-                on_error='raise',
-                **experiment_description['devices']['neurophotometrics'],
-            )
-            task.get_signatures()
-            for signature in task.signature['input_files']:
-                file, collection, required, _ = signature
-                try:
-                    self.one.load_dataset(eid, file, collection=collection, download_only=True)
-                except ALFObjectNotFound:
-                    if required:
-                        raise
-                    else:
-                        print(f'optional file {file} not found, skipping')
-
-            assert task.assert_expected_inputs()[0]
-            task.run()
-            assert task.status == 0
+                task.get_signatures()
+                self.assertTrue(task.assert_expected_inputs()[0], f'missing inputs for {sync_mode} task')
+                self.assertEqual(0, task.run(), task.log)
