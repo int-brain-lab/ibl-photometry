@@ -119,11 +119,15 @@ def from_photometry_df(
     for channel in channel_names:
         # get the data for the band
         df = photometry_df.groupby('name').get_group(channel)
+        # Select on the acquisition channel names, which are unique, and rename
+        # after. Renaming first and selecting on the result returns one column
+        # per (channel x matching name) pair, so two fibers a locations file
+        # gives the same brain region come back as four columns rather than two.
+        df = df.set_index('times')[data_columns]
         # if rename dict is passed, rename Region0X to the corresponding brain region
         if rename is not None:
             df = df.rename(columns=rename)
-            data_columns = rename.values()
-        signal_dfs[channel] = df.set_index('times')[data_columns]
+        signal_dfs[channel] = df
 
     return signal_dfs
 
@@ -148,7 +152,7 @@ def from_photometry_pqt(
 
     if locations_pqt_path is not None:
         locations_df = pd.read_parquet(locations_pqt_path)
-        data_columns = (list(locations_df.index),)
+        data_columns = list(locations_df.index)
         rename = locations_df['brain_region'].to_dict()
     else:
         # warnings.warn('loading a photometry.signal.pqt file without its corresponding photometryROI.locations.pqt')
