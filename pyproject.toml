@@ -25,8 +25,7 @@ dependencies = [
     "pandera[pandas] >= 0.24.0",
     "pywavelets",
     "matplotlib",
-    "ibllib @ git+https://github.com/int-brain-lab/ibllib.git@ci",
-    "iblscripts @ git+https://github.com/int-brain-lab/iblscripts",
+    "ibllib >= 3.4.0",
     "ONE-api>=3.3.0",
 ]
 

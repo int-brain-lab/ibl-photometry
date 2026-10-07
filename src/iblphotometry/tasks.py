@@ -24,6 +24,7 @@ from iblphotometry import qc
 from one.alf.spec import QC as QC_status
 from iblphotometry.metrics import n_unique_samples, n_edges
 
+from collections import OrderedDict
 
 _logger = logging.getLogger('ibllib')
 
@@ -993,3 +994,42 @@ class FibrePhotometryQC(base_tasks.Task):
     def _run(self):
         self.qc.load_data()
         self.qc.run(dry=self.dry)
+
+
+def get_photometry_tasks(acquisition_description, **kwargs):
+    """acquisition description and experiment description - study discrepancy"""
+    devices = acquisition_description.get('devices', {})
+    photometry_tasks = OrderedDict()
+
+    task_protocols = acquisition_description['tasks']
+    sync_mode = devices['neurophotometrics']['sync_mode']
+
+    for protocol in task_protocols:
+        # syncing / extraction
+        match sync_mode:
+            case 'bpod':
+                # for synchronization with the BNC inputs of the neurophotometrics receiving the sync pulses
+                # from the individual bpods
+                photometry_tasks['FibrePhotometryBpodSync'] = type('FibrePhotometryBpodSync', (FibrePhotometryBpodSync,), {})(
+                    **kwargs,
+                )
+            case 'daqami':
+                # for synchronization with the DAQami receiving the sync pulses from the individual bpods
+                # as well as the frame clock from the FP3002
+                if 'passive' in next(iter(protocol.keys())):  # in protocol name
+                    photometry_tasks['FibrePhotometryPassiveChoiceWorld'] = type(
+                        'FibrePhotometryPassiveChoiceWorld', (FibrePhotometryPassiveChoiceWorld,), {}
+                    )(**kwargs)
+                else:
+                    photometry_tasks['FibrePhotometryDAQSync'] = type('FibrePhotometryDAQSync', (FibrePhotometryDAQSync,), {})(
+                        **kwargs,
+                    )
+            case _:
+                raise ValueError('unknown sync mode')
+
+    # QC
+    # tasks['FibrePhotometryQC'] = type('FibrePhotometryQC', (FibrePhotometryQC,), {})(
+    #     **kwargs, parents=[tasks['FibrePhotometryDAQSync']]  # conditional parents?
+    # )
+
+    return photometry_tasks
