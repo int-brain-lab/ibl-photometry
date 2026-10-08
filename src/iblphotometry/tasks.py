@@ -15,7 +15,7 @@ from abc import abstractmethod
 import iblphotometry
 from iblphotometry import fpio
 
-from one.api import ONE
+from one.api import ONE, One
 import json
 from scipy.optimize import minimize
 
@@ -656,15 +656,32 @@ class FibrePhotometryPassiveChoiceWorld(base_tasks.BehaviourTask):
     def __init__(
         self,
         session_path: str | Path,
-        one: ONE,
+        one: One | None = None,
         load_timestamps: bool = True,
+        task_collection: str | None = None,
+        task_protocol: str | None = None,
         **kwargs,
     ):
+        one = ONE() if one is None else one
         super().__init__(session_path, one=one, **kwargs)
         self.photometry_collection = kwargs.get('collection', 'raw_photometry_data')
+
+        self.task_protocol = task_protocol
+        self.task_collection = task_collection
+
+        if self.task_protocol is None:
+            # we will work with the first protocol here
+            for task in self.session_params['tasks']:
+                self.task_protocol = next(k for k in task)
+                break
+
+        if self.task_collection is None:
+            # if not provided, infer
+            self.task_collection = ibllib_session_params.get_task_collection(self.session_params, self.task_protocol)
+
         self.kwargs = kwargs
         self.load_timestamps = load_timestamps
-        assert self.session_params['neurophotometrics']['sync_mode'] == 'daqami', (
+        assert self.session_params['devices']['neurophotometrics']['sync_mode'] == 'daqami', (
             'passive protocol syncing only supported for DAQ based syncing'
         )
 
@@ -674,14 +691,14 @@ class FibrePhotometryPassiveChoiceWorld(base_tasks.BehaviourTask):
             'input_files': [
                 ('_neurophotometrics_fpData.raw.pqt', self.photometry_collection, True, True),
                 ('_mcc_DAQdata.raw.tdms', self.photometry_collection, True, True),
-                ('_iblrig_taskData.raw.jsonable', self.task_collection, True, True),
+                # ('_iblrig_taskData.raw.jsonable', self.task_collection, True, True),
                 ('_iblrig_taskSettings.raw.json', self.task_collection, True, True),
                 ('_iblmic_audioOnsetGoCue.times_mic', self.task_collection, True, True),
             ],
             'output_files': [
                 ('photometry.signal.pqt', 'alf/photometry', True),
                 ('photometryROI.locations.pqt', 'alf/photometry', True),
-                ('_ibl_passiveStims.table.pqt', 'alf' / self.collection, True),
+                ('_ibl_passiveStims.table.pqt', f'alf/{self.collection}', True),
             ],
         }
         return signature
@@ -1015,8 +1032,10 @@ def get_photometry_tasks(acquisition_description, **kwargs):
                 )
             case 'daqami':
                 # for synchronization with the DAQami receiving the sync pulses from the individual bpods
-                # as well as the frame clock from the FP3002
-                if 'passive' in next(iter(protocol.keys())):  # in protocol name
+                # as well as the frame clock from the FP3002\
+                protocol_name = next(iter(protocol.keys()))
+                if 'passive' in protocol_name:
+                    kwargs.update({'task_protocol': protocol_name})
                     photometry_tasks['FibrePhotometryPassiveChoiceWorld'] = type(
                         'FibrePhotometryPassiveChoiceWorld', (FibrePhotometryPassiveChoiceWorld,), {}
                     )(**kwargs)
